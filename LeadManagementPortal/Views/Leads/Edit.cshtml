@@ -1,0 +1,302 @@
+@model Lead
+@{
+    ViewData["Title"] = "Edit Lead";
+    bool isRestricted = User.IsInRole("SalesOrgAdmin") || User.IsInRole("GroupAdmin");
+}
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-pencil"></i> Edit Lead</h2>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Details
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <h5 class="mb-3"><i class="bi bi-person"></i> Contact Information</h5>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="FirstName" class="form-label">First Name *</label>
+                    <input asp-for="FirstName" class="form-control" readonly="@isRestricted" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="LastName" class="form-label">Last Name *</label>
+                    <input asp-for="LastName" class="form-control" readonly="@isRestricted" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="Email" class="form-label">Email *</label>
+                    <input asp-for="Email" type="email" class="form-control" readonly="@isRestricted" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Phone" class="form-label">Phone *</label>
+                    <input asp-for="Phone" class="form-control" readonly="@isRestricted" />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label asp-for="Company" class="form-label">Company</label>
+                    @if (User.IsInRole("OrganizationAdmin"))
+                    {
+                        <input asp-for="Company" class="form-control" />
+                    }
+                    else
+                    {
+                        <input asp-for="Company" class="form-control" readonly />
+                        <input type="hidden" asp-for="Company" />
+                        <small class="text-muted">Only Organization Admin can change the company name.</small>
+                    }
+                    <span asp-validation-for="Company" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label class="form-label">Products</label>
+                    <select name="productIds" class="form-select" multiple asp-items="ViewBag.Products" data-enhance="multiselect" disabled="@isRestricted"></select>
+                    <small class="text-muted">Click to select/unselect products. Click outside to close.</small>
+                </div>
+            </div>
+
+            <h5 class="mb-3 mt-4"><i class="bi bi-geo-alt"></i> Address Information</h5>
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label asp-for="Address" class="form-label">Address</label>
+                    <div class="position-relative">
+                        <input asp-for="Address" class="form-control" autocomplete="off" readonly="@isRestricted" />
+                        <ul id="address-suggestions" class="dropdown-menu w-100" style="max-height: 200px; overflow-y: auto;"></ul>
+                    </div>
+                    <small class="text-muted">Start typing to search addresses (powered by SmartyStreets).</small>
+                    <span asp-validation-for="Address" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label asp-for="City" class="form-label">City</label>
+                    <input asp-for="City" class="form-control" readonly="@isRestricted" />
+                    <span asp-validation-for="City" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="State" class="form-label">State</label>
+                    <input asp-for="State" class="form-control" readonly="@isRestricted" />
+                    <span asp-validation-for="State" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ZipCode" class="form-label">Zip Code</label>
+                    <input asp-for="ZipCode" class="form-control" readonly="@isRestricted" />
+                    <span asp-validation-for="ZipCode" class="text-danger"></span>
+                </div>
+            </div>
+
+            @if (User.IsInRole("OrganizationAdmin"))
+            {
+                <h5 class="mb-3 mt-4"><i class="bi bi-shield-check"></i> Admin Only Fields</h5>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label asp-for="Status" class="form-label">Status</label>
+                        <select asp-for="Status" class="form-select" asp-items="ViewBag.Statuses"></select>
+                        <span asp-validation-for="Status" class="text-danger"></span>
+                    </div>
+                </div>
+            }
+
+            <h5 class="mb-3 mt-4"><i class="bi bi-chat-left-text"></i> Additional Information</h5>
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label asp-for="Notes" class="form-label">Notes</label>
+                    <textarea asp-for="Notes" class="form-control" rows="4" readonly="@isRestricted"></textarea>
+                    <span asp-validation-for="Notes" class="text-danger"></span>
+                </div>
+            </div>
+
+            @if (User.IsInRole("OrganizationAdmin") || User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))
+            {
+                <h5 class="mb-3 mt-4"><i class="bi bi-person-badge"></i> Assignment</h5>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Sales Group</label>
+                        <select id="salesGroupId" name="SalesGroupId" class="form-select" asp-items="ViewBag.SalesGroups" 
+                            disabled="@(User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))">
+                            <option value="">-- Select Group --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Sales Org</label>
+                        <select id="salesOrgId" asp-for="SalesOrgId" class="form-select" asp-items="ViewBag.SalesOrgs"
+                            disabled="@(User.IsInRole("SalesOrgAdmin"))">
+                            <option value="">-- Select Org --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Sales Rep</label>
+                        <select id="assignedToId" name="AssignedToId" class="form-select" asp-items="ViewBag.SalesReps">
+                            <option value="">-- Select Rep --</option>
+                        </select>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" asp-for="AssignedToId" />
+                <input type="hidden" asp-for="SalesGroupId" />
+            }
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+        <script>
+                (function() {
+                        const $form = document.querySelector('form[method="post"][action*="Edit"]') || document.querySelector('form[method="post"]');
+                        if (!$form) return;
+
+                        const $addr = document.getElementById('Address');
+                        const $city = document.getElementById('City');
+                        const $state = document.getElementById('State');
+                        const $zip = document.getElementById('ZipCode');
+                        const $company = document.getElementById('Company');
+                        const $list = document.getElementById('address-suggestions');
+
+            let debounceTimer;
+
+            function debounce(fn, ms) {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(fn, ms);
+            }
+
+            async function fetchSuggestions() {
+                const search = $addr.value.trim();
+                if (!search) { 
+                    $list.innerHTML = ''; 
+                    $list.classList.remove('show');
+                    return; 
+                }
+                try {
+                    const params = new URLSearchParams({ search, city: $city.value, state: $state.value });
+                    const resp = await fetch(`/Leads/AddressAutocomplete?${params.toString()}`);
+                    const items = await resp.json();
+                    $list.innerHTML = '';
+                    
+                    if (items && items.length > 0) {
+                        items.slice(0, 10).forEach(i => {
+                            const li = document.createElement('li');
+                            const a = document.createElement('a');
+                            a.classList.add('dropdown-item');
+                            a.href = '#';
+                            const displayParts = [i.text, i.city, i.state, i.zip].filter(p => p);
+                            a.textContent = displayParts.join(', ');
+                            a.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                $addr.value = i.text;
+                                if (i.city) $city.value = i.city;
+                                if (i.state) $state.value = i.state;
+                                if (i.zip) $zip.value = i.zip;
+                                $list.classList.remove('show');
+                                validateAndFill(); // Trigger validation for full details
+                            });
+                            li.appendChild(a);
+                            $list.appendChild(li);
+                        });
+                        $list.classList.add('show');
+                    } else {
+                        $list.classList.remove('show');
+                    }
+                } catch { /* ignore */ }
+            }
+
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if ($addr && $list && !$addr.contains(e.target) && !$list.contains(e.target)) {
+                    $list.classList.remove('show');
+                }
+            });
+
+            async function validateAndFill() {
+                const street = $addr.value.trim();
+                if (!street) return;
+                try {
+                    const params = new URLSearchParams({ street, city: $city.value, state: $state.value, zip: $zip.value });
+                    const resp = await fetch(`/Leads/ValidateAddressApi?${params.toString()}`);
+                    const v = await resp.json();
+                    if (v && v.street1) {
+                        $addr.value = [v.street1, v.street2 || ''].filter(Boolean).join(' ');
+                        $city.value = v.city || $city.value;
+                        $state.value = v.state || $state.value;
+                        $zip.value = v.zip4 ? `${v.zip5}-${v.zip4}` : (v.zip5 || $zip.value);
+                    }
+                } catch { /* ignore */ }
+            }
+
+            if ($addr) {
+                $addr.addEventListener('input', () => debounce(fetchSuggestions, 250));
+                $addr.addEventListener('change', validateAndFill);
+                $addr.addEventListener('blur', validateAndFill);
+            }
+
+            const groupSelect = document.getElementById('salesGroupId');
+            const orgSelect = document.getElementById('salesOrgId');
+            const repSelect = document.getElementById('assignedToId');
+
+            if (groupSelect) {
+                groupSelect.addEventListener('change', async function() {
+                    const groupId = this.value;
+                    orgSelect.innerHTML = '<option value="">-- Select Org --</option>';
+                    repSelect.innerHTML = '<option value="">-- Select Rep --</option>';
+                    
+                    if (groupId) {
+                        const resp = await fetch(`/Leads/GetSalesOrgs?groupId=${groupId}`);
+                        const orgs = await resp.json();
+                        orgs.forEach(o => {
+                            const opt = document.createElement('option');
+                            opt.value = o.id;
+                            opt.text = o.name;
+                            orgSelect.appendChild(opt);
+                        });
+                    }
+                });
+            }
+
+            if (orgSelect) {
+                orgSelect.addEventListener('change', async function() {
+                    const orgId = this.value;
+                    repSelect.innerHTML = '<option value="">-- Select Rep --</option>';
+                    
+                    if (orgId) {
+                        const resp = await fetch(`/Leads/GetSalesReps?orgId=${orgId}`);
+                        const reps = await resp.json();
+                        reps.forEach(r => {
+                            const opt = document.createElement('option');
+                            opt.value = r.id;
+                            opt.text = r.fullName;
+                            repSelect.appendChild(opt);
+                        });
+                    }
+                });
+            }
+        })();
+    </script>
+}

@@ -1,0 +1,20 @@
+@model LeadManagementPortal.Models.SalesOrg
+@{
+    ViewData["Title"] = "Edit Sales Org";
+}
+<h2>Edit Sales Org</h2>
+<form asp-action="Edit" method="post">
+    <input type="hidden" asp-for="Id" />
+    <div class="form-group">
+        <label asp-for="Name"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label>Sales Group</label>
+        <select asp-for="SalesGroupId" class="form-control" asp-items="new SelectList((IEnumerable<LeadManagementPortal.Models.SalesGroup>)ViewBag.SalesGroups, nameof(LeadManagementPortal.Models.SalesGroup.Id), nameof(LeadManagementPortal.Models.SalesGroup.Name))"></select>
+        <span asp-validation-for="SalesGroupId" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>

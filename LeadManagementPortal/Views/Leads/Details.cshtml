@@ -1,0 +1,254 @@
+@model Lead
+@inject LeadManagementPortal.Services.ISettingsService SettingsService
+@{
+    ViewData["Title"] = "Lead Details";
+    var settings = await SettingsService.GetAsync();
+}
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-person-badge"></i> Lead Details</h2>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+        @if (Model.Status != LeadStatus.Converted)
+        {
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+        }
+        @if (User.IsInRole("SalesOrgAdmin") || User.IsInRole("OrganizationAdmin"))
+        {
+            <a asp-action="Reassign" asp-route-id="@Model.Id" class="btn btn-outline-warning">
+                <i class="bi bi-arrow-left-right"></i> Reassign Lead
+            </a>
+        }
+    </div>
+</div>
+
+<!-- Status Banner -->
+@if (Model.UrgencyLevel == "High" && !Model.IsExpired && Model.Status != LeadStatus.Converted)
+{
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>High Priority!</strong> This lead will expire in @Model.DaysRemaining days.
+    </div>
+}
+else if (Model.UrgencyLevel == "Medium" && !Model.IsExpired && Model.Status != LeadStatus.Converted)
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-circle"></i>
+        <strong>Medium Priority!</strong> This lead will expire in @Model.DaysRemaining days.
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Personal Information -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-person"></i> Personal Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-md-6">
+                        <strong>First Name:</strong>
+                        <p>@Model.FirstName</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Last Name:</strong>
+                        <p>@Model.LastName</p>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-6">
+                        <strong>Email:</strong>
+                        <p><a href="mailto:@Model.Email">@Model.Email</a></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Phone:</strong>
+                        <p><a href="tel:@Model.Phone">@Model.Phone</a></p>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-12">
+                        <strong>Company:</strong>
+                        <p>@Model.Company</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Address Information -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Address Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-md-12">
+                        <strong>Address:</strong>
+                        <p>@Model.Address</p>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-4">
+                        <strong>City:</strong>
+                        <p>@Model.City</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>State:</strong>
+                        <p>@Model.State</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Zip Code:</strong>
+                        <p>@Model.ZipCode</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Notes</h5>
+            </div>
+            <div class="card-body">
+                <p>@(string.IsNullOrEmpty(Model.Notes) ? "No notes available" : Model.Notes)</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Lead Status -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Lead Status</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>Status:</strong><br />
+                    <span class="badge bg-@(Model.Status == LeadStatus.Converted ? "success" : Model.IsExpired ? "danger" : "primary") fs-6">
+                        @Model.Status
+                    </span>
+                </p>
+                <p>
+                    <strong>Urgency Level:</strong><br />
+                    @if (Model.UrgencyLevel == "High")
+                    {
+                        <span class="badge bg-danger fs-6">High</span>
+                    }
+                    else if (Model.UrgencyLevel == "Medium")
+                    {
+                        <span class="badge bg-warning text-dark fs-6">Medium</span>
+                    }
+                    else if (Model.UrgencyLevel == "Low")
+                    {
+                        <span class="badge bg-secondary fs-6">Low</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary fs-6">None</span>
+                    }
+                </p>
+                <p>
+                    <strong>Days Remaining:</strong><br />
+                    @if (Model.Status != LeadStatus.Converted && !Model.IsExpired)
+                    {
+                        <span class="fs-4">@Model.DaysRemaining</span><text> days</text>
+                    }
+                    else
+                    {
+                        <span class="text-muted">-</span>
+                    }
+                </p>
+                <hr />
+                <p><strong>Created:</strong><br />@Model.CreatedDate.ToString("MMM dd, yyyy")</p>
+                <p><strong>Expires:</strong><br />@Model.ExpiryDate.ToString("MMM dd, yyyy")</p>
+                @if (Model.ConvertedDate.HasValue)
+                {
+                    <p><strong>Converted:</strong><br />@Model.ConvertedDate.Value.ToString("MMM dd, yyyy")</p>
+                }
+            </div>
+        </div>
+
+        <!-- Assignment Info -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Assignment</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>Sales Rep:</strong><br />
+                    @Model.AssignedTo?.FirstName @Model.AssignedTo?.LastName<br />
+                    <small class="text-muted">@Model.AssignedTo?.Email</small>
+                </p>
+                <p>
+                    <strong>Sales Org:</strong><br />
+                    @(Model.AssignedTo?.SalesOrg?.Name ?? "Not Assigned")
+                </p>
+                <p>
+                    <strong>Sales Group:</strong><br />
+                    @Model.SalesGroup?.Name
+                </p>
+                <p>
+                    <strong>Created By:</strong><br />
+                    @Model.CreatedBy?.FirstName @Model.CreatedBy?.LastName
+                </p>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
+            </div>
+            <div class="card-body">
+                @if (User.IsInRole("OrganizationAdmin") && Model.Status != LeadStatus.Converted && Model.Status != LeadStatus.Lost && !Model.IsExpired)
+                {
+                    <form asp-action="Convert" asp-route-id="@Model.Id" method="post" class="mb-2">
+                        <button type="submit" class="btn btn-success w-100" onclick="return confirm('Are you sure you want to convert this lead to a customer?')">
+                            <i class="bi bi-check-circle"></i> Convert to Customer
+                        </button>
+                    </form>
+                }
+
+                @if (User.IsInRole("OrganizationAdmin") && !Model.IsExtended && Model.Status != LeadStatus.Converted && Model.Status != LeadStatus.Lost)
+                {
+                    <form asp-action="GrantExtension" asp-route-id="@Model.Id" method="post">
+                        <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Grant a @settings.LeadExtensionDays-day extension to this lead?')">
+                            <i class="bi bi-calendar-plus"></i> Grant Extension
+                        </button>
+                    </form>
+                }
+
+                @if (Model.IsExtended)
+                {
+                    <div class="alert alert-info mt-2 mb-0">
+                        <small>
+                            <i class="bi bi-info-circle"></i> Extension granted on @Model.ExtensionGrantedDate?.ToString("MMM dd, yyyy")
+                        </small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="lead-documents" data-lead-id="@Model.Id"></div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const container = document.getElementById('lead-documents');
+            if (!container) return;
+            const leadId = container.getAttribute('data-lead-id');
+            fetch(`/LeadDocuments/List?leadId=${encodeURIComponent(leadId)}`)
+                .then(r => r.text())
+                .then(html => container.innerHTML = html)
+                .catch(() => container.innerHTML = '<div class="alert alert-warning">Could not load documents.</div>');
+        })();
+    </script>
+}

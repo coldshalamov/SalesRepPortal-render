@@ -1,0 +1,54 @@
+@model LeadManagementPortal.Controllers.DeactivateUserViewModel
+@{
+    ViewData["Title"] = "Deactivate User";
+}
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-person-x"></i> Deactivate Sales Rep</h2>
+        <p class="text-muted">Transfer all assigned leads and customers to another active user in your sales org.</p>
+    </div>
+    <div class="col-auto">
+        <a asp-action="MyOrg" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="Deactivate" method="post">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+            <input type="hidden" asp-for="UserId" />
+
+            <div class="mb-3">
+                <label class="form-label">User</label>
+                <input type="text" class="form-control" value="@Model.UserDisplay" readonly />
+                @if (!Model.IsCurrentlyActive)
+                {
+                    <small class="text-warning">This user is already inactive. Reassigning will still move data.</small>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="TransferToUserId" class="form-label">Transfer data to</label>
+                <select asp-for="TransferToUserId" class="form-select" asp-items="ViewBag.TransferTargets"></select>
+                <span asp-validation-for="TransferToUserId" class="text-danger"></span>
+            </div>
+
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                Deactivating will immediately reassign all leads (Assigned To) and customers (Sales Rep) to the selected user.
+            </div>
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a asp-action="MyOrg" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-danger" onclick="return confirm('Deactivate this user and transfer all data?')">
+                    <i class="bi bi-person-dash"></i> Deactivate and Transfer
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

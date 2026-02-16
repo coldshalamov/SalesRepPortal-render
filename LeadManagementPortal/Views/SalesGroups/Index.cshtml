@@ -1,0 +1,95 @@
+@model IEnumerable<SalesGroup>
+@{
+    ViewData["Title"] = "Sales Groups";
+    var totalGroups = Model?.Count() ?? 0;
+}
+
+<div class="row mb-4">
+    <div class="col d-flex align-items-center gap-2">
+        <h2 class="mb-0"><i class="bi bi-diagram-3"></i> Sales Groups</h2>
+        <span class="badge rounded-pill bg-secondary" title="Total sales groups">@totalGroups</span>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Sales Group
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    @if (Model != null && Model.Any())
+    {
+        @foreach (var group in Model)
+        {
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">@group.Name</h5>
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-primary">@group.SalesReps.Count members</span>
+                                <span class="badge bg-info text-dark">@group.SalesOrgs.Count orgs</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">@group.Description</p>
+                        <p class="mb-2">
+                            <strong>Group Admins:</strong><br />
+                            @{
+                                var adminsMap = ViewBag.GroupAdmins as Dictionary<string, List<ApplicationUser>>;
+                                var hasAdmins = false;
+                                if (adminsMap != null && adminsMap.ContainsKey(group.Id))
+                                {
+                                    var admins = adminsMap[group.Id];
+                                    if (admins.Any())
+                                    {
+                                        hasAdmins = true;
+                                        for (int i = 0; i < admins.Count; i++)
+                                        {
+                                            var admin = admins[i];
+                                            <span title="@admin.Email" data-bs-toggle="tooltip">@admin.FirstName @admin.LastName</span>@(i < admins.Count - 1 ? ", " : "")
+                                        }
+                                    }
+                                }
+
+                                if (!hasAdmins)
+                                {
+                                    if (group.GroupAdmin != null)
+                                    {
+                                        @group.GroupAdmin.FirstName @group.GroupAdmin.LastName
+                                        <br />
+                                        <small class="text-muted">@group.GroupAdmin.Email</small>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Not assigned</span>
+                                    }
+                                }
+                            }
+                        </p>
+                        <p class="mb-0">
+                            <small class="text-muted">Created: @group.CreatedDate.ToString("MMM dd, yyyy")</small>
+                        </p>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <a asp-action="Details" asp-route-id="@group.Id" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> View Details
+                        </a>
+                        <a asp-action="Edit" asp-route-id="@group.Id" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No sales groups found. <a asp-action="Create">Create your first sales group</a>
+            </div>
+        </div>
+    }
+</div>

@@ -1,0 +1,46 @@
+@model SystemSettings
+@{
+    ViewData["Title"] = "Settings";
+}
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-gear"></i> Settings</h2>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            <div class="mb-3">
+                <label class="form-label" asp-for="CoolingPeriodDays">Cooling Period (days)</label>
+                <input class="form-control" asp-for="CoolingPeriodDays" type="number" min="0" />
+                <small class="text-muted">Window to block duplicate companies after conversion.</small>
+                <span class="text-danger" asp-validation-for="CoolingPeriodDays"></span>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" asp-for="LeadInitialExpiryDays">Lead Initial Expiry (days)</label>
+                <input class="form-control" asp-for="LeadInitialExpiryDays" type="number" min="1" />
+                <small class="text-muted">Days given to a new lead before it expires.</small>
+                <span class="text-danger" asp-validation-for="LeadInitialExpiryDays"></span>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" asp-for="LeadExtensionDays">Lead Extension Increment (days)</label>
+                <input class="form-control" asp-for="LeadExtensionDays" type="number" min="1" />
+                <small class="text-muted">Each extension adds this many days; unlimited extensions allowed.</small>
+                <span class="text-danger" asp-validation-for="LeadExtensionDays"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check2-circle"></i> Save
+            </button>
+        </form>
+    </div>
+ </div>

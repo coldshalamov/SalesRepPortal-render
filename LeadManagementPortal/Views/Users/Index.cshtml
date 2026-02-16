@@ -1,0 +1,107 @@
+@using Microsoft.AspNetCore.Identity
+@model IEnumerable<ApplicationUser>
+@inject UserManager<ApplicationUser> UserManager
+@{
+    ViewData["Title"] = "Users";
+}
+
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-people"></i> Users</h2>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New User
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Sales Group</th>
+                        <th>Sales Org</th>
+                        <th>Created Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model != null && Model.Any())
+                    {
+                        @foreach (var user in Model)
+                        {
+                            var roles = await UserManager.GetRolesAsync(user);
+                            <tr>
+                                <td><strong>@user.FirstName @user.LastName</strong></td>
+                                <td>@user.Email</td>
+                                <td>
+                                    @if (roles.Any())
+                                    {
+                                        <span class="badge bg-info">@roles.First()</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (user.SalesGroup != null)
+                                    {
+                                        <span class="badge bg-primary">@user.SalesGroup.Name</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Not assigned</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (user.SalesOrg != null)
+                                    {
+                                        <span class="badge bg-secondary">@user.SalesOrg.Name</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Not assigned</span>
+                                    }
+                                </td>
+                                <td>@user.CreatedDate.ToString("MMM dd, yyyy")</td>
+                                <td>
+                                    @if (user.IsActive)
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    }
+                                </td>
+                                <td>
+                                    <a asp-action="Edit" asp-route-id="@user.Id" class="btn btn-sm btn-outline-primary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    @if (User.IsInRole("SalesOrgAdmin"))
+                                    {
+                                        <a asp-action="Deactivate" asp-route-id="@user.Id" class="btn btn-sm btn-outline-danger ms-1" title="Deactivate & Transfer">
+                                            <i class="bi bi-person-dash"></i>
+                                        </a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No users found.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

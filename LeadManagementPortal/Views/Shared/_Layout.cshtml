@@ -1,0 +1,164 @@
+@using Microsoft.EntityFrameworkCore
+@inject Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> UserManager
+@inject LeadManagementPortal.Data.ApplicationDbContext AppDbContext
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - DiRx</title>
+    <link rel="icon" type="image/x-icon" href="~/img/favicon.ico" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/multiselect.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-dark bg-primary mb-3">
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex align-items-center" href="@Url.Action("Index", "Dashboard")">
+                   @{
+                        // Fetch user with explicit include for SalesOrg and SalesGroup
+                        ApplicationUser? user = null;
+                        var claimsPrincipal = User;
+                        if (claimsPrincipal.Identity?.IsAuthenticated == true)
+                        {
+                            var userId = UserManager.GetUserId(claimsPrincipal);
+                            if (!string.IsNullOrEmpty(userId))
+                            {
+                                // We cannot use await directly inside a razor code block efficiently if it spans multiple lines without a function, 
+                                // but we can query directly if context is injected.
+                                // Note: This is synchronous-like access in a view, which is not ideal but solves the navigation property issue. 
+                                // Better performance would be a ViewComponent.
+                                user = AppDbContext.Users
+                                    .Include(u => u.SalesOrg)
+                                    .Include(u => u.SalesGroup)
+                                    .FirstOrDefault(u => u.Id == userId);
+                            }
+                        }
+                        var orgLogo = user?.SalesOrg?.LogoUrl;
+                        var groupLogo = user?.SalesGroup?.LogoUrl;
+                        var customLogo = !string.IsNullOrWhiteSpace(orgLogo) ? orgLogo : groupLogo;
+                    }
+                    @if (!string.IsNullOrWhiteSpace(customLogo))
+                    {
+                        <img src="@customLogo" alt="Logo" style="height:32px;" class="me-2" />
+                    }
+                    else
+                    {
+                        <img src="~/img/DiRxLogoWhite.svg" alt="Default" style="height:32px;" class="me-2" />
+                    }
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <ul class="navbar-nav flex-grow-1">
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Leads" asp-action="Index">Leads</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Customers" asp-action="Index">Customers</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Commissions" asp-action="Index">Commissions <span class="badge bg-warning text-dark ms-1">New</span></a>
+                            </li>
+                            @if (User.IsInRole("OrganizationAdmin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="SalesGroups" asp-action="Index">Sales Groups</a>
+                                </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" asp-controller="SalesOrgs" asp-action="Index">Sales Orgs</a>
+                                    </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Users" asp-action="Index">Users</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Settings" asp-action="Index">Settings</a>
+                                </li>
+                            }
+                            else if (User.IsInRole("GroupAdmin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="SalesGroups" asp-action="MyGroup">My Group</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Users" asp-action="MyGroup">My Group Users</a>
+                                </li>
+                            }
+                            else if (User.IsInRole("SalesOrgAdmin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Users" asp-action="MyOrg">My Org Users</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="SalesOrgs" asp-action="MyOrgDetails">My Org</a>
+                                </li>
+                            }
+                        </ul>
+                        <ul class="navbar-nav">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-person-circle"></i> @((await UserManager.GetUserAsync(User)) is ApplicationUser u ? (string.IsNullOrWhiteSpace(u.FullName) ? User.Identity.Name : u.FullName) : User.Identity.Name)
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword">
+                                            <i class="bi bi-key"></i> Change Password
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <form asp-controller="Account" asp-action="Logout" method="post" class="px-3">
+                                            <button type="submit" class="dropdown-item">
+                                                <i class="bi bi-box-arrow-right"></i> Logout
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container text-center">
+            &copy; @DateTime.Now.Year - DiRx
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/multiselect.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

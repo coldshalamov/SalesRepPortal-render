@@ -1,0 +1,135 @@
+@model Customer
+@{
+    ViewData["Title"] = "Customer Details";
+}
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-person-check"></i> Customer Details</h2>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Personal Information -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-person"></i> Personal Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-md-6">
+                        <strong>First Name:</strong>
+                        <p>@Model.FirstName</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Last Name:</strong>
+                        <p>@Model.LastName</p>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-6">
+                        <strong>Email:</strong>
+                        <p><a href="mailto:@Model.Email">@Model.Email</a></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Phone:</strong>
+                        <p><a href="tel:@Model.Phone">@Model.Phone</a></p>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-12">
+                        <strong>Company:</strong>
+                        <p>@Model.Company</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Address Information -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Address Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-md-12">
+                        <strong>Address:</strong>
+                        <p>@Model.Address</p>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-4">
+                        <strong>City:</strong>
+                        <p>@Model.City</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>State:</strong>
+                        <p>@Model.State</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Zip Code:</strong>
+                        <p>@Model.ZipCode</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-chat-left-text"></i> Notes</h5>
+            </div>
+            <div class="card-body">
+                <p>@(string.IsNullOrEmpty(Model.Notes) ? "No notes available" : Model.Notes)</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Conversion Info -->
+        <div class="card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Conversion Info</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>Converted By:</strong><br />
+                    @Model.ConvertedBy?.FirstName @Model.ConvertedBy?.LastName<br />
+                    <small class="text-muted">@Model.ConvertedBy?.Email</small>
+                </p>
+                <p>
+                    <strong>Sales Group:</strong><br />
+                    @Model.SalesGroup?.Name
+                </p>
+                <hr />
+                <p>
+                    <strong>Lead Created:</strong><br />
+                    @Model.LeadCreatedDate.ToString("MMM dd, yyyy")
+                </p>
+                <p>
+                    <strong>Converted:</strong><br />
+                    @Model.ConversionDate.ToString("MMM dd, yyyy")
+                </p>
+                <p>
+                    <strong>Days to Convert:</strong><br />
+                    <span class="badge bg-info fs-6">@Model.DaysToConvert days</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Success Badge -->
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <i class="bi bi-trophy text-success" style="font-size: 3rem;"></i>
+                <h5 class="mt-2 text-success">Successfully Converted!</h5>
+                <p class="text-muted mb-0">This lead is now a customer</p>
+            </div>
+        </div>
+    </div>
+</div>

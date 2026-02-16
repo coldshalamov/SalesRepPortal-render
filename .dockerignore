@@ -1,0 +1,13 @@
+.git/
+.vs/
+.local/
+
+**/bin/
+**/obj/
+**/TestResults/
+**/*.user
+**/*.suo
+**/*.log
+
+LeadManagementPortal/wwwroot/lib/
+

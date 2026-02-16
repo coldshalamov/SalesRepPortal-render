@@ -1,0 +1,39 @@
+name: Deploy to Azure Web App
+
+on:
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  PROJECT_PATH: "LeadManagementPortal/LeadManagementPortal.csproj"
+  AZURE_WEBAPP_NAME: "dirx-lead-management-prod"
+  AZURE_WEBAPP_PACKAGE_PATH: "publish"
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Build
+        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}

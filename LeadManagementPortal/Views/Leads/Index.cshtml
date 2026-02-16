@@ -1,0 +1,210 @@
+@model IEnumerable<Lead>
+@{
+    ViewData["Title"] = "Leads";
+}
+
+@functions {
+    string GetStatusBadgeClasses(Lead lead)
+    {
+        if (lead.IsExpired)
+            return "bg-danger";
+
+        switch (lead.Status)
+        {
+            case LeadStatus.New:
+                return "bg-primary";
+            case LeadStatus.Contacted:
+                return "bg-info text-dark";
+            case LeadStatus.Qualified:
+                return "bg-info text-dark";
+            case LeadStatus.Proposal:
+                return "bg-warning text-dark";
+            case LeadStatus.Negotiation:
+                return "bg-warning text-dark";
+            case LeadStatus.Converted:
+                return "bg-success";
+            case LeadStatus.Lost:
+                return "bg-secondary";
+            case LeadStatus.Expired:
+                return "bg-danger";
+            default:
+                return "bg-secondary";
+        }
+    }
+}
+
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-people"></i> Leads</h2>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Lead
+        </a>
+    </div>
+</div>
+
+<!-- Search and Filter -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form asp-action="Index" method="get" class="row g-3">
+            <div class="col-md-3">
+                <input type="text" name="searchTerm" value="@ViewBag.SearchTerm" class="form-control" placeholder="Search..." />
+            </div>
+            
+            @if (ViewBag.SalesGroups != null)
+            {
+                <div class="col-md-2">
+                    <select name="salesGroupId" class="form-select" asp-items="ViewBag.SalesGroups">
+                        <option value="">All Groups</option>
+                    </select>
+                </div>
+            }
+            
+            @if (ViewBag.SalesOrgs != null)
+            {
+                <div class="col-md-2">
+                    <select name="salesOrgId" class="form-select" asp-items="ViewBag.SalesOrgs">
+                        <option value="">All Orgs</option>
+                    </select>
+                </div>
+            }
+
+            @if (ViewBag.SalesReps != null)
+            {
+                <div class="col-md-2">
+                    <select name="salesRepId" class="form-select" asp-items="ViewBag.SalesReps">
+                        <option value="">All Reps</option>
+                    </select>
+                </div>
+            }
+
+            <div class="col-md-2">
+                <select name="statuses" class="form-select" multiple size="1" aria-label="Select statuses" data-enhance="multiselect">
+                    @foreach (LeadStatus s in Enum.GetValues(typeof(LeadStatus)))
+                    {
+                        var selectedList = ViewBag.SelectedStatuses as List<LeadStatus> ?? new List<LeadStatus>();
+                        <option value="@s" selected="@(selectedList.Contains(s))">@s</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary w-100" title="Search">
+                    <i class="bi bi-search"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Leads Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Company</th>
+                        <th>Name</th>
+                        <th>Contact</th>
+                        <th>Sales Rep</th>
+                        <th>Sales Org</th>
+                        <th>Status</th>
+                        <th>Days Left</th>
+                        <th>Urgency</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model != null && Model.Any())
+                {
+                    foreach (var lead in Model)
+                    {
+                        <tr class="@(lead.UrgencyLevel == "High" ? "table-danger" : lead.UrgencyLevel == "Medium" ? "table-warning" : "")">
+                            <td><strong>@lead.Company</strong></td>
+                            <td>@lead.FirstName @lead.LastName</td>
+                            <td>
+                                <small>
+                                    <i class="bi bi-envelope"></i> @lead.Email<br />
+                                    <i class="bi bi-telephone"></i> @lead.Phone
+                                </small>
+                            </td>
+                            <td>
+                                <small>
+                                    @if (lead.AssignedTo != null)
+                                    {
+                                        if (!string.IsNullOrWhiteSpace(lead.AssignedTo.FullName))
+                                        {
+                                            @lead.AssignedTo.FullName
+                                            if (!string.IsNullOrWhiteSpace(lead.AssignedTo.Email))
+                                            {
+                                                <br />
+                                                <span class="text-muted">@lead.AssignedTo.Email</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            @lead.AssignedTo.Email
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @("-")
+                                    }
+                                </small>
+                            </td>
+                            <td>@(lead.AssignedTo?.SalesOrg?.Name ?? "-")</td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClasses(lead)">@lead.Status</span>
+                            </td>
+                            <td>
+                                @if (lead.Status != LeadStatus.Converted && !lead.IsExpired)
+                                {
+                                    <strong>@lead.DaysRemaining</strong>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>
+                                @if (lead.UrgencyLevel == "High")
+                                {
+                                    <span class="badge bg-danger">High</span>
+                                }
+                                else if (lead.UrgencyLevel == "Medium")
+                                {
+                                    <span class="badge bg-info">Medium</span>
+                                }
+                                else if (lead.UrgencyLevel == "Low")
+                                {
+                                    <span class="badge bg-secondary">Low</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a asp-action="Details" asp-route-id="@lead.Id" class="btn btn-outline-primary" title="Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    @if (lead.Status != LeadStatus.Converted)
+                                    {
+                                        <a asp-action="Edit" asp-route-id="@lead.Id" class="btn btn-outline-secondary" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">No leads found.</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

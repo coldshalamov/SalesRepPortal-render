@@ -1,0 +1,178 @@
+@model LeadManagementPortal.Controllers.EditUserViewModel
+@{
+    ViewData["Title"] = "Edit User";
+}
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-pencil-square"></i> Edit User</h2>
+    </div>
+    <div class="col-auto">
+        @if (ViewBag.LockToGroup == true)
+        {
+            <a asp-action="MyGroup" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to List
+            </a>
+        }
+        else
+        {
+            <a asp-action="Index" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to List
+            </a>
+        }
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="Edit" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="FirstName" class="form-label">First Name *</label>
+                    <input asp-for="FirstName" class="form-control" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="LastName" class="form-label">Last Name *</label>
+                    <input asp-for="LastName" class="form-control" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label">Email *</label>
+                <input asp-for="Email" type="email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            @if (ViewBag.LockToGroup == true)
+            {
+                <input type="hidden" asp-for="Role" value="SalesRep" />
+                <div class="mb-3">
+                    <label class="form-label">Role</label>
+                    <input class="form-control" value="SalesRep" disabled />
+                </div>
+            }
+            else
+            {
+                <div class="mb-3">
+                    <label asp-for="Role" class="form-label">Role *</label>
+                    <select asp-for="Role" class="form-select" asp-items="ViewBag.Roles">
+                        <option value="">-- Select Role --</option>
+                    </select>
+                    <span asp-validation-for="Role" class="text-danger"></span>
+                </div>
+            }
+
+            <div class="mb-3">
+                <label asp-for="SalesGroupId" class="form-label">Sales Group</label>
+                <select asp-for="SalesGroupId" class="form-select" asp-items="ViewBag.SalesGroups" disabled="@(ViewBag.LockToGroup == true ? "disabled" : null)">
+                    <option value="">-- No Group --</option>
+                </select>
+                @if (ViewBag.LockToGroup == true)
+                {
+                    <input type="hidden" asp-for="SalesGroupId" />
+                    <small class="text-muted">You can only edit users in your own group.</small>
+                }
+                else
+                {
+                    <small class="text-muted">Assign user to a sales group. Required for Group Admins, Sales Org Admins, and Sales Reps.</small>
+                }
+                <span asp-validation-for="SalesGroupId" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="SalesOrgId" class="form-label">Sales Org</label>
+                <select asp-for="SalesOrgId" class="form-select" asp-items="ViewBag.SalesOrgs" disabled="@(ViewBag.LockToOrg == true ? "disabled" : null)">
+                    <option value="">-- No Org --</option>
+                </select>
+                @if (ViewBag.LockToOrg == true)
+                {
+                    <input type="hidden" asp-for="SalesOrgId" />
+                    <small class="text-muted">You can only edit users in your own org.</small>
+                }
+                else
+                {
+                    <small class="text-muted">Assign user to a sales organization within the selected group. Required for Sales Org Admins and Sales Reps.</small>
+                }
+                <span asp-validation-for="SalesOrgId" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3 form-check">
+                <input asp-for="IsActive" type="checkbox" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label">Active</label>
+                <span asp-validation-for="IsActive" class="text-danger"></span>
+            </div>
+
+            @if (ViewBag.LockToGroup != true)
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Role Descriptions:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li><strong>OrganizationAdmin:</strong> Full access to all features and data</li>
+                        <li><strong>SalesOrgAdmin:</strong> Manage sales organizations and related settings</li>
+                        <li><strong>GroupAdmin:</strong> Manage leads within their sales group</li>
+                        <li><strong>SalesRep:</strong> View and manage only their assigned leads</li>
+                    </ul>
+                </div>
+            }
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Update User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            const groupSelect = document.getElementById('SalesGroupId');
+            const orgSelect = document.getElementById('SalesOrgId');
+
+            async function loadOrgs(groupId, selectedOrgId) {
+                orgSelect.innerHTML = '';
+                const none = document.createElement('option');
+                none.value = '';
+                none.textContent = '-- No Org --';
+                orgSelect.appendChild(none);
+
+                if (!groupId) return;
+
+                try {
+                    const url = '@Url.Action("OrgsByGroup", "Users")' + '?groupId=' + encodeURIComponent(groupId);
+                    const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    if (!resp.ok) return;
+                    const data = await resp.json();
+                    data.forEach(o => {
+                        const opt = document.createElement('option');
+                        opt.value = o.id;
+                        opt.textContent = o.name;
+                        if (selectedOrgId != null && String(selectedOrgId) === String(o.id)) {
+                            opt.selected = true;
+                        }
+                        orgSelect.appendChild(opt);
+                    });
+                } catch (e) {
+                    // noop
+                }
+            }
+
+            window.addEventListener('DOMContentLoaded', function () {
+                if (!groupSelect || !orgSelect) return;
+                loadOrgs(groupSelect.value, orgSelect.value);
+                groupSelect.addEventListener('change', function () {
+                    loadOrgs(groupSelect.value, null);
+                });
+            });
+        })();
+    </script>
+}
