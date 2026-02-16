@@ -14,5 +14,3 @@ services:
         value: Data Source=/tmp/leadportal.db
       - key: LocalStorage__RootPath
         value: /tmp/uploads
-      - key: SeedDemoUsers__Enabled
-        value: "true"
