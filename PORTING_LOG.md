@@ -8,7 +8,31 @@ Purpose: track every change made in `SalesRepPortal-render`, classify whether it
 2. Port only selected files/commits to a dedicated feature branch in the work repo.
 3. Keep infrastructure changes (Render, SQLite, demo seeding) out of work PRs unless explicitly requested.
 
+## Edit Ledger Rules
+
+For every new commit in this sandbox repo, append an entry with:
+
+- Commit hash
+- Files changed
+- Why the change exists
+- Classification (`Portable`, `Portable with edits`, `Render-only`)
+- Exact port action (`Port`, `Port with edits`, `Do not port`)
+
 ## Current Commit Log
+
+### `e1422a3` - Revert "Seed demo users for each role"
+
+- Scope: `LeadManagementPortal/Data/SeedData.cs`, `render.yaml`, `RENDER.md`
+- Reason: remove demo-access seeding so sandbox does not drift into product behavior.
+- Classification: **Render-only**
+- Exact port action: **Do not port**
+
+### `da7d143` - Add explicit porting log and safety workflow
+
+- Scope: `PORTING_LOG.md`
+- Reason: establish controlled migration process.
+- Classification: **Process doc**
+- Exact port action: **Optional doc port only**
 
 ### `af9e0eb` - Fix Render SQLite initialization and fail fast on seed errors
 
@@ -23,11 +47,11 @@ Purpose: track every change made in `SalesRepPortal-render`, classify whether it
 - Classification: **Render-only**
 - Port to work repo: **No**
 
-### `d4c9be2` - Seed demo users for each role
+### `d4c9be2` - Seed demo users for each role (now reverted by `e1422a3`)
 
 - Scope: `LeadManagementPortal/Data/SeedData.cs`, `render.yaml`, `RENDER.md`
 - Classification: **Render-only by default**
-- Port to work repo: **No**, unless business explicitly wants demo-account seeding behavior.
+- Exact port action: **Do not port**
 
 ### `d117b9f` - Initial Render-ready snapshot
 
@@ -50,10 +74,4 @@ Purpose: track every change made in `SalesRepPortal-render`, classify whether it
 
 ## Working Agreement For Future Changes
 
-For every new change, this file should get a new entry:
-
-- Commit hash
-- Files changed
-- Why the change exists
-- Classification (`Portable`, `Portable with edits`, `Render-only`)
-- Porting notes
+Every commit entry must be appended on the same day it is created.
