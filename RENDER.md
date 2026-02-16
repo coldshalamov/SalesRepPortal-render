@@ -15,10 +15,19 @@ This repo includes a `Dockerfile` and `render.yaml` so you can deploy via a Rend
    - Optional: `SeedAdmin__Email` (defaults to `admin@dirxhealth.com`)
 4. Deploy, then log in at `/Account/Login`.
 
+## Demo logins (seeded)
+When `SeedDemoUsers__Enabled=true` (already set in `render.yaml`), these accounts are created on first boot:
+- Org admin: `orgadmin@demo.local`
+- Group admin: `groupadmin@demo.local`
+- Sales org admin: `salesorgadmin@demo.local`
+- Sales rep: `salesrep@demo.local`
+
+Password:
+- Set `SeedDemoUsers__Password` in Render to whatever you want, or it defaults to `Demo123`.
+
 ## Optional env vars (if you want them enabled)
 - SmartyStreets:
   - `SmartyStreets__SmartyStreetKey`
   - `SmartyStreets__Referer` (set to your Render URL)
 - Azure Blob documents (if you prefer Azure instead of local disk):
   - `AzureStorage__ConnectionString` (and optionally `AzureStorage__ContainerName`)
-
