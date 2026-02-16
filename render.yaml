@@ -2,21 +2,17 @@ services:
   - type: web
     name: salesrepportal
     env: docker
-    plan: starter
+    plan: free
     autoDeploy: false
     healthCheckPath: /
-    disk:
-      name: data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
       - key: DatabaseProvider
         value: Sqlite
       - key: ConnectionStrings__DefaultConnection
-        value: Data Source=/var/data/leadportal.db
+        value: Data Source=/tmp/leadportal.db
       - key: LocalStorage__RootPath
-        value: /var/data/uploads
+        value: /tmp/uploads
       - key: SeedDemoUsers__Enabled
         value: "true"

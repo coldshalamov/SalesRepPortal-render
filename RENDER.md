@@ -4,8 +4,8 @@ This repo includes a `Dockerfile` and `render.yaml` so you can deploy via a Rend
 
 ## What the Blueprint does
 - Deploys the ASP.NET Core app as a Docker web service.
-- Uses SQLite on a persistent disk mounted at `/var/data` (good for demos/testing; not ideal for scale).
-- Stores uploaded lead documents on the same disk (local storage).
+- Uses SQLite on ephemeral storage (resets on restarts/redeploys; fine for quick demos).
+- Stores uploaded lead documents on ephemeral storage (local storage).
 
 ## Deploy steps
 1. Create a new GitHub repo and push this folder to it.
