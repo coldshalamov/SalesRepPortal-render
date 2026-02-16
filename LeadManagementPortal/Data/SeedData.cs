@@ -17,9 +17,6 @@ namespace LeadManagementPortal.Data
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var db = serviceProvider.GetRequiredService<ApplicationDbContext>();
 
-            // Ensure database is up to date
-            await db.Database.MigrateAsync();
-
             // Create Roles
             string[] roleNames = { UserRoles.OrganizationAdmin, UserRoles.GroupAdmin, UserRoles.SalesRep, UserRoles.SalesOrgAdmin };
             foreach (var roleName in roleNames)
