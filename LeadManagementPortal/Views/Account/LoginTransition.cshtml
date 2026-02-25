@@ -56,6 +56,25 @@
             height: 100%;
             opacity: 0;
             animation: fadeIn 0.3s ease-out forwards;
+            mix-blend-mode: multiply;
+        }
+
+        .hyperspace-shockwave {
+            position: absolute;
+            inset: 0;
+            margin: auto;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+            opacity: 0;
+            transform: scale(1);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .animate-shockwave {
+            animation: shockwaveExpand 0.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards !important;
         }
 
         .logo-ring {
@@ -500,6 +519,17 @@
             }
         }
 
+        @@keyframes shockwaveExpand {
+            0% {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(40);
+            }
+        }
+
         @@media (prefers-reduced-motion: reduce) {
             *,
             *::before,
@@ -548,6 +578,7 @@
         </div>
 
         <div class="success-container" id="success-container">
+            <div class="hyperspace-shockwave" id="shockwave"></div>
             <div class="checkmark-circle">
                 <div class="checkmark" id="checkmark"></div>
             </div>
@@ -574,6 +605,7 @@
                 this.ctx = canvas.getContext("2d");
                 this.particles = [];
                 this.running = false;
+                this.isWarping = false;
                 this.resize();
                 this.init();
                 window.addEventListener("resize", () => this.resize());
@@ -587,7 +619,7 @@
             }
 
             init() {
-                const particleCount = 36;
+                const particleCount = 72;
                 for (let i = 0; i < particleCount; i++) {
                     this.particles.push(this.createParticle());
                 }
@@ -599,6 +631,8 @@
                 return {
                     x: this.centerX + Math.cos(angle) * distance,
                     y: this.centerY + Math.sin(angle) * distance,
+                    angle: angle,
+                    distance: distance,
                     radius: Math.random() * 2 + 1,
                     opacity: Math.random() * 0.5 + 0.2,
                     pulse: Math.random() * Math.PI * 2,
@@ -626,11 +660,22 @@
                     return;
                 }
 
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillStyle = "rgba(246, 249, 255, 0.25)";
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
                 this.particles.forEach((particle, index) => {
                     particle.pulse += particle.pulseSpeed;
                     const pulseFactor = Math.sin(particle.pulse) * 0.3 + 0.7;
+
+                    if (this.isWarping) {
+                        particle.distance *= 1.1;
+                        particle.radius *= 1.05;
+                    }
+
+                    const orbitSpeed = 0.0003 * (200 / Math.max(particle.distance, 1));
+                    particle.angle += orbitSpeed;
+                    particle.x = this.centerX + Math.cos(particle.angle) * particle.distance;
+                    particle.y = this.centerY + Math.sin(particle.angle) * particle.distance;
 
                     this.ctx.beginPath();
                     this.ctx.arc(particle.x, particle.y, particle.radius * pulseFactor, 0, Math.PI * 2);
@@ -640,8 +685,9 @@
                     this.particles.slice(index + 1).forEach((otherParticle) => {
                         const dx = particle.x - otherParticle.x;
                         const dy = particle.y - otherParticle.y;
-                        const distance = Math.sqrt(dx * dx + dy * dy);
-                        if (distance < 80) {
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq < 6400) {
+                            const distance = Math.sqrt(distSq);
                             this.ctx.beginPath();
                             this.ctx.moveTo(particle.x, particle.y);
                             this.ctx.lineTo(otherParticle.x, otherParticle.y);
@@ -649,14 +695,6 @@
                             this.ctx.stroke();
                         }
                     });
-
-                    const dx = particle.x - this.centerX;
-                    const dy = particle.y - this.centerY;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    const orbitSpeed = 0.0003 * (200 / distance);
-                    const angle = Math.atan2(dy, dx) + orbitSpeed;
-                    particle.x = this.centerX + Math.cos(angle) * distance;
-                    particle.y = this.centerY + Math.sin(angle) * distance;
                 });
 
                 requestAnimationFrame(() => this.animate());
@@ -799,6 +837,14 @@
                         elements.progress.style.opacity = "0";
                         elements.success.classList.add("animate-success");
                         window.setTimeout(() => elements.checkmark.classList.add("play-checkmark"), 100);
+                        
+                        if (particleSystem) {
+                            particleSystem.isWarping = true;
+                        }
+                        const shockwave = document.getElementById("shockwave");
+                        if (shockwave) {
+                            shockwave.classList.add("animate-shockwave");
+                        }
                     }
                 },
                 {
