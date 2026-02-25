@@ -106,6 +106,38 @@
             animation: stripeWaveFour 2.2s ease-in-out infinite;
         }
 
+        .stripe-5 {
+            stroke: url(#stripeYellow);
+            stroke-width: 35;
+            opacity: 0.85;
+            filter: drop-shadow(0 0 8px rgba(234, 179, 8, 0.36));
+            animation: stripeWaveOne 3.1s ease-in-out infinite;
+        }
+
+        .stripe-6 {
+            stroke: url(#stripeRed);
+            stroke-width: 25;
+            opacity: 0.75;
+            filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));
+            animation: stripeWaveTwo 2.8s ease-in-out infinite;
+        }
+
+        .stripe-7 {
+            stroke: url(#stripeSky);
+            stroke-width: 15;
+            opacity: 0.65;
+            filter: drop-shadow(0 0 9px rgba(59, 130, 246, 0.28));
+            animation: stripeWaveThree 3.4s ease-in-out infinite;
+        }
+
+        .stripe-8 {
+            stroke: url(#stripeHighlight);
+            stroke-width: 8;
+            opacity: 0.55;
+            filter: drop-shadow(0 0 8px rgba(219, 234, 254, 0.45));
+            animation: stripeWaveFour 2.5s ease-in-out infinite;
+        }
+
         .corner-glow {
             position: absolute;
             top: -12%;
@@ -412,11 +444,25 @@
                     <stop offset="50%" stop-color="rgba(219, 234, 254, 0.62)" />
                     <stop offset="100%" stop-color="rgba(191, 219, 254, 0.42)" />
                 </linearGradient>
+                <linearGradient id="stripeYellow" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="rgba(253, 224, 71, 0.9)" />
+                    <stop offset="52%" stop-color="rgba(234, 179, 8, 0.9)" />
+                    <stop offset="100%" stop-color="rgba(202, 138, 4, 0.86)" />
+                </linearGradient>
+                <linearGradient id="stripeRed" x1="6%" y1="8%" x2="100%" y2="92%">
+                    <stop offset="0%" stop-color="rgba(252, 165, 165, 0.82)" />
+                    <stop offset="52%" stop-color="rgba(239, 68, 68, 0.9)" />
+                    <stop offset="100%" stop-color="rgba(185, 28, 28, 0.8)" />
+                </linearGradient>
             </defs>
-            <path class="stripe stripe-1" d="M 256 -90 C 390 72 470 204 740 510" />
-            <path class="stripe stripe-2" d="M 334 -118 C 436 56 518 188 786 496" />
-            <path class="stripe stripe-3" d="M 196 -58 C 318 90 380 198 632 478" />
-            <path class="stripe stripe-4" d="M 282 -76 C 410 68 478 198 708 486" />
+            <path class="stripe stripe-1" d="M 120 -180 C 390 72 470 204 740 510" />
+            <path class="stripe stripe-2" d="M 198 -208 C 436 56 518 188 786 496" />
+            <path class="stripe stripe-3" d="M 60 -148 C 318 90 380 198 632 478" />
+            <path class="stripe stripe-4" d="M 146 -166 C 410 68 478 198 708 486" />
+            <path class="stripe stripe-5" d="M 80 -210 C 350 42 430 174 700 480" />
+            <path class="stripe stripe-6" d="M 228 -178 C 466 86 548 218 816 526" />
+            <path class="stripe stripe-7" d="M 30 -198 C 288 40 350 148 602 428" />
+            <path class="stripe stripe-8" d="M 166 -136 C 430 98 498 228 728 516" />
         </svg>
         </div>
     </div>
