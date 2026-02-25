@@ -19,6 +19,8 @@ class NotificationPoller {
         this.pollPending = false;
         this.notificationLimit = 50;
         this.listenersBound = false;
+        this.pendingDropdownNotifications = null;
+        this.forceDropdownUpdateOnNextPoll = false;
     }
 
     /**
@@ -48,17 +50,25 @@ class NotificationPoller {
      * Send a POST action to the notifications API.
      * Uses fetch with credentials (auth cookie is sent automatically).
      */
-    async postNotificationAction(action, notificationId = null) {
-        const body = {};
-        if (notificationId !== null && notificationId !== undefined) {
+    async postNotificationAction(action, notificationId = null, options = null) {
+        const resolvedOptions = options || {};
+        const body = resolvedOptions.body || {};
+        if ((notificationId !== null && notificationId !== undefined) && body.notification_id === undefined) {
             body.notification_id = notificationId;
+        }
+
+        const headers = { 'Content-Type': 'application/json' };
+        const antiforgeryToken = document.querySelector('meta[name="RequestVerificationToken"]')?.getAttribute('content');
+        if (antiforgeryToken) {
+            headers.RequestVerificationToken = antiforgeryToken;
         }
 
         const response = await fetch(`/api/notifications/${action}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             credentials: 'same-origin',
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
+            keepalive: resolvedOptions.keepalive === true
         });
 
         let data = null;
@@ -79,12 +89,19 @@ class NotificationPoller {
     /**
      * Poll the API for notifications.
      */
-    async poll() {
+    async poll(options = null) {
+        const requestedForceDropdownUpdate = options?.forceDropdownUpdate === true;
         if (this.pollInFlight) {
             this.pollPending = true;
+            if (requestedForceDropdownUpdate) {
+                this.forceDropdownUpdateOnNextPoll = true;
+            }
             return;
         }
         this.pollInFlight = true;
+
+        const forceDropdownUpdate = requestedForceDropdownUpdate || this.forceDropdownUpdateOnNextPoll;
+        this.forceDropdownUpdateOnNextPoll = false;
 
         try {
             const response = await fetch(
@@ -108,7 +125,14 @@ class NotificationPoller {
             } else {
                 this.updateBadge(notifications);
             }
-            this.updateDropdown(notifications);
+
+            const canUpdateWhileOpen = forceDropdownUpdate === true;
+            if (!this.isOpen || canUpdateWhileOpen) {
+                this.updateDropdown(notifications);
+                this.pendingDropdownNotifications = null;
+            } else {
+                this.pendingDropdownNotifications = notifications;
+            }
         } catch (error) {
             console.error('Notification poll failed:', error);
             this.renderLoadError('Unable to load notifications right now.');
@@ -334,8 +358,8 @@ class NotificationPoller {
         if (!ids.length) return;
 
         try {
-            await Promise.all(ids.map(id => this.postNotificationAction('mark_read', id)));
-            await this.poll();
+            await this.postNotificationAction('mark_read_bulk', null, { body: { notification_ids: ids } });
+            await this.poll({ forceDropdownUpdate: true });
         } catch (err) {
             console.error('Failed to mark selected as read:', err);
         }
@@ -346,8 +370,8 @@ class NotificationPoller {
         if (!ids.length) return;
 
         try {
-            await Promise.all(ids.map(id => this.postNotificationAction('mark_unread', id)));
-            await this.poll();
+            await this.postNotificationAction('mark_unread_bulk', null, { body: { notification_ids: ids } });
+            await this.poll({ forceDropdownUpdate: true });
         } catch (err) {
             console.error('Failed to mark selected as unread:', err);
         }
@@ -364,7 +388,7 @@ class NotificationPoller {
         this.toggleDropdown(false);
         this.setNotificationReadState(notificationId, true);
 
-        const markReadPromise = this.postNotificationAction('mark_read', notificationId)
+        const markReadPromise = this.postNotificationAction('mark_read', notificationId, { keepalive: true })
             .catch(err => {
                 console.error('Failed to mark as read on click:', err);
             });
@@ -448,40 +472,12 @@ class NotificationPoller {
     async markAllRead() {
         try {
             await this.postNotificationAction('mark_all_read');
-            await this.poll();
+            await this.poll({ forceDropdownUpdate: true });
             return true;
         } catch (err) {
             console.error('Failed to mark all as read:', err);
             return false;
         }
-    }
-
-    /**
-     * Optimistically mark all visible items as read in the DOM before the
-     * server responds - gives instant feedback when the dropdown opens.
-     */
-    markCurrentListReadOptimistic() {
-        document.querySelectorAll('#notifList .notif-item.unread').forEach(item => {
-            item.classList.remove('unread');
-            item.dataset.isRead = '1';
-
-            const dot = item.querySelector('.notif-dot');
-            if (dot) {
-                dot.classList.remove('unread');
-                dot.classList.add('read');
-            }
-
-            const btn = item.querySelector('.notif-read-toggle');
-            if (btn) btn.title = 'Mark as unread';
-        });
-
-        const badge = document.getElementById('notifBadge');
-        if (badge) {
-            badge.style.display = 'none';
-            badge.textContent = '0';
-        }
-
-        this.updateBulkBar();
     }
 
     toggleDropdown(force) {
@@ -494,21 +490,22 @@ class NotificationPoller {
         if (this.isOpen) {
             dropdown.classList.add('active');
             if (!wasOpen) {
-                this.markCurrentListReadOptimistic();
-                void this.markAllRead();
+                void this.poll({ forceDropdownUpdate: true });
             }
         } else {
             dropdown.classList.remove('active');
             this.selectedNotifications.clear();
+            if (this.pendingDropdownNotifications) {
+                this.updateDropdown(this.pendingDropdownNotifications);
+                this.pendingDropdownNotifications = null;
+            }
         }
     }
 
     handleDropdownClick(event) {
         const target = event.target;
 
-        const selectAll =
-            target.closest('#notifSelectAll') ||
-            target.closest('.notif-bulk-select-all')?.querySelector('#notifSelectAll');
+        const selectAll = target.closest('#notifSelectAll');
         if (selectAll) {
             this.toggleSelectAll();
             event.stopPropagation();
@@ -553,6 +550,14 @@ class NotificationPoller {
         const dropdown = document.getElementById('notifDropdown');
         if (dropdown) {
             dropdown.addEventListener('click', e => this.handleDropdownClick(e));
+        }
+
+        const markAllButton = document.getElementById('notifMarkAllBtn');
+        if (markAllButton) {
+            markAllButton.addEventListener('click', e => {
+                e.preventDefault();
+                void this.markAllRead();
+            });
         }
 
         document.addEventListener('click', e => {
@@ -607,6 +612,10 @@ class NotificationPoller {
 
 if (!window.DiRxNotifications) {
     window.DiRxNotifications = new NotificationPoller();
+}
+
+if (!window.SalesRepPortalNotifications) {
+    window.SalesRepPortalNotifications = window.DiRxNotifications;
 }
 
 const startNotifications = () => window.DiRxNotifications.start();

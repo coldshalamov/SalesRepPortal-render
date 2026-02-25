@@ -99,6 +99,42 @@ namespace LeadManagementPortal.Controllers
             return Ok(new { success = true, data = new { message = "Notification marked as unread" } });
         }
 
+        // POST /api/notifications/mark_read_bulk
+        [HttpPost("mark_read_bulk")]
+        public async Task<IActionResult> MarkReadBulk([FromBody] NotificationBulkActionRequest request)
+        {
+            var ids = request?.notification_ids?
+                .Where(id => id > 0)
+                .Distinct()
+                .Take(200)
+                .ToArray() ?? Array.Empty<int>();
+
+            if (ids.Length == 0)
+                return BadRequest(new { success = false, error = new { message = "notification_ids required", code = "VALIDATION_ERROR" } });
+
+            var (userId, role) = GetUserContext();
+            var updated = await _notificationService.MarkReadBulkAsync(ids, userId, role);
+            return Ok(new { success = true, data = new { requested_count = ids.Length, updated_count = updated } });
+        }
+
+        // POST /api/notifications/mark_unread_bulk
+        [HttpPost("mark_unread_bulk")]
+        public async Task<IActionResult> MarkUnreadBulk([FromBody] NotificationBulkActionRequest request)
+        {
+            var ids = request?.notification_ids?
+                .Where(id => id > 0)
+                .Distinct()
+                .Take(200)
+                .ToArray() ?? Array.Empty<int>();
+
+            if (ids.Length == 0)
+                return BadRequest(new { success = false, error = new { message = "notification_ids required", code = "VALIDATION_ERROR" } });
+
+            var (userId, role) = GetUserContext();
+            var updated = await _notificationService.MarkUnreadBulkAsync(ids, userId, role);
+            return Ok(new { success = true, data = new { requested_count = ids.Length, updated_count = updated } });
+        }
+
         // POST /api/notifications/mark_all_read
         [HttpPost("mark_all_read")]
         public async Task<IActionResult> MarkAllRead()
@@ -119,5 +155,10 @@ namespace LeadManagementPortal.Controllers
     public class NotificationActionRequest
     {
         public int notification_id { get; set; }
+    }
+
+    public class NotificationBulkActionRequest
+    {
+        public int[] notification_ids { get; set; } = Array.Empty<int>();
     }
 }

@@ -34,6 +34,12 @@ namespace LeadManagementPortal.Services
         /// <summary>Mark a single notification as unread (ownership enforced).</summary>
         Task<bool> MarkUnreadAsync(int notificationId, string userId, string role);
 
+        /// <summary>Mark many notifications as read (ownership enforced). Returns count updated.</summary>
+        Task<int> MarkReadBulkAsync(IReadOnlyCollection<int> notificationIds, string userId, string role);
+
+        /// <summary>Mark many notifications as unread (ownership enforced). Returns count updated.</summary>
+        Task<int> MarkUnreadBulkAsync(IReadOnlyCollection<int> notificationIds, string userId, string role);
+
         /// <summary>Mark all of a user's notifications as read.</summary>
         Task<bool> MarkAllReadAsync(string userId, string role);
 
