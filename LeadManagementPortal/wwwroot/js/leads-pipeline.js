@@ -258,12 +258,13 @@
     alert.textContent = message;
 
     // Keep toast positioning stable even if surrounding layout changes.
+    const toastParent = pipelineWorkspace.querySelector(".card-body") || pipelineWorkspace;
     let toastHost = pipelineWorkspace.querySelector("[data-pipeline-toast-host='1']");
     if (!toastHost) {
       toastHost = document.createElement("div");
       toastHost.setAttribute("data-pipeline-toast-host", "1");
-      toastHost.className = "px-3 pb-3";
-      pipelineWorkspace.insertAdjacentElement("afterbegin", toastHost);
+      toastHost.className = "mt-2";
+      toastParent.appendChild(toastHost);
     }
 
     toastHost.appendChild(alert);

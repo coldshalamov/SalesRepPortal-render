@@ -9,12 +9,14 @@ namespace LeadManagementPortal.Services
         private readonly ApplicationDbContext _context;
         private readonly ISettingsService _settingsService;
         private readonly ICustomerService _customerService;
+        private readonly ILeadDocumentService _leadDocumentService;
 
-        public LeadService(ApplicationDbContext context, ICustomerService customerService, ISettingsService settingsService)
+        public LeadService(ApplicationDbContext context, ICustomerService customerService, ISettingsService settingsService, ILeadDocumentService leadDocumentService)
         {
             _context = context;
             _customerService = customerService;
             _settingsService = settingsService;
+            _leadDocumentService = leadDocumentService;
         }
 
         public async Task<Lead?> GetByIdAsync(string id)
@@ -185,6 +187,9 @@ namespace LeadManagementPortal.Services
                 var lead = await _context.Leads.FindAsync(id);
                 if (lead == null) return false;
 
+                // Ensure storage-backed documents are removed before the lead is deleted (DB cascade only cleans rows).
+                await _leadDocumentService.DeleteForLeadAsync(id);
+
                 _context.Leads.Remove(lead);
                 await _context.SaveChangesAsync();
                 return true;
@@ -263,6 +268,12 @@ namespace LeadManagementPortal.Services
             var nState = (state ?? string.Empty).Trim().ToLower();
             var nZip = (zip ?? string.Empty).Trim().ToLower();
 
+            // Use only first 5 characters of ZipCode for comparison (keep consistent with CanRegisterLeadAsync)
+            if (nZip.Length > 5)
+            {
+                nZip = nZip.Substring(0, 5);
+            }
+
             var conflicts = await _context.Leads
                 .Where(l => !l.IsExpired
                             && l.Status != LeadStatus.Converted
@@ -272,13 +283,13 @@ namespace LeadManagementPortal.Services
                                 (
                                     string.IsNullOrEmpty(nAddr)
                                     ||
-                                    (!string.IsNullOrEmpty(nAddr) && l.Address != null && l.Address.ToLower() == nAddr
-                                        && (string.IsNullOrEmpty(nCity) || (l.City != null && l.City.ToLower() == nCity))
-                                        && (string.IsNullOrEmpty(nState) || (l.State != null && l.State.ToLower() == nState))
-                                        && (string.IsNullOrEmpty(nZip) || (l.ZipCode != null && l.ZipCode.ToLower() == nZip))
-                                    )
-                                )
-                            ))
+                                     (!string.IsNullOrEmpty(nAddr) && l.Address != null && l.Address.ToLower() == nAddr
+                                         && (string.IsNullOrEmpty(nCity) || (l.City != null && l.City.ToLower() == nCity))
+                                         && (string.IsNullOrEmpty(nState) || (l.State != null && l.State.ToLower() == nState))
+                                         && (string.IsNullOrEmpty(nZip) || (l.ZipCode != null && (l.ZipCode.Length >= 5 ? l.ZipCode.Substring(0, 5) : l.ZipCode).ToLower() == nZip))
+                                     )
+                                 )
+                             ))
                 .Select(l => new { l.Status, l.SalesGroupId })
                 .ToListAsync();
 
@@ -294,13 +305,13 @@ namespace LeadManagementPortal.Services
                                         (
                                             string.IsNullOrEmpty(nAddr)
                                             ||
-                                            (!string.IsNullOrEmpty(nAddr) && c.Address != null && c.Address.ToLower() == nAddr
-                                                && (string.IsNullOrEmpty(nCity) || (c.City != null && c.City.ToLower() == nCity))
-                                                && (string.IsNullOrEmpty(nState) || (c.State != null && c.State.ToLower() == nState))
-                                                && (string.IsNullOrEmpty(nZip) || (c.ZipCode != null && c.ZipCode.ToLower() == nZip))
-                                            )
-                                        )
-                                   ));
+                                             (!string.IsNullOrEmpty(nAddr) && c.Address != null && c.Address.ToLower() == nAddr
+                                                 && (string.IsNullOrEmpty(nCity) || (c.City != null && c.City.ToLower() == nCity))
+                                                 && (string.IsNullOrEmpty(nState) || (c.State != null && c.State.ToLower() == nState))
+                                                 && (string.IsNullOrEmpty(nZip) || (c.ZipCode != null && (c.ZipCode.Length >= 5 ? c.ZipCode.Substring(0, 5) : c.ZipCode).ToLower() == nZip))
+                                             )
+                                         )
+                                    ));
                 return !recentCustomerExists;
             }
 

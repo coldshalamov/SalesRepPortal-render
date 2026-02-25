@@ -94,6 +94,16 @@ async function setupDom({ seed, config } = {}) {
     json: async () => ({ success: true, tasks: [], message: "ok" })
   });
 
+  // The pipeline script uses Bootstrap's Modal helper in production.
+  // Provide a minimal stub so JSDOM tests don't trip over a missing global.
+  window.bootstrap = {
+    Modal: {
+      getOrCreateInstance() {
+        return { show() {}, hide() {} };
+      }
+    }
+  };
+
   window.eval(scriptSource);
   await Promise.resolve();
   return { dom, window, document: window.document };
@@ -162,4 +172,3 @@ test("quick-task autosave does not double-post when clicked twice quickly", asyn
   resolveFetch();
   await Promise.resolve();
 });
-

@@ -72,8 +72,9 @@ namespace LeadManagementPortal.Tests
             // Mock dependencies
             var mockCustomerService = new Mock<ICustomerService>();
             var mockSettingsService = new Mock<ISettingsService>();
+            var mockLeadDocumentService = new Mock<ILeadDocumentService>();
 
-            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object);
+            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object, mockLeadDocumentService.Object);
 
             // Act
             var result = await leadService.GetByUserAsync("admin-a", UserRoles.SalesOrgAdmin);
@@ -100,7 +101,8 @@ namespace LeadManagementPortal.Tests
 
             var mockCustomerService = new Mock<ICustomerService>();
             var mockSettingsService = new Mock<ISettingsService>();
-            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object);
+            var mockLeadDocumentService = new Mock<ILeadDocumentService>();
+            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object, mockLeadDocumentService.Object);
 
             // Act
             var result = await leadService.GetByUserAsync("admin-no-org", UserRoles.SalesOrgAdmin);
@@ -151,7 +153,8 @@ namespace LeadManagementPortal.Tests
 
             var mockCustomerService = new Mock<ICustomerService>();
             var mockSettingsService = new Mock<ISettingsService>();
-            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object);
+            var mockLeadDocumentService = new Mock<ILeadDocumentService>();
+            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object, mockLeadDocumentService.Object);
 
             // Act
             var result = await leadService.SearchAsync("John", "admin-a", UserRoles.SalesOrgAdmin);

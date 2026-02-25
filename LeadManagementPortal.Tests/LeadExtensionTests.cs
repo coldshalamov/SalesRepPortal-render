@@ -70,7 +70,8 @@ namespace LeadManagementPortal.Tests
 
             var mockCustomerService = new Mock<ICustomerService>();
             var mockSettingsService = CreateSettingsMock(extensionDays: 5);
-            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object);
+            var mockLeadDocumentService = new Mock<ILeadDocumentService>();
+            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object, mockLeadDocumentService.Object);
 
             var ok1 = await leadService.GrantExtensionAsync(lead.Id, "admin");
             Assert.True(ok1);
@@ -116,11 +117,11 @@ namespace LeadManagementPortal.Tests
 
             var mockCustomerService = new Mock<ICustomerService>();
             var mockSettingsService = CreateSettingsMock(extensionDays: 5);
-            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object);
+            var mockLeadDocumentService = new Mock<ILeadDocumentService>();
+            var leadService = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object, mockLeadDocumentService.Object);
 
             var ok = await leadService.GrantExtensionAsync(lead.Id, "admin");
             Assert.False(ok);
         }
     }
 }
-
