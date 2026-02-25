@@ -69,10 +69,10 @@ body {
 }
 
 .card {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e2e8f0;
   margin-bottom: 1.5rem;
-  border-radius: 12px;
+  border-radius: 0;
 }
 
 .table-hover tbody tr:hover {
@@ -85,7 +85,7 @@ body {
    exactly on top of this line. The active tab "lights up" its
    segment — identical to GitHub / Vercel. */
 .navbar {
-  box-shadow: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
   border-bottom: none;
   padding-bottom: 0;
   position: relative;
@@ -325,6 +325,7 @@ body {
   border-radius: 999px;
   padding: 4px 14px 4px 6px;
   transition: background 0.15s, border-color 0.15s;
+  transform: translateY(-3px);
 }
 
 .user-pill:hover,

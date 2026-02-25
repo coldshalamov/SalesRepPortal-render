@@ -1,0 +1,137 @@
+name: Browser Quality Advisory
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-quality-advisory-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  NODE_VERSION: "22"
+  LIGHTHOUSE_BASE_URL: "http://127.0.0.1:5073"
+
+jobs:
+  advisory:
+    name: A11y + Lighthouse (Advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+
+      - name: Install advisory dependencies
+        run: npm --prefix tests/browser ci
+
+      - name: Install Playwright runtime (chromium + webkit)
+        run: npx --prefix tests/browser playwright install --with-deps chromium webkit
+
+      - name: Run advisory accessibility lane
+        continue-on-error: true
+        run: |
+          npx --prefix tests/browser playwright test \
+            --config tests/browser/playwright.config.js \
+            --project chromium \
+            --project mobile-safari \
+            --grep "@advisory"
+
+      - name: Start app for Lighthouse
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          DatabaseProvider: Sqlite
+          ConnectionStrings__DefaultConnection: Data Source=${{ github.workspace }}/tests/browser/.tmp/leadportal-lighthouse.db
+          SeedAdmin__Email: admin@dirxhealth.com
+          SeedAdmin__Password: Admin@123
+          LocalStorage__RootPath: ${{ github.workspace }}/tests/browser/.tmp/uploads
+          SEED_DEMO_DATA: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tests/browser/.tmp/uploads tests/browser/lighthouse tests/browser/test-results
+          dotnet run \
+            --project LeadManagementPortal/LeadManagementPortal.csproj \
+            --urls "${LIGHTHOUSE_BASE_URL}" \
+            > tests/browser/test-results/lighthouse-app.log 2>&1 &
+          echo $! > tests/browser/.tmp/lighthouse.pid
+
+      - name: Wait for app readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if curl -fsS "${LIGHTHOUSE_BASE_URL}/Account/Login" > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Application did not become ready in time."
+          exit 1
+
+      - name: Run Lighthouse audits
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          routes=(
+            "/"
+            "/Account/Login"
+            "/Account/AccessDenied"
+          )
+
+          for route in "${routes[@]}"; do
+            slug="$(echo "$route" | sed 's#^/##; s#[^a-zA-Z0-9]#-#g')"
+            if [ -z "$slug" ]; then
+              slug="home"
+            fi
+
+            npx --prefix tests/browser lighthouse \
+              "${LIGHTHOUSE_BASE_URL}${route}" \
+              --chrome-flags="--headless --no-sandbox" \
+              --only-categories=performance,accessibility,best-practices,seo \
+              --output=html \
+              --output=json \
+              --output-path="tests/browser/lighthouse/${slug}"
+          done
+
+      - name: Stop Lighthouse app
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -f tests/browser/.tmp/lighthouse.pid ]; then
+            kill "$(cat tests/browser/.tmp/lighthouse.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload advisory artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-quality-advisory
+          path: |
+            tests/browser/playwright-report/
+            tests/browser/test-results/
+            tests/browser/lighthouse/
+          if-no-files-found: ignore
+          retention-days: 14

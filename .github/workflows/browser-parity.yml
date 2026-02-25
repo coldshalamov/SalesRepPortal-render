@@ -1,0 +1,96 @@
+name: Browser Parity
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-parity-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  NODE_VERSION: "22"
+
+jobs:
+  parity:
+    name: Cross-Browser Parity (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - chromium
+          - firefox
+          - webkit
+          - edge
+          - mobile-chrome
+          - mobile-safari
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+
+      - name: Install browser test dependencies
+        run: npm --prefix tests/browser ci
+
+      - name: Install Playwright runtime for matrix browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.project }}" in
+            chromium|mobile-chrome)
+              target="chromium"
+              ;;
+            firefox)
+              target="firefox"
+              ;;
+            webkit|mobile-safari)
+              target="webkit"
+              ;;
+            edge)
+              target="msedge"
+              ;;
+            *)
+              echo "Unknown project: ${{ matrix.project }}"
+              exit 1
+              ;;
+          esac
+
+          npx --prefix tests/browser playwright install --with-deps "$target"
+
+      - name: Run parity suite
+        run: |
+          npx --prefix tests/browser playwright test \
+            --config tests/browser/playwright.config.js \
+            --project "${{ matrix.project }}" \
+            --grep-invert "@advisory"
+
+      - name: Upload parity artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-parity-${{ matrix.project }}
+          path: |
+            tests/browser/playwright-report/
+            tests/browser/test-results/
+          if-no-files-found: ignore
+          retention-days: 14

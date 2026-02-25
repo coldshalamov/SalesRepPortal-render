@@ -334,3 +334,18 @@ This project is created for demonstration purposes.
 ## Support
 
 For issues or questions, please refer to the project documentation or contact the development team.
+
+## Browser CI
+
+This repository includes a dedicated browser compatibility suite under `tests/browser`.
+
+- Blocking parity workflow: `.github/workflows/browser-parity.yml`
+- Advisory quality workflow (a11y + lighthouse): `.github/workflows/browser-quality-advisory.yml`
+
+Local execution from repo root:
+
+```bash
+npm --prefix tests/browser ci
+npx --prefix tests/browser playwright install --with-deps
+npm --prefix tests/browser run test:parity
+```

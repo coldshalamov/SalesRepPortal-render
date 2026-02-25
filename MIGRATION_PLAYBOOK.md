@@ -132,3 +132,16 @@ When a feature adds EF entities/tables/columns (like pipeline follow-up tasks):
 6. Roll out application code + migration together and monitor startup logs for migration/apply errors.
 
 If any step fails, stop porting and keep the feature sandbox-only until fixed.
+
+## CI Guardrails For Portability
+
+- Always-on CI guard:
+  - `scripts/ci/check-portability-guardrails.ps1`
+  - Enforces:
+    - migration metadata completeness (discoverable EF migrations),
+    - follow-up/notification schema dependency contracts,
+    - no mixed PRs that combine Render-only files with product code.
+- Optional deep dry run against a real target zip:
+  - `scripts/ci/portability-target-dry-run.ps1 -TargetRepoZipPath <path-to-zip>`
+  - Applies portable files onto extracted target snapshot, then runs restore/build/tests there.
+  - In GitHub Actions, this is exposed via manual dispatch input `target_zip_url`.

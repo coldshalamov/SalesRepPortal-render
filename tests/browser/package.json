@@ -1,0 +1,14 @@
+{
+  "name": "salesrepportal-browser-ci",
+  "private": true,
+  "scripts": {
+    "test": "playwright test --config playwright.config.js",
+    "test:parity": "playwright test --config playwright.config.js --grep-invert @advisory",
+    "test:advisory": "playwright test --config playwright.config.js --grep @advisory"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.58.2",
+    "lighthouse": "^12.8.2"
+  }
+}

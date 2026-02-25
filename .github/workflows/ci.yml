@@ -5,6 +5,11 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      target_zip_url:
+        description: "Optional URL to target repo zip for full portability dry-run"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -21,9 +26,30 @@ env:
   TEST_FILTER: "FullyQualifiedName!~LeadManagementPortal.Tests.LocalSeeder"
 
 jobs:
+  portability-guardrails:
+    name: Portability Guardrails
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Portability Guardrails
+        shell: pwsh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          ./scripts/ci/check-portability-guardrails.ps1 `
+            -BaseSha "$env:BASE_SHA" `
+            -HeadSha "$env:HEAD_SHA"
+
   build-test:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: portability-guardrails
     strategy:
       fail-fast: false
       matrix:
@@ -90,3 +116,23 @@ jobs:
 
       - name: Publish
         run: dotnet publish LeadManagementPortal/LeadManagementPortal.csproj -c Release --no-restore -o out
+
+  target-port-dry-run:
+    name: Target Port Dry Run (Optional)
+    runs-on: windows-latest
+    needs: portability-guardrails
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target_zip_url != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Run Target Portability Dry Run
+        shell: pwsh
+        run: |
+          ./scripts/ci/portability-target-dry-run.ps1 -TargetRepoZipUrl "${{ inputs.target_zip_url }}"

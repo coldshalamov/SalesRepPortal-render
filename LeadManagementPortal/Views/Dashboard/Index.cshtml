@@ -52,15 +52,15 @@
 <!-- Stats Cards -->
 <div class="row g-3 mb-4">
     <div class="col-md-3">
-        <div class="card border-primary h-100">
+        <div class="card h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="text-muted mb-1">Total Leads</h6>
                         <h2 class="mb-0">@stats?.TotalLeads</h2>
                     </div>
-                    <div class="bg-primary bg-opacity-10 p-3 rounded d-flex align-items-center justify-content-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary">
+                    <div class="bg-light p-3 d-flex align-items-center justify-content-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-secondary">
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                             <path d="M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"></path>
                             <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -73,15 +73,15 @@
     </div>
 
     <div class="col-md-3">
-        <div class="card border-warning h-100">
+        <div class="card h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="text-muted mb-1">Pending Leads</h6>
                         <h2 class="mb-0">@stats?.PendingLeads</h2>
                     </div>
-                    <div class="bg-warning bg-opacity-10 p-3 rounded d-flex align-items-center justify-content-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>
+                    <div class="bg-light p-3 d-flex align-items-center justify-content-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-secondary"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>
                     </div>
                 </div>
             </div>
@@ -89,15 +89,15 @@
     </div>
 
     <div class="col-md-3">
-        <div class="card border-success h-100">
+        <div class="card h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div>
                         <h6 class="text-muted mb-1">Converted</h6>
                         <h2 class="mb-0">@stats?.ConvertedLeads</h2>
                     </div>
-                    <div class="bg-success bg-opacity-10 p-3 rounded d-flex align-items-center justify-content-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <div class="bg-light p-3 d-flex align-items-center justify-content-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-secondary"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                     </div>
                 </div>
                 <small class="text-muted">@stats?.ConversionRate% conversion rate</small>
@@ -106,15 +106,15 @@
     </div>
 
     <div class="col-md-3">
-        <div class="card border-info h-100">
+        <div class="card h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h6 class="text-muted mb-1">Total Customers</h6>
                         <h2 class="mb-0">@stats?.TotalCustomers</h2>
                     </div>
-                    <div class="bg-info bg-opacity-10 p-3 rounded d-flex align-items-center justify-content-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-info"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>
+                    <div class="bg-light p-3 d-flex align-items-center justify-content-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-secondary"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>
                     </div>
                 </div>
             </div>
@@ -125,7 +125,7 @@
 <!-- Priority Alerts -->
 <div class="row g-3 mb-4">
     <div class="col-md-6">
-        <div class="card border-danger h-100">
+        <div class="card h-100">
             <div class="card-body">
                 <h5 class="card-title text-danger">
                     <i class="bi bi-exclamation-triangle"></i> Critical Leads

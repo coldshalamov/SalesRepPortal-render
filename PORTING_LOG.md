@@ -108,15 +108,18 @@ For every new commit in this sandbox repo, append an entry with:
 ## Safe Port Workflow
 
 1. Build feature only in app files relevant to requested UI/backend behavior.
-2. Before porting, run:
+2. Run portability guardrails:
+   - `scripts/ci/check-portability-guardrails.ps1`
+   - Optional target simulation: `scripts/ci/portability-target-dry-run.ps1 -TargetRepoZipPath <zip>`
+3. Before porting, run:
    - `git log --oneline` in `SalesRepPortal-render`
    - `git diff --name-only <base>..<feature-commit>`
-3. Classify each changed file:
+4. Classify each changed file:
    - Product behavior/UI -> candidate to port
    - Deploy/seeding/env/render/sqlite -> do not port
-4. In the work repo, create a branch and port only candidate changes.
-5. Validate locally against SQL Server-oriented behavior before PR.
-6. Open PR with explicit "Not included" section (Render-only deltas excluded).
+5. In the work repo, create a branch and port only candidate changes.
+6. Validate locally against SQL Server-oriented behavior before PR.
+7. Open PR with explicit "Not included" section (Render-only deltas excluded).
 
 ## Working Agreement For Future Changes
 

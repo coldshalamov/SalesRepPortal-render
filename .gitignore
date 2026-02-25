@@ -78,3 +78,9 @@ App_Data/
 **/*.db
 **/*.db-shm
 **/*.db-wal
+
+# Browser CI artifacts
+tests/browser/.tmp/
+tests/browser/playwright-report/
+tests/browser/test-results/
+tests/browser/lighthouse/
