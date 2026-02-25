@@ -30,10 +30,40 @@
     color: #fff;
 }
 
+#notifBellBtn:hover svg {
+    animation: bell-wobble 0.5s ease-in-out;
+}
+
 #notifBellBtn svg {
     width: 20px;
     height: 20px;
     flex-shrink: 0;
+}
+
+@keyframes bell-wobble {
+    0% {
+        transform: rotate(0);
+    }
+
+    15% {
+        transform: rotate(10deg);
+    }
+
+    30% {
+        transform: rotate(-10deg);
+    }
+
+    45% {
+        transform: rotate(5deg);
+    }
+
+    60% {
+        transform: rotate(-5deg);
+    }
+
+    100% {
+        transform: rotate(0);
+    }
 }
 
 /* --- Unread badge --- */
@@ -50,11 +80,13 @@
     height: 16px;
     padding: 2px 4px;
     border-radius: 999px;
-    display: none;        /* shown by JS when count > 0 */
+    display: none;
+    /* shown by JS when count > 0 */
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    box-shadow: 0 0 0 2px #0d6efd; /* matches navbar --bs-primary */
+    box-shadow: 0 0 0 2px #0d6efd;
+    /* matches navbar --bs-primary */
 }
 
 /* --- Dropdown panel --- */

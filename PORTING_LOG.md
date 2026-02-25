@@ -403,24 +403,31 @@ confirm parity.
 parity tests, frontend JS guards, CodeQL security scanning, dependency review,
 and Docker build validation.
 
-**New/modified files:**
+**Classification:** **Do not port**
 
-| File | Classification |
+**Reason:** The work repo is a **private repository**. GitHub Actions minutes are
+billed on private repos (free tier only covers public repos). Porting any workflow
+would start incurring charges on the owner's account without explicit approval.
+The only workflow that should exist in the work repo is the existing
+`deploy-azure.yml` — do not touch it.
+
+If automated CI is wanted in the future, bring it up with the repo owner as a
+separate budget discussion. The workflows exist here in the sandbox (public/free)
+and can be referenced at that time.
+
+**Files — do not copy any of these:**
+
+| File | Reason |
 |---|---|
-| `.github/workflows/ci.yml` | **Portable** (enhanced .NET CI) |
-| `.github/workflows/browser-parity.yml` | **Portable** (Playwright cross-browser CI) |
-| `.github/workflows/browser-quality-advisory.yml` | **Portable** (quality advisory CI) |
-| `.github/workflows/frontend-guards.yml` | **Portable** (frontend JS linting/guards) |
-| `.github/workflows/codeql.yml` | **Portable** (CodeQL security scan) |
-| `.github/workflows/dependency-review.yml` | **Portable** (dependency review on PRs) |
-| `.github/workflows/docker-build.yml` | **Render-only** (Render-specific Docker build; do not port) |
-| `.github/actions/dotnet-ci/action.yml` | **Portable** (reusable composite action) |
-| `.github/dependabot.yml` | **Portable** (automated dependency updates config) |
-
-**Port action:**
-- Port all workflows except `docker-build.yml`.
-- Review `ci.yml` to confirm it does not reference any Render-specific env vars before
-  adding to work repo.
+| `.github/workflows/ci.yml` | Paid minutes on private repo |
+| `.github/workflows/browser-parity.yml` | Paid minutes on private repo |
+| `.github/workflows/browser-quality-advisory.yml` | Paid minutes on private repo |
+| `.github/workflows/frontend-guards.yml` | Paid minutes on private repo |
+| `.github/workflows/codeql.yml` | Paid minutes on private repo |
+| `.github/workflows/dependency-review.yml` | Paid minutes on private repo |
+| `.github/workflows/docker-build.yml` | Also Render-specific |
+| `.github/actions/dotnet-ci/action.yml` | Paid minutes on private repo |
+| `.github/dependabot.yml` | Paid minutes on private repo |
 
 ---
 

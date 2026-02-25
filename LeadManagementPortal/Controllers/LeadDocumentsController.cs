@@ -49,13 +49,14 @@ namespace LeadManagementPortal.Controllers
             }
 
             await using var stream = file.OpenReadStream();
+            var uploadedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             await _leadDocs.AddAsync(
                 leadId: leadId,
                 fileName: file.FileName,
                 contentType: contentType,
                 sizeBytes: file.Length,
                 content: stream,
-                uploadedByUserId: User?.Identity?.Name,
+                uploadedByUserId: uploadedByUserId,
                 ct: ct);
 
             TempData["Success"] = "Document uploaded.";
@@ -86,7 +87,13 @@ namespace LeadManagementPortal.Controllers
             if (userRole == UserRoles.OrganizationAdmin)
                 return true;
 
-            if (userRole == UserRoles.SalesOrgAdmin || userRole == UserRoles.GroupAdmin)
+            if (userRole == UserRoles.SalesOrgAdmin)
+            {
+                var user = await _userManager.FindByIdAsync(userId);
+                return user?.SalesOrgId != null && lead.AssignedTo != null && lead.AssignedTo.SalesOrgId == user.SalesOrgId;
+            }
+
+            if (userRole == UserRoles.GroupAdmin)
             {
                 var user = await _userManager.FindByIdAsync(userId);
                 return user?.SalesGroupId == lead.SalesGroupId;

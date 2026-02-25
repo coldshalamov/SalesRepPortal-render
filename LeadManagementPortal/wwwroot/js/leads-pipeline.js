@@ -46,6 +46,12 @@
     Lost: "Lost"
   };
 
+  const canonicalStatusByLower = Object.create(null);
+  columnStatuses.forEach((status) => {
+    canonicalStatusByLower[status.toLowerCase()] = status;
+  });
+  const unknownStatuses = new Set();
+
   const quickTaskTemplates = {
     call_tomorrow: { type: "call", description: "Call tomorrow to review next step.", dueOffsetDays: 1, autoSave: true },
     send_proposal: { type: "email", description: "Send proposal with updated pricing.", dueOffsetDays: null, autoSave: false },
@@ -56,7 +62,8 @@
   const state = {
     leads: Array.isArray(seed) ? seed.map(normalizeLead) : [],
     selectedLeadId: null,
-    dragLeadId: null
+    dragLeadId: null,
+    isSavingTask: false
   };
   const viewStorageKey = "leadsPipelinePreferredView";
 
@@ -101,7 +108,18 @@
 
   function normalizeStatus(rawStatus) {
     const status = String(rawStatus || "").trim();
-    return stageLabels[status] ? status : "New";
+    if (!status) return "New";
+
+    const canonical = canonicalStatusByLower[status.toLowerCase()];
+    if (canonical) return canonical;
+
+    if (!unknownStatuses.has(status)) {
+      unknownStatuses.add(status);
+      console.warn("Leads pipeline received unexpected status:", status);
+    }
+
+    // Preserve unknown statuses so we don't silently remap them to "New".
+    return status;
   }
 
   function urgencyClass(urgency) {
@@ -238,7 +256,17 @@
     alert.className = `alert alert-${alertColor} py-2 px-3 mt-2`;
     alert.setAttribute("role", "alert");
     alert.textContent = message;
-    pipelineWorkspace.insertAdjacentElement("afterend", alert);
+
+    // Keep toast positioning stable even if surrounding layout changes.
+    let toastHost = pipelineWorkspace.querySelector("[data-pipeline-toast-host='1']");
+    if (!toastHost) {
+      toastHost = document.createElement("div");
+      toastHost.setAttribute("data-pipeline-toast-host", "1");
+      toastHost.className = "px-3 pb-3";
+      pipelineWorkspace.insertAdjacentElement("afterbegin", toastHost);
+    }
+
+    toastHost.appendChild(alert);
     setTimeout(() => alert.remove(), 2600);
   }
 
@@ -393,6 +421,8 @@
 
   async function saveTaskFromForm() {
     if (!state.selectedLeadId || !config.addFollowUpUrl) return;
+    if (state.isSavingTask) return;
+
     const typeEl = document.getElementById("pipelineTaskType");
     const dueEl = document.getElementById("pipelineTaskDueDate");
     const descriptionEl = document.getElementById("pipelineTaskDescription");
@@ -401,6 +431,10 @@
       showToast("Task description is required.", "danger");
       return;
     }
+
+    state.isSavingTask = true;
+    const saveButton = document.getElementById("pipelineTaskSaveBtn");
+    if (saveButton) saveButton.setAttribute("disabled", "disabled");
 
     try {
       const result = await postJson(config.addFollowUpUrl, {
@@ -418,6 +452,9 @@
       showToast(result.message || "Task added.", "success");
     } catch (error) {
       showToast(error?.message || "Unable to add task.", "danger");
+    } finally {
+      state.isSavingTask = false;
+      if (saveButton) saveButton.removeAttribute("disabled");
     }
   }
 
@@ -555,7 +592,7 @@
       state.dragLeadId = leadId;
       card.classList.add("is-dragging");
       event.dataTransfer?.setData("text/plain", leadId);
-      event.dataTransfer.effectAllowed = "move";
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
     });
 
     boardRoot.addEventListener("dragend", (event) => {
