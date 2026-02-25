@@ -389,8 +389,9 @@ namespace LeadManagementPortal.Services
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.ConvertToCustomerAsync failed for LeadId={LeadId}", leadId);
                 return false;
             }
         }
@@ -443,8 +444,9 @@ namespace LeadManagementPortal.Services
                 await UpdateAsync(lead);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.GrantExtensionAsync failed for LeadId={LeadId}", leadId);
                 return false;
             }
         }
