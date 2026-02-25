@@ -1,18 +1,35 @@
 # Migration Playbook (Sandbox -> Work Repo)
 
-This file defines the exact process for moving all feature changes from
-`SalesRepPortal-render` into `SalesRepPortal` as a single clean PR.
+This file defines the process for porting changes from `SalesRepPortal-render`
+into the work repo safely.
+
+Preferred approach: a stack of smaller, feature-based PRs.
+Alternative: a single integration PR (kept below for when leadership insists).
 
 ---
 
 ## Latest Compatibility Audit (2026-02-25)
 
 - Sandbox: `D:\GitHub\SalesRepPortal-render`
-- Work snapshot: `D:\GitHub\SalesRepPortal-main.zip` (last write: 2026-02-24)
-- Files differing (shared path, different content): **119** (107 under `LeadManagementPortal/`)
-- Files present only in sandbox: **104+** new source files (plus per-folder agent docs)
-- Verdict: sandbox is a full superset; narrow PR slicing or a controlled integration
-  branch is required.
+- Work snapshot zip: `D:\GitHub\SalesRepPortal-render\SalesRepPortal-main.zip`
+  - Last write: 2026-02-24 22:41:36
+  - SHA256: `32DFBB55EA654DE999E4B2CC1A0E0B921291D778559377C0B60169F7375E9DFC`
+- Sandbox HEAD at time of audit: `634473171a1eb1662dc778aa179f54d8dbbb72a8`
+- Portable-file diff (using the same include/exclude rules as `scripts/ci/portability-target-dry-run.ps1`):
+  - Total portable files considered: **150**
+  - Present only in sandbox: **39**
+  - Same content: **62**
+  - Different content: **49**
+
+Reproduce:
+```powershell
+./scripts/ci/portability-audit.ps1 -TargetRepoZipPath .\SalesRepPortal-main.zip
+```
+
+Notes:
+- "Same/different" is computed after normalizing line endings for text files
+  (to avoid CRLF-only churn when comparing to the zip snapshot).
+- The sandbox is still a superset; avoid bulk copying and slice PRs narrowly.
 
 ---
 
@@ -20,9 +37,9 @@ This file defines the exact process for moving all feature changes from
 
 | Approach | Risk |
 |---|---|
-| Bulk "copy everything changed" | **9/10 – Do not do this** |
-| Single integration PR using the guided sequence below | **3/10 – Acceptable** |
-| Narrow feature-by-feature PRs | **2/10 – Lowest risk** |
+| Bulk "copy everything changed" | **9/10 - Do not do this** |
+| Single integration PR using the guided sequence below | **3/10 - Acceptable** |
+| Narrow feature-by-feature PRs | **2/10 - Lowest risk** |
 
 ---
 
@@ -30,47 +47,53 @@ This file defines the exact process for moving all feature changes from
 
 See `PORTING_LOG.md` for per-feature detail and exact file lists. Summary:
 
-| # | Feature | Schema change? | New package? |
-|---|---|---|---|
-| 1 | Notification system (bell + API) | YES – `Notifications` table | No |
-| 2 | Lead follow-up task system (pipeline board) | YES – `LeadFollowUpTasks` table | No |
-| 3 | Lead CSV export | No | YES – CsvHelper 33.0.1 |
-| 4 | Global navbar search API + typeahead | No | No |
-| 5 | Customer edit (full CRUD) | No | No |
-| 6 | Commissions dashboard (mock scaffold) | No | No |
-| 7 | Login redesign + transition animation | No | No |
-| 8 | Dashboard redesign (stat cards, activity feed) | No | No |
-| 9 | Layout/nav overhaul (logo, search, bell) | No | No |
-| 10 | Local file storage (dev/Render fallback) | No | No |
-| 11 | .NET unit/integration test suite (7 classes) | No | No |
-| 12 | Playwright browser test suite | No | No |
-| 13 | GitHub Actions CI workflows | No | No | **DO NOT PORT** (private repo = paid minutes) |
+| # | Feature | Schema change? | New package? | Notes |
+|---|---|---|---|---|
+| 1 | Notification system (bell + API) | YES - `Notifications` table | No | |
+| 2 | Lead follow-up task system (pipeline board) | YES - `LeadFollowUpTasks` table | No | |
+| 3 | Lead CSV export | No | YES - CsvHelper 33.0.1 | |
+| 4 | Global navbar search API + typeahead | No | No | |
+| 5 | Customer edit (full CRUD) | No | No | |
+| 6 | Commissions dashboard surface | No | No | |
+| 7 | Login redesign + transition animation | No | No | |
+| 8 | Dashboard redesign (stat cards, activity feed) | No | No | |
+| 9 | Layout/nav overhaul (logo, search, bell) | No | No | |
+| 10 | Local file storage fallback + protected download URLs | No | No | |
+| 11 | Expanded .NET test suite (11+ classes) | No | No | |
+| 12 | Playwright browser test suite | No | No | |
+| 13 | GitHub Actions CI workflows | No | No | Approval required |
 
 ---
 
 ## Never Port These
 
-- `render.yaml`, `Dockerfile`, `.github/workflows/docker-build.yml`
-- `Program.cs` – SQLite provider branch + `EnsureCreatedAsync()` path
-- `Data/SeedData.cs` – demo user additions
-- `appsettings.json` – SQLite connection string / Render env overrides
-- Per-folder `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` docs
-- **All GitHub Actions workflows** – the work repo is **private**; GitHub Actions
-  minutes are billed on private repos. Do not port any `.github/workflows/` files,
-  `.github/actions/`, or `.github/dependabot.yml`. The existing `deploy-azure.yml`
-  the boss already has is the only workflow that should exist in the work repo.
-  If CI is wanted later, that is a separate conversation with the boss about budget.
+- Render-only deploy artifacts:
+  - `render.yaml`, `Dockerfile`, `.render/`, `RENDER.md`
+- Render-only runtime behavior:
+  - The `DatabaseProvider=Sqlite` configuration + `EnsureCreatedAsync()` startup path in `LeadManagementPortal/Program.cs`
+    (Render-only unless the work repo explicitly wants SQLite support)
+- Demo-only seeding:
+  - Demo user/demo data seeding paths in `LeadManagementPortal/Data/SeedData.cs` (only enable via env flags)
+- Environment-specific configuration files:
+  - Do not port sandbox `LeadManagementPortal/appsettings.json` or `LeadManagementPortal/appsettings.Development.json`
+    into the work repo. Keep configuration in the work repo as-is and move secrets to environment variables
+    (the zip snapshot currently contains secrets in `LeadManagementPortal/appsettings.json` - scrub those first).
+- Agent scaffolding docs (optional, usually skip):
+  - Per-folder `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`
+- GitHub Actions workflows:
+  - Do not port CI workflows without explicit approval. Private-repo CI can be policy-sensitive
+    (cost, compliance, minutes, secrets). If approved, port only the workflows you want and keep them minimal.
 
 ---
 
 ## Current High-Risk Items
 
-### Risk 1 – EF Schema Mismatch (BLOCKING)
+### Risk 1 - EF Schema Mismatch (BLOCKING)
 
 Two new tables exist in sandbox that do not exist in the work repo:
 
-- `Notifications` – required by Features 1, 9 (notification bell in layout)
-- `LeadFollowUpTasks` – required by Features 2, 8 (pipeline board, overdue count)
+- `Notifications` - required by Features 1, 9 (notification bell in layout)
+- `LeadFollowUpTasks` - required by Features 2, 8 (pipeline board, overdue count)
 
 Porting any code that references these tables without the migrations will cause a
 runtime crash on first request that touches them.
@@ -78,7 +101,7 @@ runtime crash on first request that touches them.
 **Mitigation:** Regenerate both migrations in the work repo and validate against a
 SQL Server staging clone before any other code lands.
 
-### Risk 2 – Notification Service Coupling
+### Risk 2 - Notification Service Coupling
 
 `LeadsController` injects `INotificationService` and calls `NotifyUserAsync` on
 lead status changes. Porting lead pipeline code (Feature 2) without Feature 1 will
@@ -86,7 +109,7 @@ cause a DI / compile failure.
 
 **Mitigation:** Always port Feature 1 (notification stack) before Feature 2.
 
-### Risk 3 – CsvHelper Package Missing
+### Risk 3 - CsvHelper Package Missing
 
 The `Export()` action on `LeadsController` uses `CsvHelper`. If the code is ported
 but the NuGet package is not added to `.csproj`, the project will not build.
@@ -94,7 +117,7 @@ but the NuGet package is not added to `.csproj`, the project will not build.
 **Mitigation:** Add `CsvHelper 33.0.1` to `.csproj` in the same commit as the
 export action.
 
-### Risk 4 – Program.cs Startup Drift
+### Risk 4 - Program.cs Startup Drift
 
 Sandbox `Program.cs` has significant additions:
 - `AddHttpContextAccessor()` (needed by `LocalFileStorageService`)
@@ -108,7 +131,7 @@ Sandbox `Program.cs` has significant additions:
 **Mitigation:** Port `Program.cs` changes surgically, line by line, not as a bulk
 replacement.
 
-### Risk 5 – site.css and _Layout.cshtml Surface Area
+### Risk 5 - site.css and _Layout.cshtml Surface Area
 
 Both files have extensive changes. Bulk-replacing them risks losing untracked
 prod-only customizations and introducing style regressions.
@@ -117,20 +140,52 @@ prod-only customizations and introducing style regressions.
 
 ---
 
+## Recommended Approach: Feature-Based PR Stack
+
+Port the sandbox work as multiple smaller PRs. This reduces merge conflicts and
+makes schema changes reviewable.
+
+Suggested stack (adjust to match the work repo's current mainline):
+
+1. **PR: DB prerequisites**
+   - Regenerate SQL Server migrations in the work repo for:
+     - `Notifications`
+     - `LeadFollowUpTasks`
+   - Port the corresponding model/DbContext changes (no UI yet).
+2. **PR: Notifications**
+   - API + service + UI bell dropdown + minimal tests.
+3. **PR: Lead pipeline follow-ups**
+   - Follow-up task CRUD + pipeline UI + controller endpoints + tests.
+4. **PR: Storage fallback + protected downloads**
+   - `LocalFileStorageService`, `FilesController`, `LocalStorageOptions`, and the
+     DI selection changes in `Program.cs`.
+5. **PR: Search + customer edit**
+   - Navbar search/typeahead + `CustomerEditViewModel` + customer edit view flow.
+6. **PR: Commissions surface**
+   - Commissions controller/viewmodel/view + tests.
+7. **PR: Quality gates**
+   - `scripts/ci/*` guardrails and additional `LeadManagementPortal.Tests/*`.
+8. **Optional PRs (only if desired/approved)**
+   - Playwright `tests/browser/*` (and any CI workflows to run it).
+   - Render deploy artifacts (`render.yaml`, `Dockerfile`, `.render/`, `RENDER.md`).
+   - UI-only polish (large diffs in `site.css` and `_Layout.cshtml`).
+
+---
+
 ## Integration Approach: Single Clean PR
 
 This is the recommended path when leadership wants one PR in the work repo.
 
-### Step 0 – Set Up Integration Branch in Work Repo
+### Step 0 - Set Up Integration Branch in Work Repo
 
-```bash
+```powershell
 # In the work repo
 git checkout main
 git pull
 git checkout -b integration/feature-parity-20260225
 ```
 
-### Step A – Schema Prerequisites
+### Step A - Schema Prerequisites
 
 **Goal:** Both new tables exist and migrate cleanly on SQL Server.
 
@@ -154,18 +209,40 @@ LeadManagementPortal/Data/ApplicationDbContext.cs
 
 **Generate migrations (do NOT copy from sandbox):**
 
-```bash
-# In work repo
-dotnet ef migrations add AddNotifications \
-  --project LeadManagementPortal/LeadManagementPortal.csproj
+```powershell
+# In work repo (PowerShell)
+dotnet tool restore
 
-dotnet ef migrations add AddLeadFollowUpTasks \
-  --project LeadManagementPortal/LeadManagementPortal.csproj
+# Ensure EF runs against SQL Server (not SQLite).
+# If the work repo does not use DatabaseProvider switching, you can omit this.
+$env:DatabaseProvider = "SqlServer"
+$env:ConnectionStrings__DefaultConnection = "<your-sqlserver-connection-string>"
+
+dotnet ef migrations add AddNotifications `
+  --project LeadManagementPortal/LeadManagementPortal.csproj `
+  --startup-project LeadManagementPortal/LeadManagementPortal.csproj `
+  --context ApplicationDbContext
+
+dotnet ef migrations add AddLeadFollowUpTasks `
+  --project LeadManagementPortal/LeadManagementPortal.csproj `
+  --startup-project LeadManagementPortal/LeadManagementPortal.csproj `
+  --context ApplicationDbContext
+```
+
+Optional (recommended): generate and review SQL before applying to any shared DB:
+
+```powershell
+dotnet ef migrations script `
+  --project LeadManagementPortal/LeadManagementPortal.csproj `
+  --startup-project LeadManagementPortal/LeadManagementPortal.csproj `
+  --context ApplicationDbContext `
+  --idempotent `
+  --output ./.tmp/migrations-idempotent.sql
 ```
 
 **Validate:**
 
-```bash
+```powershell
 dotnet restore
 dotnet build
 dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
@@ -173,7 +250,7 @@ dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
 
 Run the generated migrations against a SQL Server staging clone and confirm:
 - `UPDATE` applies cleanly
-- `DOWN` (rollback) removes tables without data loss on other tables
+- `DOWN` (rollback) removes tables on a disposable DB (validate rollback in staging; do not rely on down-migrations as the production rollback plan)
 
 **Commit:**
 ```
@@ -182,7 +259,7 @@ feat(db): add Notifications and LeadFollowUpTasks schema
 
 ---
 
-### Step B – Service/Model Contracts
+### Step B - Service/Model Contracts
 
 **Goal:** All service interfaces and implementations updated; no behavior-breaking
 changes to existing methods.
@@ -190,7 +267,7 @@ changes to existing methods.
 **Files to modify/add in work repo:**
 
 ```
-# Service interfaces (add new methods only – do not remove existing signatures)
+# Service interfaces (add new methods only - do not remove existing signatures)
 LeadManagementPortal/Services/ILeadService.cs
   + SearchTopAsync(string term, string userId, string userRole, int maxResults)
   + GetFollowUpsForLeadsAsync(IEnumerable<string> leadIds, string userId, string userRole)
@@ -227,7 +304,7 @@ LeadManagementPortal/Models/ViewModels/CustomerEditViewModel.cs         [copy fr
 
 **Validate:**
 
-```bash
+```powershell
 dotnet build
 dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
 ```
@@ -239,7 +316,7 @@ feat(services): add notification service, follow-up task service methods, custom
 
 ---
 
-### Step C – Program.cs + Package Updates
+### Step C - Program.cs + Package Updates
 
 **Goal:** New services are registered; CsvHelper package added; local storage
 fallback wired. SQLite-only code stays out.
@@ -247,7 +324,7 @@ fallback wired. SQLite-only code stays out.
 **Changes to make in work repo:**
 
 ```csharp
-// Program.cs – add these registrations (do NOT add SQLite/EnsureCreated logic)
+// Program.cs - add these registrations (do NOT add SQLite/EnsureCreated logic)
 
 builder.Services.AddHttpContextAccessor();   // needed by LocalFileStorageService
 
@@ -296,7 +373,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options => { ... });
 
 **Validate:**
 
-```bash
+```powershell
 dotnet restore
 dotnet build
 dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
@@ -309,7 +386,7 @@ feat(startup): register notification service, conditional file storage, CsvHelpe
 
 ---
 
-### Step D – Controllers
+### Step D - Controllers
 
 **Goal:** All new API endpoints and the commissions/files controllers added;
 existing controllers have new actions only (no removal of existing actions).
@@ -347,7 +424,7 @@ LeadManagementPortal/Controllers/AccountController.cs
 
 **Validate:**
 
-```bash
+```powershell
 dotnet build
 dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
 ```
@@ -359,7 +436,7 @@ feat(controllers): add pipeline status/follow-up endpoints, notification API, se
 
 ---
 
-### Step E – Views and Frontend Assets
+### Step E - Views and Frontend Assets
 
 **Goal:** All UI changes land in one commit group; reviewers can see the full
 visual scope.
@@ -372,7 +449,7 @@ LeadManagementPortal/Views/Account/LoginTransition.cshtml
 LeadManagementPortal/Views/Commissions/Index.cshtml
 LeadManagementPortal/Views/Customers/Edit.cshtml
 
-# Modified views (careful diff/merge – do not bulk replace)
+# Modified views (careful diff/merge - do not bulk replace)
 LeadManagementPortal/Views/Account/Login.cshtml            -- full redesign
 LeadManagementPortal/Views/Dashboard/Index.cshtml          -- stat cards, activity feed
 LeadManagementPortal/Views/Leads/Index.cshtml              -- Kanban board, follow-up sidebar, export button
@@ -392,12 +469,12 @@ LeadManagementPortal/wwwroot/css/site.css                  -- large diff; merge 
 ```
 
 **High-caution files:**
-- `_Layout.cshtml` – touches every page; get a second set of eyes
-- `site.css` – large; visual regressions are easy to introduce silently
+- `_Layout.cshtml` - touches every page; get a second set of eyes
+- `site.css` - large; visual regressions are easy to introduce silently
 
 **Validate:**
 
-```bash
+```powershell
 dotnet build
 # Manual smoke test: login, dashboard, leads pipeline, notifications bell, global search
 ```
@@ -409,47 +486,60 @@ feat(ui): add pipeline board, login redesign, dashboard overhaul, notification b
 
 ---
 
-### Step F – Tests Only (NO CI Workflows)
+### Step F - Tests Only (NO CI Workflows)
 
 **Goal:** All new .NET tests land. Tests must be green before PR opens.
 
-> **Why no CI workflows?** The work repo is **private**. GitHub Actions minutes are
-> billed on private repos. Porting the CI suite would start charging the boss's
-> account without his explicit approval. Leave all `.github/workflows/`,
-> `.github/actions/`, and `.github/dependabot.yml` out of this PR entirely.
-> The existing `deploy-azure.yml` must not be touched. If automated CI is wanted,
-> raise that as a separate cost discussion before doing anything.
+> **Why no CI workflows by default?** CI policies for the work repo may be
+> cost/compliance-sensitive (private repo minutes, secrets handling, approval
+> processes). Do not port `.github/workflows/`, `.github/actions/`, or
+> `.github/dependabot.yml` without explicit approval. Do not touch the existing
+> `deploy-azure.yml` unless asked.
 
 **Files to add in work repo:**
 
 ```
 # .NET test classes (copy from sandbox)
+LeadManagementPortal.Tests/CommissionsControllerTests.cs
 LeadManagementPortal.Tests/CustomerAccessAndUpdateTests.cs
 LeadManagementPortal.Tests/CustomerVisibilityHardeningTests.cs
 LeadManagementPortal.Tests/FrontendNotificationScriptTests.cs
+LeadManagementPortal.Tests/LeadDocumentsControllerTests.cs
+LeadManagementPortal.Tests/LeadDocumentServiceDeletionTests.cs
 LeadManagementPortal.Tests/LeadExtensionTests.cs
 LeadManagementPortal.Tests/LeadsControllerSecurityContractsTests.cs
+LeadManagementPortal.Tests/LeadServiceHardeningTests.cs
 LeadManagementPortal.Tests/PortabilityMigrationContractsTests.cs
 LeadManagementPortal.Tests/SalesOrgAdminVisibilityTests.cs
 LeadManagementPortal.Tests/SeedingTool.cs
 
-# Playwright browser tests (copy entire directory – run locally only, NOT in CI)
+# Playwright browser tests (copy entire directory - run locally only, NOT in CI)
 tests/browser/
 ```
 
 **Do NOT add:**
 ```
-.github/workflows/*       ← private repo = paid minutes, boss has not approved
-.github/actions/*         ← same
-.github/dependabot.yml    ← same
+.github/workflows/*       (approval required)
+.github/actions/*         (approval required)
+.github/dependabot.yml    (approval required)
 ```
 
 **Validate locally:**
 
-```bash
+```powershell
 dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
 # Playwright is run locally by the dev before opening the PR; not required in CI
-cd tests/browser && npx playwright test  # point PLAYWRIGHT_BASE_URL at local instance
+Set-Location tests/browser
+npm ci
+npx playwright install
+
+# Option A (default): Playwright starts the app via `webServer` in playwright.config.js
+npx playwright test
+
+# Option B: run against an already-running app
+# $env:SKIP_WEBSERVER = "1"
+# $env:BASE_URL = "https://<staging-host>"
+# npx playwright test
 ```
 
 **Commit:**
@@ -469,15 +559,15 @@ All items must be checked off:
   - `LeadFollowUpTasks` table created with correct columns + indexes
   - Rollback (`dotnet ef database update <previous-migration>`) removes tables cleanly
 - [ ] `dotnet build` exits 0 on the integration branch
-- [ ] `dotnet test` exits 0 (all 7 new test classes + any existing tests pass)
+- [ ] `dotnet test` exits 0 (all new test classes + any existing tests pass)
 - [ ] No Render-only files present in the PR diff (run `git diff main --name-only` and check)
 - [ ] Role/permission regression check completed for:
   - `GrantExtension` (SalesOrgAdmin + OrganizationAdmin only)
   - Lead reassignment (GroupAdmin + OrganizationAdmin only)
-  - Lead status movement (`UpdateStatus` — who can move to which statuses)
+  - Lead status movement (`UpdateStatus` - who can move to which statuses)
   - Notification ownership (users can only mark their own notifications read)
 - [ ] Manual smoke test completed:
-  - [ ] Login → LoginTransition → Dashboard renders without error
+  - [ ] Login -> LoginTransition -> Dashboard renders without error
   - [ ] Leads index loads pipeline board
   - [ ] Follow-up task can be created, completed, deleted
   - [ ] Lead status can be moved via pipeline API
@@ -511,8 +601,8 @@ Built through a controlled integration branch with staged commits.
 
 ## Schema changes
 
-- Migration `AddNotifications` – creates `Notifications` table (safe, additive)
-- Migration `AddLeadFollowUpTasks` – creates `LeadFollowUpTasks` table (safe, additive)
+- Migration `AddNotifications` - creates `Notifications` table (safe, additive)
+- Migration `AddLeadFollowUpTasks` - creates `LeadFollowUpTasks` table (safe, additive)
 - Both validated on SQL Server staging clone with apply and rollback confirmed.
 
 ## Not included
@@ -532,7 +622,7 @@ Built through a controlled integration branch with staged commits.
 ## Smoke test checklist
 
 - [ ] Login page renders with animated gradient
-- [ ] LoginTransition → Dashboard redirect works
+- [ ] LoginTransition -> Dashboard redirect works
 - [ ] Leads pipeline board loads and moves status
 - [ ] Follow-up task CRUD works
 - [ ] Lead CSV export downloads

@@ -1,7 +1,8 @@
 param(
     [string]$TargetRepoZipPath = "",
     [string]$TargetRepoZipUrl = "",
-    [switch]$SkipTests
+    [string]$OutputJsonPath = "",
+    [switch]$ShowLists
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,7 +10,7 @@ Set-StrictMode -Version Latest
 
 function Fail([string]$message) {
     Write-Host ""
-    Write-Host "Target dry-run failed: $message" -ForegroundColor Red
+    Write-Host "Portability audit failed: $message" -ForegroundColor Red
     exit 1
 }
 
@@ -21,13 +22,6 @@ function Resolve-RepoRoot {
 function Normalize-Relative([string]$absolute, [string]$root) {
     $relative = $absolute.Substring($root.Length).TrimStart("\", "/")
     return $relative.Replace("\", "/")
-}
-
-function Ensure-DotNet {
-    $dotnetCmd = Get-Command dotnet -ErrorAction SilentlyContinue
-    if (-not $dotnetCmd) {
-        Fail "dotnet SDK is required for target dry run."
-    }
 }
 
 function Find-SolutionRoot([string]$path) {
@@ -98,9 +92,7 @@ if ([string]::IsNullOrWhiteSpace($TargetRepoZipPath) -and [string]::IsNullOrWhit
     Fail "Provide -TargetRepoZipPath or -TargetRepoZipUrl."
 }
 
-Ensure-DotNet
-
-$workDir = Join-Path ([System.IO.Path]::GetTempPath()) ("port-dry-run-" + [Guid]::NewGuid().ToString("N"))
+$workDir = Join-Path ([System.IO.Path]::GetTempPath()) ("port-audit-" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $workDir -Force | Out-Null
 
 try {
@@ -139,7 +131,7 @@ try {
     $includePrefixPattern = "^(LeadManagementPortal/|LeadManagementPortal\.Tests/|LeadManagementPortal\.sln$|scripts/ci/)"
     $currentFiles = Get-ChildItem -Path $repoRoot -Recurse -File
 
-$candidateFiles = $currentFiles | ForEach-Object {
+    $candidateFiles = $currentFiles | ForEach-Object {
         $relative = Normalize-Relative $_.FullName $repoRoot
         [PSCustomObject]@{
             Relative = $relative
@@ -149,7 +141,6 @@ $candidateFiles = $currentFiles | ForEach-Object {
         $_.Relative -match $includePrefixPattern
     }
 
-    # Filter exclusions in a second pass to keep pattern matching explicit.
     $portableFiles = New-Object System.Collections.Generic.List[object]
     foreach ($file in $candidateFiles) {
         $excluded = $false
@@ -164,54 +155,70 @@ $candidateFiles = $currentFiles | ForEach-Object {
         }
     }
 
-    $copied = New-Object System.Collections.Generic.List[string]
+    $onlyInSandbox = New-Object System.Collections.Generic.List[string]
+    $same = New-Object System.Collections.Generic.List[string]
+    $different = New-Object System.Collections.Generic.List[string]
+
     foreach ($file in $portableFiles) {
         $targetPath = Join-Path $targetRoot ($file.Relative.Replace("/", "\"))
-        $targetDir = Split-Path -Parent $targetPath
-        if (-not (Test-Path $targetDir)) {
-            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+        if (-not (Test-Path $targetPath)) {
+            $onlyInSandbox.Add($file.Relative)
+            continue
         }
 
-        $shouldCopy = $true
-        if (Test-Path $targetPath) {
-            $sourceHash = Get-PortableHash $file.FullName $file.Relative
-            $targetHash = Get-PortableHash $targetPath $file.Relative
-            $shouldCopy = $sourceHash -ne $targetHash
+        $sourceHash = Get-PortableHash $file.FullName $file.Relative
+        $targetHash = Get-PortableHash $targetPath $file.Relative
+        if ($sourceHash -eq $targetHash) {
+            $same.Add($file.Relative)
         }
-
-        if ($shouldCopy) {
-            Copy-Item -Path $file.FullName -Destination $targetPath -Force
-            $copied.Add($file.Relative)
+        else {
+            $different.Add($file.Relative)
         }
     }
 
-    if ($copied.Count -eq 0) {
-        Write-Host "No portable file differences to apply; target already matches candidate paths."
-    }
-    else {
-        Write-Host "Applied $($copied.Count) portable file(s) onto target snapshot."
+    $result = [PSCustomObject]@{
+        TargetRepoZipPath = (Resolve-Path $TargetRepoZipPath).Path
+        TimestampUtc = [DateTime]::UtcNow.ToString("o")
+        TotalPortableFiles = $portableFiles.Count
+        OnlyInSandboxCount = $onlyInSandbox.Count
+        SameCount = $same.Count
+        DifferentCount = $different.Count
+        OnlyInSandbox = $onlyInSandbox
+        Same = $same
+        Different = $different
     }
 
-    Push-Location $targetRoot
-    try {
-        dotnet restore LeadManagementPortal.sln
-        dotnet build LeadManagementPortal.sln -c Release --no-restore
+    Write-Host ""
+    Write-Host "Portable-file diff (normalized line endings for text files):"
+    Write-Host "  Total portable files considered: $($result.TotalPortableFiles)"
+    Write-Host "  Present only in sandbox:          $($result.OnlyInSandboxCount)"
+    Write-Host "  Same content:                     $($result.SameCount)"
+    Write-Host "  Different content:                $($result.DifferentCount)"
 
-        if (-not $SkipTests.IsPresent) {
-            dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj `
-                -c Release `
-                --no-build `
-                --filter "FullyQualifiedName!~LeadManagementPortal.Tests.LocalSeeder"
+    if ($ShowLists.IsPresent) {
+        Write-Host ""
+        Write-Host "Only in sandbox ($($onlyInSandbox.Count)):"
+        $onlyInSandbox | Sort-Object | ForEach-Object { Write-Host "  $_" }
+
+        Write-Host ""
+        Write-Host "Different content ($($different.Count)):"
+        $different | Sort-Object | ForEach-Object { Write-Host "  $_" }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($OutputJsonPath)) {
+        $outDir = Split-Path -Parent $OutputJsonPath
+        if (-not [string]::IsNullOrWhiteSpace($outDir) -and -not (Test-Path $outDir)) {
+            New-Item -ItemType Directory -Path $outDir -Force | Out-Null
         }
-    }
-    finally {
-        Pop-Location
-    }
 
-    Write-Host "Target portability dry run succeeded."
+        $result | ConvertTo-Json -Depth 5 | Set-Content -Path $OutputJsonPath -Encoding UTF8
+        Write-Host ""
+        Write-Host "Wrote audit JSON: $OutputJsonPath"
+    }
 }
 finally {
     if (Test-Path $workDir) {
         Remove-Item -Path $workDir -Recurse -Force
     }
 }
+

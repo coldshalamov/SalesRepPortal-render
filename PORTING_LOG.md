@@ -2,485 +2,427 @@
 
 Purpose: track every change made in `SalesRepPortal-render`, classify whether it
 should be ported to the work repo, and define a safe PR workflow. Entries are
-grouped by feature, not by commit, because several features span many commits.
+grouped by feature (not by commit) because several features span many commits.
 
 ## Rules
 
-1. Never port `Render-only` commits to the work repo.
-2. Port only selected files/commits to a dedicated feature branch in the work repo.
-3. Keep infrastructure changes (Render, SQLite, demo seeding) out of work PRs unless explicitly approved.
-4. Migrations: **never copy migration files from sandbox; regenerate in the work repo.**
+1. Never port Render deploy artifacts unless explicitly approved.
+2. Migrations: never copy migration files from sandbox; regenerate in the work repo.
+3. Avoid "copy everything changed" PRs. Slice by feature.
+4. Treat SQL Server vs SQLite behavior as provider-sensitive; verify on SQL Server.
 
 ## Classification Legend
 
 | Label | Meaning |
 |---|---|
 | **Portable** | Port as-is with minimal review |
-| **Portable with edits** | Port after stripping sandbox-only code |
-| **Render-only** | Never port |
+| **Portable with edits** | Port after stripping sandbox-only behavior/config |
+| **Render-only** | Never port (Render sandbox infrastructure/runtime) |
+| **Approval required** | Technically portable, but requires explicit approval (policy/cost/secrets) |
 
 ---
 
-## AUDIT-2026-02-25 – Compatibility scan vs `D:\GitHub\SalesRepPortal-main.zip`
+## AUDIT-2026-02-25 - Compatibility scan vs `D:\GitHub\SalesRepPortal-render\SalesRepPortal-main.zip`
 
-- Snapshot date: 2026-02-24
-- Files differing (same path, different content): **119** (107 under `LeadManagementPortal/`)
-- Files present only in sandbox: **104+** (new source files + AGENTS/CLAUDE/GEMINI docs per folder)
-- Conclusion: sandbox is a full superset; heavy drift exists; narrow PR slicing is required.
+Work snapshot zip details:
+- Path: `D:\GitHub\SalesRepPortal-render\SalesRepPortal-main.zip`
+- Last write: 2026-02-24 22:41:36
+- SHA256: `32DFBB55EA654DE999E4B2CC1A0E0B921291D778559377C0B60169F7375E9DFC`
+
+Sandbox:
+- Repo root: `D:\GitHub\SalesRepPortal-render`
+- HEAD at time of audit: `634473171a1eb1662dc778aa179f54d8dbbb72a8`
+
+Portable-file diff (normalized line endings for text files):
+- Total portable files considered: **150**
+- Present only in sandbox: **39**
+- Same content: **62**
+- Different content: **49**
+
+Reproduce:
+```powershell
+./scripts/ci/portability-audit.ps1 -TargetRepoZipPath .\SalesRepPortal-main.zip
+```
+
+Notes:
+- This "portable-file diff" intentionally focuses on code and tooling that is normally portable:
+  `LeadManagementPortal/`, `LeadManagementPortal.Tests/`, `LeadManagementPortal.sln`, `scripts/ci/`.
+- It intentionally excludes: `.github/`, `tests/browser/`, `render.yaml`, `Dockerfile`, `.render/`, runtime uploads,
+  and app build outputs.
+
+Cross-cutting "different content" files (sandbox vs zip) that must be reviewed carefully and not accidentally swept
+into unrelated feature PRs:
+- Startup and config: `LeadManagementPortal/Program.cs`, `LeadManagementPortal/appsettings.json`
+- Data/EF: `LeadManagementPortal/Data/ApplicationDbContext.cs`, `LeadManagementPortal/Data/SeedData.cs`,
+  `LeadManagementPortal/Migrations/ApplicationDbContextModelSnapshot.cs`
+- Packages: `LeadManagementPortal/LeadManagementPortal.csproj`
+- UI surface area: `LeadManagementPortal/Views/Shared/_Layout.cshtml`, `LeadManagementPortal/wwwroot/css/site.css`,
+  many views under `LeadManagementPortal/Views/`
+- Misc frontend JS/assets: `LeadManagementPortal/wwwroot/js/site.js`, `LeadManagementPortal/wwwroot/js/multiselect.js`,
+  `LeadManagementPortal/wwwroot/img/*`
 
 ---
 
 ## Feature Inventory
 
-### Feature 1 – Notification System (full stack)
+### Feature 1 - Notification System (full stack)
 
-**What it does:** In-app bell-icon notifications. Supports user-specific and
-role-broadcast delivery (e.g. "lead assigned to you" vs "all admins"). Frontend
-polls `GET /api/notifications/get_unread_count` on page load; dropdown fetches and
-renders items; mark-read/unread/all-read supported.
+**What it does:** In-app bell-icon notifications. Supports user-targeted and
+role-broadcast delivery (e.g., "lead assigned to you" vs "all admins").
+
+**API:** `GET /api/notifications/get_notifications?limit=50&include_unread_count=true` (polling).
+`GET /api/notifications/get_unread_count` exists but the JS poller does not call it.
 
 **New files (sandbox-only):**
 
 | File | Note |
 |---|---|
-| `LeadManagementPortal/Models/Notification.cs` | DB entity; supports UserId or Role targeting |
-| `LeadManagementPortal/Services/INotificationService.cs` | Full service contract |
+| `LeadManagementPortal/Models/Notification.cs` | DB entity; supports `UserId` or `Role` targeting |
+| `LeadManagementPortal/Services/INotificationService.cs` | Service contract |
 | `LeadManagementPortal/Services/NotificationService.cs` | EF implementation |
-| `LeadManagementPortal/Controllers/NotificationsApiController.cs` | REST API at `/api/notifications` |
-| `LeadManagementPortal/Migrations/20260224_AddNotifications.cs` | Creates `Notifications` table |
+| `LeadManagementPortal/Controllers/NotificationsApiController.cs` | REST API under `/api/notifications` |
+| `LeadManagementPortal/Migrations/20260224_AddNotifications.cs` | Sandbox migration (do not port as-is) |
 | `LeadManagementPortal/wwwroot/css/notifications.css` | Bell dropdown styles |
-| `LeadManagementPortal/wwwroot/js/notifications.js` | Polling + dropdown JS |
+| `LeadManagementPortal/wwwroot/js/notifications.js` | Polling + dropdown JS (30s interval) |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Data/ApplicationDbContext.cs` | `DbSet<Notification> Notifications` + `OnModelCreating` config |
-| `Views/Shared/_Layout.cshtml` | Bell icon, unread badge, `notifications.css`/`notifications.js` injected |
-| `Program.cs` | `AddScoped<INotificationService, NotificationService>()` |
+| `LeadManagementPortal/Data/ApplicationDbContext.cs` | `DbSet<Notification>` + `OnModelCreating` config |
+| `LeadManagementPortal/Views/Shared/_Layout.cshtml` | Bell icon + badge + script/style includes |
+| `LeadManagementPortal/Program.cs` | DI registration for `INotificationService` |
 
-**Schema:** `Notifications` table; FK to `AspNetUsers.Id` (CASCADE DELETE); indexes
-on `UserId`, `Role`, `IsRead`, `CreatedAt`.
+**Schema:** `Notifications` table (required before any UI that calls the API).
 
 **Classification:** Portable with edits
-**Port action:**
-1. Port model + service + controller files.
-2. Port `ApplicationDbContext` additions.
-3. **Regenerate migration in work repo**: `dotnet ef migrations add AddNotifications`.
-4. Port CSS/JS assets and `_Layout.cshtml` bell-icon additions.
-5. Register service in `Program.cs`.
-6. Do NOT copy the migration `.cs` file from sandbox.
+
+**Port action (work repo):**
+1. Port model/service/controller/CSS/JS/layout changes.
+2. Port DbContext additions.
+3. Regenerate migration in the work repo (SQL Server): `dotnet ef migrations add AddNotifications ...`.
 
 ---
 
-### Feature 2 – Lead Follow-Up Task System (full stack)
+### Feature 2 - Lead Follow-Up Task System (pipeline board)
 
-**What it does:** Kanban-style pipeline board on the Leads index. Each lead can
-have typed follow-up tasks (call, email, demo, etc.) with due dates. API endpoints
-let the frontend create/complete/delete tasks without full-page reloads. Overdue
-count shown as a pipeline stat.
+**What it does:** Kanban-style pipeline board on Leads index. Leads can have
+typed follow-up tasks with optional due dates. Includes API endpoints used by
+`leads-pipeline.js`.
 
 **New files (sandbox-only):**
 
 | File | Note |
 |---|---|
-| `LeadManagementPortal/Models/LeadFollowUpTask.cs` | Entity: Type, Description, DueDate, IsCompleted, CreatedById, CompletedById |
-| `LeadManagementPortal/Migrations/20260225_AddLeadFollowUpTasks.cs` | Creates `LeadFollowUpTasks` table |
-| `LeadManagementPortal/wwwroot/js/leads-pipeline.js` | Board JS (drag-and-drop status, follow-up task sidebar) |
-| `LeadManagementPortal/wwwroot/css/leads-pipeline.css` | Board and pipeline styles |
+| `LeadManagementPortal/Models/LeadFollowUpTask.cs` | EF entity |
+| `LeadManagementPortal/Migrations/20260225_AddLeadFollowUpTasks.cs` | Sandbox migration (do not port as-is) |
+| `LeadManagementPortal/wwwroot/js/leads-pipeline.js` | Board + follow-up sidebar JS |
+| `LeadManagementPortal/wwwroot/css/leads-pipeline.css` | Board + pipeline styles |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Models/Lead.cs` | Added `ICollection<LeadFollowUpTask> FollowUpTasks` navigation property |
-| `Services/ILeadService.cs` | New methods: `SearchTopAsync`, `GetFollowUpsForLeadsAsync`, `GetFollowUpsForLeadAsync`, `AddFollowUpAsync`, `CompleteFollowUpAsync`, `DeleteFollowUpsAsync`, `GetOverdueFollowUpCountAsync` |
-| `Services/LeadService.cs` | Implementations of all above |
-| `Controllers/LeadsController.cs` | New API actions: `UpdateStatus`, `AddFollowUp`, `CompleteFollowUp`, `DeleteFollowUps`; also `Export` (CSV) |
-| `Data/ApplicationDbContext.cs` | `DbSet<LeadFollowUpTask> LeadFollowUpTasks` + `OnModelCreating` config |
-| `Views/Leads/Index.cshtml` | Kanban board view, pipeline stat panel, follow-up task sidebar |
+| `LeadManagementPortal/Models/Lead.cs` | Added `ICollection<LeadFollowUpTask> FollowUpTasks` navigation property |
+| `LeadManagementPortal/Data/ApplicationDbContext.cs` | `DbSet<LeadFollowUpTask>` + config |
+| `LeadManagementPortal/Services/ILeadService.cs` | Follow-up and search contract additions |
+| `LeadManagementPortal/Services/LeadService.cs` | Implements new follow-up/search methods |
+| `LeadManagementPortal/Controllers/LeadsController.cs` | Adds follow-up/task endpoints and pipeline status endpoints |
+| `LeadManagementPortal/Views/Leads/Index.cshtml` | Pipeline board UI (large change) |
 
-**Schema:** `LeadFollowUpTasks` table; FK to `Leads.Id` (CASCADE DELETE); indexes on
-`LeadId`, `DueDate`, `IsCompleted`.
+**Schema:** `LeadFollowUpTasks` table (required before any follow-up calls).
 
-**Classification:** Portable with edits (high attention — schema required first)
-**Port action:**
-1. Port `LeadFollowUpTask.cs` model.
-2. Port `Lead.cs` navigation property addition.
-3. Port `ApplicationDbContext` additions.
-4. **Regenerate migration in work repo**: `dotnet ef migrations add AddLeadFollowUpTasks`.
-5. Port `ILeadService` + `LeadService` method additions.
-6. Port `LeadsController` new API actions.
-7. Port JS/CSS assets.
-8. Port `Views/Leads/Index.cshtml` (large change – review carefully for unrelated diffs).
-9. Do NOT copy the migration `.cs` file from sandbox.
+**Classification:** Portable with edits (schema required first)
 
-**Dependency:** Feature 1 (Notifications) must be in place first because
-`LeadsController` now injects `INotificationService` and calls `NotifyUserAsync`
-on status changes.
+**Dependency:** If `LeadsController` calls `INotificationService` on status changes,
+port Feature 1 first to avoid DI/build failures.
 
 ---
 
-### Feature 3 – Lead CSV Export
+### Feature 3 - Lead CSV Export
 
-**What it does:** `GET /Leads/Export` downloads a CSV of the current user's visible
-leads. Uses CsvHelper. Output columns: Name, Email, Phone, Company, Status,
-Assigned Rep, Sales Group, Created Date, Expiry Date, Days Remaining.
+**What it does:** `GET /Leads/Export` downloads a CSV of visible leads. Uses CsvHelper.
 
-**New/modified files:**
+**Columns (current sandbox):**
+`FirstName`, `LastName`, `Email`, `Phone`, `Company`, `Address`, `City`, `State`,
+`ZipCode`, `Status`, `UrgencyLevel`, `DaysRemaining`, `CreatedDate`, `ExpiryDate`,
+`AssignedTo`, `Notes`.
+
+**Modified files:**
 
 | File | Change |
 |---|---|
-| `Controllers/LeadsController.cs` | New `Export()` action + `LeadExportRow` inner class |
-| `LeadManagementPortal.csproj` | `CsvHelper` 33.0.1 package added |
+| `LeadManagementPortal/Controllers/LeadsController.cs` | Adds `Export()` + `LeadExportRow` |
+| `LeadManagementPortal/LeadManagementPortal.csproj` | Adds `CsvHelper` 33.0.1 |
+| `LeadManagementPortal/Views/Leads/Index.cshtml` | (If ported) includes export button |
 
 **Classification:** Portable
-**Port action:**
-1. Add `<PackageReference Include="CsvHelper" Version="33.0.1" />` to work repo `.csproj`.
-2. Port the `Export()` method and `LeadExportRow` class from `LeadsController.cs`.
-3. Add the export button to `Views/Leads/Index.cshtml` if porting the full view.
 
 ---
 
-### Feature 4 – Global Navbar Search
+### Feature 4 - Global Navbar Search (typeahead)
 
-**What it does:** Typeahead search bar in the top nav. Queries
-`GET /api/search?q=...` which returns up to 5 leads + 5 customers matching the
-term, respecting role-based visibility. Results are shown in a dropdown; clicking
-navigates to the detail page.
+**What it does:** Typeahead search bar in the top nav. Queries `GET /api/search?q=...`
+and returns up to 5 leads + 5 customers (role-scoped).
 
 **New files (sandbox-only):**
 
 | File | Note |
 |---|---|
-| `Controllers/SearchController.cs` | `GET /api/search?q=` – returns `{ leads:[...], customers:[...] }` |
-| `wwwroot/js/navbar-search.js` | Typeahead input, debounce, dropdown rendering |
+| `LeadManagementPortal/Controllers/SearchController.cs` | `GET /api/search?q=` |
+| `LeadManagementPortal/wwwroot/js/navbar-search.js` | Typeahead + dropdown |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Services/ILeadService.cs` | `SearchTopAsync` (top-N fast search for typeahead, no audit log spam) |
-| `Services/ICustomerService.cs` | `SearchTopAsync` (same) |
-| `Views/Shared/_Layout.cshtml` | Search input in navbar + `navbar-search.js` injected |
+| `LeadManagementPortal/Services/ILeadService.cs` | `SearchTopAsync` |
+| `LeadManagementPortal/Services/LeadService.cs` | `SearchTopAsync` implementation |
+| `LeadManagementPortal/Services/ICustomerService.cs` | `SearchTopAsync` |
+| `LeadManagementPortal/Services/CustomerService.cs` | `SearchTopAsync` implementation |
+| `LeadManagementPortal/Views/Shared/_Layout.cshtml` | Search input + JS include |
 
 **Classification:** Portable
-**Port action:**
-1. Port `SearchController.cs`.
-2. Port `SearchTopAsync` additions to both service interfaces + implementations.
-3. Port navbar search markup + script include from `_Layout.cshtml`.
-4. Port `navbar-search.js`.
 
 ---
 
-### Feature 5 – Customer Edit
+### Feature 5 - Customer Edit
 
-**What it does:** Allows editing an existing customer's contact info and reassigning
-the sales rep. Guards ensure the new rep is in the same sales org. Previously,
-customers could not be edited after creation.
+**What it does:** Adds an Edit flow for existing customers (previously create-only).
+Includes org-boundary validation when reassigning reps.
 
 **New files (sandbox-only):**
 
 | File | Note |
 |---|---|
-| `Models/ViewModels/CustomerEditViewModel.cs` | Strongly-typed edit form model |
-| `Views/Customers/Edit.cshtml` | Edit form view |
+| `LeadManagementPortal/Models/ViewModels/CustomerEditViewModel.cs` | Edit form model |
+| `LeadManagementPortal/Views/Customers/Edit.cshtml` | Edit form view |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Services/ICustomerService.cs` | Added `GetAccessibleByIdAsync`, `UpdateAsync` |
-| `Services/CustomerService.cs` | Implementations |
-| `Controllers/CustomersController.cs` | New `Edit(GET)` + `Edit(POST)` actions with org-boundary validation |
+| `LeadManagementPortal/Services/ICustomerService.cs` | Adds `GetAccessibleByIdAsync`, `UpdateAsync` |
+| `LeadManagementPortal/Services/CustomerService.cs` | Implements above |
+| `LeadManagementPortal/Controllers/CustomersController.cs` | Adds `Edit(GET)` + `Edit(POST)` |
+| `LeadManagementPortal/Views/Customers/Index.cshtml` | (If ported) edit links/buttons |
+| `LeadManagementPortal/Views/Customers/Details.cshtml` | (If ported) edit links/buttons |
 
 **Classification:** Portable
-**Port action:**
-1. Port `CustomerEditViewModel.cs`.
-2. Port `ICustomerService` + `CustomerService` additions.
-3. Port `CustomersController` Edit actions.
-4. Port `Views/Customers/Edit.cshtml`.
-5. Add "Edit" link to `Views/Customers/Index.cshtml` / `Details.cshtml` if desired.
 
 ---
 
-### Feature 6 – Commissions Dashboard (scaffold / mock data)
+### Feature 6 - Commissions Dashboard (scaffold)
 
-**What it does:** Adds a "Commissions" page in the nav accessible to all
-authenticated users. Currently displays hardcoded mock data (no DB). Intended as
-a scaffold for a real commissions-from-orders integration.
+**What it does:** Adds a "Commissions" page (currently mock/scaffold UI).
 
 **New files (sandbox-only):**
 
 | File | Note |
 |---|---|
-| `Controllers/CommissionsController.cs` | Index() returns mock `CommissionDashboardViewModel` |
-| `Models/ViewModels/CommissionDashboardViewModel.cs` | TotalEarned, CurrentMonth, Pending, RecentDeals list |
-| `Views/Commissions/Index.cshtml` | Commission dashboard UI |
+| `LeadManagementPortal/Controllers/CommissionsController.cs` | Index returns mock data |
+| `LeadManagementPortal/Models/ViewModels/CommissionDashboardViewModel.cs` | ViewModel |
+| `LeadManagementPortal/Views/Commissions/Index.cshtml` | UI |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Views/Shared/_Layout.cshtml` | "Commissions" nav item added |
+| `LeadManagementPortal/Views/Shared/_Layout.cshtml` | Adds nav item |
 
 **Classification:** Portable with edits
-**Port caveat:** Currently uses mock data. Port as a scaffold only; do not imply to
-users or QA that this is live data. Add a "mock data" banner or disable the nav
-item until real data is wired.
-**Port action:**
-1. Port all three files.
-2. Add nav item to `_Layout.cshtml`.
-3. Decide before PR whether to show mock data or hide behind a feature flag.
+
+**Port caveat:** Decide whether to ship mock data. Consider a banner/feature flag.
 
 ---
 
-### Feature 7 – Login Page Redesign + Transition Animation
+### Feature 7 - Login Redesign + Transition Animation
 
-**What it does:** Complete visual overhaul of the login screen. Adds an animated
-stripe-gradient background, a branded card layout, and an intermediate
-`LoginTransition.cshtml` page that plays a loading animation before redirecting
-to the dashboard. Improves first-impression UX significantly.
+**What it does:** Login UI overhaul and a post-login transition page.
 
 **New files (sandbox-only):**
 
 | File | Note |
 |---|---|
-| `Views/Account/LoginTransition.cshtml` | Intermediate animated transition page |
-| `wwwroot/js/stripe-gradient.js` | Animated mesh-gradient background JS |
+| `LeadManagementPortal/Views/Account/LoginTransition.cshtml` | Transition page |
+| `LeadManagementPortal/wwwroot/js/stripe-gradient.js` | Animated gradient |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Views/Account/Login.cshtml` | Fully redesigned (gradient bg, card, branded layout) |
-| `Controllers/AccountController.cs` | POST login now redirects to `LoginTransition` instead of `Dashboard/Index` directly |
-| `wwwroot/css/site.css` | Major additions for login card, gradient, animations |
+| `LeadManagementPortal/Views/Account/Login.cshtml` | Redesigned login UI |
+| `LeadManagementPortal/Controllers/AccountController.cs` | Redirects via LoginTransition |
+| `LeadManagementPortal/wwwroot/css/site.css` | Login/animation styles |
 
 **Classification:** Portable with edits
-**Port action:**
-1. Port `LoginTransition.cshtml` and `stripe-gradient.js`.
-2. Port redesigned `Login.cshtml`.
-3. Port `AccountController.cs` redirect change (only that block — review for any
-   other unrelated changes in the controller).
-4. Merge `site.css` additions carefully (high risk of style regression if blindly
-   replaced; do a selective merge of the new login/animation sections).
 
 ---
 
-### Feature 8 – Dashboard Redesign
+### Feature 8 - Dashboard Redesign
 
-**What it does:** Replaces the plain dashboard with stat cards (total leads, new
-this week, converted, expiring soon), a recent activity feed, and a pipeline
-summary panel. Layout uses CSS Grid. Also surfaces overdue follow-up count from
-`ILeadService.GetOverdueFollowUpCountAsync`.
+**What it does:** Updates dashboard UI (stat cards, activity feed, pipeline summary).
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Views/Dashboard/Index.cshtml` | Fully redesigned (stat cards, activity feed, grid layout) |
-| `Controllers/LeadsController.cs` | Sets `ViewBag.OverdueFollowUpCount` in `Index()` (consumed by Leads view, not Dashboard directly) |
-| `wwwroot/css/site.css` | Dashboard card/grid CSS additions |
+| `LeadManagementPortal/Views/Dashboard/Index.cshtml` | Redesigned |
+| `LeadManagementPortal/wwwroot/css/site.css` | Dashboard styles |
+
+**Dependency:** If you surface overdue follow-up counts, Feature 2 must land first.
 
 **Classification:** Portable with edits
-**Dependency:** Overdue follow-up count requires Feature 2 (follow-up tasks) to be
-in place. If porting dashboard without Feature 2, guard the `ViewBag.OverdueFollowUpCount`
-call with a null check.
 
 ---
 
-### Feature 9 – Layout / Navigation Overhaul
+### Feature 9 - Layout / Navigation Overhaul
 
-**What it does:** `_Layout.cshtml` redesigned with dynamic org branding (pulls logo
-from the user's `SalesOrg` or `SalesGroup`), updated nav structure, responsive
-improvements, and wiring for notification bell + global search.
+**What it does:** `_Layout.cshtml` overhaul with dynamic org branding (logos),
+responsive nav, and wiring for notification bell + global search.
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Views/Shared/_Layout.cshtml` | Dynamic logo, Commissions item, search bar, notification bell, responsive nav |
-| `wwwroot/css/site.css` | Navbar custom styles, color palette, font imports |
+| `LeadManagementPortal/Views/Shared/_Layout.cshtml` | Large change |
+| `LeadManagementPortal/wwwroot/css/site.css` | Navbar styles |
+| `LeadManagementPortal/wwwroot/img/DiRxLogo.svg` | Updated asset |
+| `LeadManagementPortal/wwwroot/img/DiRxLogoWhite.svg` | Updated asset |
 
 **Classification:** Portable with edits
-**Port action:** This is the highest surface-area view change in the PR. Review
-diff section-by-section. The dynamic logo query (`AppDbContext.Users.Include(...)`)
-runs inline in the view — this is acceptable but note it fires a synchronous DB
-query per page load; consider converting to a ViewComponent in a follow-up.
+
+**Port caveat:** The dynamic logo query runs inline in the view; consider a ViewComponent later.
 
 ---
 
-### Feature 10 – Local File Storage + Secure File Download (dev/Render fallback)
+### Feature 10 - Local File Storage Fallback + Secure Downloads
 
-**What it does:** When Azure Blob Storage is not configured, `Program.cs` registers
-`LocalFileStorageService` instead of `AzureBlobStorageService`. Files are stored
-on disk. `FilesController` serves them via cryptographically signed, time-limited
-tokens (ASP.NET Data Protection API).
+**What it does:** Adds a local-disk `IFileStorageService` fallback when Azure
+storage is not configured, and serves files via time-limited signed tokens.
 
 **New files (sandbox-only):**
 
 | File | Note |
 |---|---|
-| `Models/LocalStorageOptions.cs` | Config POCO: `RootPath`, `BaseUrlPath` |
-| `Services/LocalFileStorageService.cs` | `IFileStorageService` impl for local disk |
-| `Controllers/FilesController.cs` | `/files/{token}` secure download endpoint |
+| `LeadManagementPortal/Models/LocalStorageOptions.cs` | Local storage options |
+| `LeadManagementPortal/Services/LocalFileStorageService.cs` | Local disk storage implementation |
+| `LeadManagementPortal/Controllers/FilesController.cs` | `/files/{token}` endpoint |
 
 **Modified files:**
 
 | File | Change |
 |---|---|
-| `Program.cs` | Conditional `IFileStorageService` registration (Azure if configured, local otherwise) |
-| `appsettings.json` | `LocalStorage` section added |
+| `LeadManagementPortal/Services/IFileStorageService.cs` | Storage contract changes |
+| `LeadManagementPortal/Services/AzureBlobStorageService.cs` | Aligns with contract + token URL behavior |
+| `LeadManagementPortal/Services/ILeadDocumentService.cs` | Uses storage abstraction |
+| `LeadManagementPortal/Services/LeadDocumentService.cs` | Uses storage abstraction |
+| `LeadManagementPortal/Controllers/LeadDocumentsController.cs` | Uses storage abstraction + secure download URLs |
+| `LeadManagementPortal/Program.cs` | Conditional registration (Azure vs local) |
 
-**Classification:** Render-only for the local storage feature itself; the **conditional
-registration pattern** in `Program.cs` is portable and useful as a dev fallback.
-**Port recommendation:**
-- DO port the conditional `IFileStorageService` registration logic from `Program.cs`
-  (keeps prod using Azure; gives developers a no-config local path).
-- DO port `LocalStorageOptions`, `LocalFileStorageService`, and `FilesController`
-  (harmless in prod; needed for local dev without Azure credentials).
-- DO add `LocalStorage` section to `appsettings.Development.json` only (not
-  `appsettings.json` / prod config).
-- DO NOT port the SQLite-specific config or `EnsureCreatedAsync` path.
+**Classification:** Portable with edits
 
----
-
-### Feature 11 – .NET Unit / Integration Test Suite
-
-**What it does:** Adds 7 test classes covering security contracts, visibility
-hardening, extension logic, notification frontend behavior, and portability
-migration contracts. Zero tests existed in prod before this.
-
-**New files (sandbox-only, all in `LeadManagementPortal.Tests/`):**
-
-| File | Coverage |
-|---|---|
-| `CustomerAccessAndUpdateTests.cs` | Customer `GetAccessibleByIdAsync` and `UpdateAsync` access control |
-| `CustomerVisibilityHardeningTests.cs` | Customer search visibility by role |
-| `FrontendNotificationScriptTests.cs` | Verifies notification JS API contracts (string checks) |
-| `LeadExtensionTests.cs` | `GrantExtension` role/rule behavior |
-| `LeadsControllerSecurityContractsTests.cs` | Role-based action gating on lead endpoints |
-| `PortabilityMigrationContractsTests.cs` | Confirms migration names exist and are discoverable |
-| `SalesOrgAdminVisibilityTests.cs` | `SalesOrgAdmin` sees correct org-scoped data |
-| `SeedingTool.cs` | Shared test DB seeding helper |
-
-**Classification:** Portable (strongly recommended — port these before anything else)
-**Port action:** Copy test files as-is. Run `dotnet test` in work repo to confirm
-green before other PR steps.
+**Port caveats:**
+- DataProtection keys must be persisted if you run multiple instances or need tokens to survive restarts.
+- Do not port sandbox `appsettings.json` into the work repo; add local storage config via env vars or dev-only config.
 
 ---
 
-### Feature 12 – Playwright Browser Test Suite
+### Feature 11 - Expanded .NET Test Suite
 
-**What it does:** End-to-end browser tests using Playwright covering public pages,
-authenticated flows, API surface parity, mobile layout, accessibility advisory,
-and visual captures. Targets the deployed app URL via environment variable.
+**What it does:** Adds unit-ish tests to harden access control and portability contracts.
 
-**New files (sandbox-only):**
+**New files (sandbox-only, `LeadManagementPortal.Tests/`):**
+- `LeadManagementPortal.Tests/CommissionsControllerTests.cs`
+- `LeadManagementPortal.Tests/CustomerAccessAndUpdateTests.cs`
+- `LeadManagementPortal.Tests/CustomerVisibilityHardeningTests.cs`
+- `LeadManagementPortal.Tests/FrontendNotificationScriptTests.cs`
+- `LeadManagementPortal.Tests/LeadDocumentsControllerTests.cs`
+- `LeadManagementPortal.Tests/LeadDocumentServiceDeletionTests.cs`
+- `LeadManagementPortal.Tests/LeadExtensionTests.cs`
+- `LeadManagementPortal.Tests/LeadsControllerSecurityContractsTests.cs`
+- `LeadManagementPortal.Tests/LeadServiceHardeningTests.cs`
+- `LeadManagementPortal.Tests/PortabilityMigrationContractsTests.cs`
+- `LeadManagementPortal.Tests/SeedingTool.cs`
 
-| Path | Contents |
-|---|---|
-| `tests/browser/` | Full Playwright project (package.json, playwright.config.js, helpers/, specs/) |
-| `tests/browser/specs/accessibility-advisory.spec.js` | WCAG advisory checks |
-| `tests/browser/specs/api-surface.spec.js` | API endpoint availability |
-| `tests/browser/specs/browser-capabilities.spec.js` | Cross-browser compat checks |
-| `tests/browser/specs/mobile-layout.spec.js` | Responsive/mobile viewport |
-| `tests/browser/specs/render-authenticated.spec.js` | Authenticated page rendering |
-| `tests/browser/specs/render-public.spec.js` | Public page rendering |
-| `tests/browser/specs/visual-capture.spec.js` | Screenshot capture for visual comparison |
+**Modified files:**
+- `LeadManagementPortal.Tests/SalesOrgAdminVisibilityTests.cs` (tightened visibility contracts)
 
 **Classification:** Portable (strongly recommended)
-**Port action:** Copy `tests/browser/` directory. Update `playwright.config.js`
-`baseURL` to point to the work repo's staging URL. Run `npx playwright test` to
-confirm parity.
 
 ---
 
-### Feature 13 – GitHub Actions CI Workflows
+### Feature 12 - Playwright Browser Test Suite
 
-**What it does:** Adds comprehensive CI coverage: .NET build/test, browser
-parity tests, frontend JS guards, CodeQL security scanning, dependency review,
-and Docker build validation.
+**What it does:** End-to-end browser tests using Playwright. Covers public pages,
+authenticated flows, API surface parity, mobile layout, and basic advisory checks.
 
-**Classification:** **Do not port**
+**Files (sandbox-only):**
+- `tests/browser/*`
 
-**Reason:** The work repo is a **private repository**. GitHub Actions minutes are
-billed on private repos (free tier only covers public repos). Porting any workflow
-would start incurring charges on the owner's account without explicit approval.
-The only workflow that should exist in the work repo is the existing
-`deploy-azure.yml` — do not touch it.
+**How it runs (current sandbox):**
+- By default, `tests/browser/playwright.config.js` starts the app via Playwright `webServer`
+  (`dotnet run`) and uses SQLite under `tests/browser/.tmp/`.
+- To run against an external deployed URL, set `BASE_URL` and `SKIP_WEBSERVER=1`.
 
-If automated CI is wanted in the future, bring it up with the repo owner as a
-separate budget discussion. The workflows exist here in the sandbox (public/free)
-and can be referenced at that time.
-
-**Files — do not copy any of these:**
-
-| File | Reason |
-|---|---|
-| `.github/workflows/ci.yml` | Paid minutes on private repo |
-| `.github/workflows/browser-parity.yml` | Paid minutes on private repo |
-| `.github/workflows/browser-quality-advisory.yml` | Paid minutes on private repo |
-| `.github/workflows/frontend-guards.yml` | Paid minutes on private repo |
-| `.github/workflows/codeql.yml` | Paid minutes on private repo |
-| `.github/workflows/dependency-review.yml` | Paid minutes on private repo |
-| `.github/workflows/docker-build.yml` | Also Render-specific |
-| `.github/actions/dotnet-ci/action.yml` | Paid minutes on private repo |
-| `.github/dependabot.yml` | Paid minutes on private repo |
+**Classification:** Portable (often best as a separate PR)
 
 ---
 
-### Feature 14 – NuGet Package: CsvHelper
+### Feature 13 - GitHub Actions CI Workflows
 
-**What it does:** Required by the Lead CSV Export feature (Feature 3).
+**What it does:** Adds CI workflows for build/test and optional browser parity checks.
 
-| Change | Detail |
-|---|---|
-| `LeadManagementPortal.csproj` | Added `CsvHelper 33.0.1` |
+**Files (sandbox-only):**
+- `.github/*`
 
-**Note:** The git log shows several Dependabot bumps for EF Core / Identity / dotnet-ef
-packages. Those bumps were applied as commits but **the `.csproj` in sandbox still
-shows EF Core 8.0.0**. The Dependabot commits updated `.github/dependabot.yml` only,
-not the actual package references. No EF Core version bump needs to be ported.
+**Classification:** Approval required
 
-**Classification:** Portable
-**Port action:** Add `<PackageReference Include="CsvHelper" Version="33.0.1" />` to
-the work repo `.csproj`.
+**Port notes:**
+- Do not change existing Azure deploy workflows in the work repo without explicit direction.
+- If approved, port the minimal workflows first (build + test) and add browser/CodeQL later.
 
 ---
 
-## Items That Are Render-Only (Never Port)
+## Render-Only / Not-To-Port Items
 
-| Item | Reason |
-|---|---|
-| `render.yaml` | Render deploy config |
-| `Dockerfile` | Render-specific container build |
-| `.github/workflows/docker-build.yml` | Render-specific CI |
-| `Program.cs` – SQLite provider branch | Free-tier SQLite; prod uses SQL Server |
-| `Program.cs` – `EnsureCreatedAsync()` path | Only for SQLite; prod uses `MigrateAsync()` |
-| `Program.cs` – fail-fast re-throw on seed error | Can be ported but review first; changes startup behavior |
-| `Program.cs` – `ForwardedHeadersOptions` | Useful for any reverse-proxy deploy; evaluate if prod needs it |
-| `Data/SeedData.cs` – demo user additions | Demo users; not for prod |
-| `appsettings.json` – SQLite connection string | Dev/Render-only |
-| `LeadManagementPortal/.config/AGENTS.md` etc. | Agent scaffolding docs; not needed in prod |
+Never port these without explicit approval:
+- `render.yaml`, `Dockerfile`, `.render/`, `RENDER.md`
+- `LeadManagementPortal/appsettings.json` (contains environment-specific config and may contain secrets)
+- SQLite-only startup behavior in `LeadManagementPortal/Program.cs` (`DatabaseProvider=Sqlite`, `EnsureCreatedAsync()`)
+- Any `/tmp/...` paths or Render-specific environment variables
+
+Evaluate before porting (depends on work repo infrastructure):
+- `UseForwardedHeaders()` / `ForwardedHeadersOptions` (reverse proxy correctness)
+- "Fail-fast" behavior on seed failure (startup behavior change)
 
 ---
 
 ## Safe Port Workflow (Per Feature)
 
-1. Read the relevant entry above; identify all files in scope.
-2. In the work repo, create a feature branch:
-   `git checkout -b feature/<name>`
-3. Port candidate files manually (no bulk copy of directories).
-4. If the feature adds EF entities: **regenerate migrations in the work repo**:
-   `dotnet ef migrations add <Name> --project LeadManagementPortal/LeadManagementPortal.csproj`
-5. Verify build + tests:
-   `dotnet build && dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj`
-6. Open PR with explicit "Not included" section listing all excluded Render-only files.
+1. Pick a single feature from this log.
+2. In the work repo, create a feature branch.
+3. Port only the files for that feature (avoid bulk directory copies).
+4. If the feature adds EF entities, regenerate migrations in the work repo.
+5. Verify in work repo (PowerShell):
+```powershell
+dotnet tool restore
+dotnet restore
+dotnet build
+dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
+```
+6. Open PR and include a "Not included" section (explicitly list Render-only items excluded).
 
-## Working Agreement
+---
 
-Every new feature commit in this sandbox should get an entry here on the same day
-it lands. Use this log together with `git log --oneline` and a fresh
-`MIGRATION_PLAYBOOK.md` compatibility audit before opening any work-repo PR.
+## Suggested Feature PR Stack (Leadership-Friendly)
+
+1. PR: DB prerequisites (Notifications + LeadFollowUpTasks migrations, SQL review)
+2. PR: Notifications (API/service/layout/JS/CSS + minimal tests)
+3. PR: Follow-up tasks / pipeline board
+4. PR: Storage fallback + secure downloads
+5. PR: Search + customer edit
+6. PR: Commissions scaffold
+7. PR: UI polish (login/dashboard/layout/site.css) - optional, large diff
+8. PR: Quality gates (LeadManagementPortal.Tests + scripts/ci)
+9. Optional PRs (approval required): Playwright `tests/browser/*`, GitHub Actions `.github/*`, Render deploy artifacts
