@@ -7,6 +7,7 @@ namespace LeadManagementPortal.Services
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<LeadExpiryBackgroundService> _logger;
+        private static readonly TimeSpan WarningNotificationDedupeWindow = TimeSpan.FromHours(23);
 
         public LeadExpiryBackgroundService(
             IServiceProvider serviceProvider,
@@ -30,16 +31,22 @@ namespace LeadManagementPortal.Services
                     var leadService = scope.ServiceProvider.GetRequiredService<ILeadService>();
                     var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
+                    var now = DateTime.UtcNow;
+
                     // Get leads expiring within 3 days (warning) before they expire
-                    await SendExpiryWarningsAsync(leadService, notificationService);
+                    await SendExpiryWarningsAsync(leadService, notificationService, now);
 
                     // Expire overdue leads and notify
-                    await ExpireLeadsAndNotifyAsync(leadService, notificationService);
+                    await ExpireLeadsAndNotifyAsync(leadService, notificationService, now);
 
                     // Clean up old read notifications
-                    await notificationService.CleanupOldAsync(30);
+                    await notificationService.CleanupOldAsync(30, includeUnread: true);
 
                     _logger.LogInformation("Lead Expiry Background Service completed check.");
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (Exception ex)
                 {
@@ -47,61 +54,59 @@ namespace LeadManagementPortal.Services
                 }
 
                 // Run every hour
-                await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
             }
 
             _logger.LogInformation("Lead Expiry Background Service is stopping.");
         }
 
-        private async Task SendExpiryWarningsAsync(ILeadService leadService, INotificationService notificationService)
+        private async Task SendExpiryWarningsAsync(ILeadService leadService, INotificationService notificationService, DateTime utcNow)
         {
-            var allLeads = await leadService.GetAllAsync();
-            var warningLeads = allLeads.Where(l =>
-                !l.IsExpired &&
-                l.Status != LeadStatus.Converted &&
-                l.Status != LeadStatus.Lost &&
-                l.Status != LeadStatus.Expired &&
-                l.DaysRemaining > 0 &&
-                l.DaysRemaining <= 3 &&
-                !string.IsNullOrEmpty(l.AssignedToId)
-            ).ToList();
-
+            var warningLeads = await leadService.GetLeadsExpiringSoonAsync(utcNow, 3);
             foreach (var lead in warningLeads)
             {
-                await notificationService.NotifyUserAsync(
+                if (string.IsNullOrWhiteSpace(lead.AssignedToId))
+                {
+                    continue;
+                }
+
+                var daysRemaining = Math.Max(0, (lead.ExpiryDateUtc - utcNow).Days);
+                if (daysRemaining <= 0)
+                {
+                    continue;
+                }
+
+                await notificationService.NotifyUserDedupedAsync(
                     lead.AssignedToId,
                     "lead_expiring_soon",
                     "Lead Expiring Soon",
-                    $"Your lead \"{lead.Company}\" expires in {lead.DaysRemaining} day{(lead.DaysRemaining == 1 ? "" : "s")}.",
-                    $"/Leads/Details/{lead.Id}"
+                    $"Your lead \"{lead.Company}\" expires in {daysRemaining} day{(daysRemaining == 1 ? "" : "s")}.",
+                    $"/Leads/Details/{lead.LeadId}",
+                    WarningNotificationDedupeWindow
                 );
             }
         }
 
-        private async Task ExpireLeadsAndNotifyAsync(ILeadService leadService, INotificationService notificationService)
+        private async Task ExpireLeadsAndNotifyAsync(ILeadService leadService, INotificationService notificationService, DateTime utcNow)
         {
-            // Fetch leads that WILL be expired this sweep, before expiring them
-            var allLeads = await leadService.GetAllAsync();
-            var toExpire = allLeads.Where(l =>
-                l.ExpiryDate <= DateTime.UtcNow &&
-                !l.IsExpired &&
-                l.Status != LeadStatus.Converted
-            ).ToList();
-
-            // Run the expiry sweep
-            await leadService.ExpireOldLeadsAsync();
-
-            // Now notify for each expired lead
-            foreach (var lead in toExpire)
+            var expiredLeads = await leadService.ExpireOldLeadsAsync(utcNow);
+            foreach (var lead in expiredLeads)
             {
-                if (!string.IsNullOrEmpty(lead.AssignedToId))
+                if (!string.IsNullOrWhiteSpace(lead.AssignedToId))
                 {
                     await notificationService.NotifyUserAsync(
                         lead.AssignedToId,
                         "lead_expired",
                         "Lead Expired",
                         $"Your lead \"{lead.Company}\" has expired and is no longer active.",
-                        $"/Leads/Details/{lead.Id}"
+                        $"/Leads/Details/{lead.LeadId}"
                     );
                 }
 
@@ -111,7 +116,7 @@ namespace LeadManagementPortal.Services
                     "lead_expired",
                     "Lead Expired",
                     $"Lead \"{lead.Company}\" has expired.",
-                    $"/Leads/Details/{lead.Id}"
+                    $"/Leads/Details/{lead.LeadId}"
                 );
             }
         }

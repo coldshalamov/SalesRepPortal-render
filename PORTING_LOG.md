@@ -4,6 +4,11 @@ Purpose: track every change made in `SalesRepPortal-render`, classify whether it
 should be ported to the work repo, and define a safe PR workflow. Entries are
 grouped by feature (not by commit) because several features span many commits.
 
+> **Before porting:** Read `MIGRATION_PLAYBOOK.md` first — it has the pre-flight
+> setup (database backup, staging clone, deploy sequence), rollback runbook, and
+> post-deploy monitoring steps. This file tells you WHAT to port; the playbook
+> tells you HOW to port it safely.
+
 ## Rules
 
 1. Never port Render deploy artifacts unless explicitly approved.
@@ -31,7 +36,7 @@ Work snapshot zip details:
 
 Sandbox:
 - Repo root: `D:\GitHub\SalesRepPortal-render`
-- HEAD at time of audit: `634473171a1eb1662dc778aa179f54d8dbbb72a8`
+- HEAD at time of audit: `2180e7ea5a98d0e46fadcda4a798c1a30e9ab1fb`
 
 Portable-file diff (normalized line endings for text files):
 - Total portable files considered: **150**

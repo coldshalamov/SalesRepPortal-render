@@ -8,13 +8,299 @@ Alternative: a single integration PR (kept below for when leadership insists).
 
 ---
 
+## How This Works (Plain English)
+
+This sandbox repo (`SalesRepPortal-render`) is a copy of the production repo where
+we built new features. Now we need to move those features back into the production
+repo without breaking anything. Here's the core idea:
+
+1. **We never touch the production database or server directly.** Everything goes
+   through Pull Requests in the work repo, which get reviewed and tested before
+   anyone clicks "merge."
+2. **Schema changes (new database tables) are additive only.** We're adding two
+   new tables (`Notifications` and `LeadFollowUpTasks`). We are NOT modifying or
+   deleting any existing tables, columns, or data. Existing data stays untouched.
+3. **We port features one at a time**, in a specific order. Each PR is small enough
+   to review and roll back independently.
+4. **We test each PR against a staging copy of the production database** before
+   merging. If the migration fails on staging, we fix it before touching production.
+5. **We back up the production database before every schema PR** so we can restore
+   if something goes wrong (it shouldn't, but the safety net is non-negotiable).
+
+**What can NOT go wrong if you follow this playbook:**
+- Data loss - impossible. We only run `CREATE TABLE` (additive). No `DROP`, no
+  `ALTER COLUMN`, no `DELETE FROM`. Existing tables and rows are untouched.
+- App crashes - caught in staging first. Each PR must build and pass tests before
+  merge.
+- Partial deploys - each PR is self-contained. If PR #3 fails, PRs #1 and #2
+  still work fine on their own.
+
+---
+
+## Pre-Migration Setup (Do This Once, Before Any PRs)
+
+### 1. Back Up the Production Database
+
+Before merging ANY schema PR, create a full backup of the production SQL Server
+database. This is your safety net.
+
+```powershell
+# Option A: Azure Portal (easiest)
+# Go to Azure Portal > SQL Database > your-database > Backups > Create manual backup
+# OR use Azure CLI:
+az sql db export `
+  --admin-user <admin> `
+  --admin-password <password> `
+  --auth-type SQL `
+  --name <database-name> `
+  --resource-group <resource-group> `
+  --server <server-name> `
+  --storage-key <storage-key> `
+  --storage-key-type StorageAccessKey `
+  --storage-uri "https://<storage-account>.blob.core.windows.net/backups/pre-migration-$(Get-Date -Format yyyyMMdd).bacpac"
+
+# Option B: SQL Server Management Studio (SSMS)
+# Right-click database > Tasks > Export Data-tier Application > Save .bacpac to disk
+
+# Option C: sqlcmd / PowerShell (if you have direct access)
+# Use BACKUP DATABASE ... TO DISK = '...' WITH COPY_ONLY
+```
+
+**Save the backup file name and timestamp. You'll need it if rollback is required.**
+
+### 2. Create a Staging Database Clone
+
+You need a staging database that mirrors production to test migrations against
+BEFORE merging PRs. This is how you verify that the migration won't break prod.
+
+```powershell
+# Option A: Azure Portal - copy the production database
+# Go to Azure Portal > SQL Database > your-database > Copy
+# Name it: <database-name>-staging
+# This creates an exact copy including all data.
+
+# Option B: Restore from the backup you just made
+# Import the .bacpac from step 1 into a new database named <database-name>-staging
+
+# Option C: LocalDB (quick local test - no production data, but validates SQL)
+# Install SQL Server Express LocalDB if needed, then update your local
+# appsettings.Development.json:
+#   "ConnectionStrings": {
+#     "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=LeadManagement_Staging;Trusted_Connection=True"
+#   }
+# Then run: dotnet ef database update --project LeadManagementPortal/LeadManagementPortal.csproj
+```
+
+**Which option should you pick?**
+- If you have Azure access and want to test with real data: Option A (best)
+- If you just want to verify the migration SQL is syntactically correct: Option C
+- Both is ideal - Option C first (fast, local), then Option A (realistic, final)
+
+### 3. Prepare Your Work Repo Clone
+
+```powershell
+# Clone the work repo fresh (do NOT work inside this sandbox repo)
+git clone <work-repo-url> D:\GitHub\SalesRepPortal-work
+cd D:\GitHub\SalesRepPortal-work
+git checkout main
+git pull origin main
+
+# Verify it builds clean BEFORE making any changes
+dotnet restore
+dotnet build
+dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj
+```
+
+If the work repo doesn't build clean before you start, fix that first - do not
+proceed with porting until the baseline is green.
+
+### 4. Determine How Migrations Are Applied in Production
+
+Check whether the work repo applies migrations automatically on startup or manually:
+
+```powershell
+# In the work repo, search Program.cs for automatic migration
+Select-String -Path LeadManagementPortal/Program.cs -Pattern "Migrate|EnsureCreated" -CaseSensitive:$false
+```
+
+- **If you find `MigrateAsync()` or `Migrate()`:** Migrations run automatically
+  when the app starts. Merging a PR with a migration -> deploy -> app restarts ->
+  migration applies. No manual step needed.
+- **If you find nothing:** Migrations must be applied manually via
+  `dotnet ef database update` before or during deployment.
+
+**Write down which strategy your work repo uses. It affects the deploy sequence.**
+
+---
+
+## Environment Variables Checklist
+
+New features require these environment variables (or appsettings entries) on the
+production server. **Set these BEFORE deploying the code that uses them.**
+
+| Variable / Config Key | Required By | Default | Notes |
+|---|---|---|---|
+| `AzureStorage:ConnectionString` | Feature 10 (file storage) | (existing) | Already set if Azure blob uploads work today |
+| `AzureStorage:AccountName` | Feature 10 | (existing) | Alternative to ConnectionString |
+| `AzureStorage:AccountKey` | Feature 10 | (existing) | Alternative to ConnectionString |
+| `AzureStorage:ContainerName` | Feature 10 | (existing) | Alternative to ConnectionString |
+| `LocalStorage:RootPath` | Feature 10 (fallback only) | `""` | Only needed if Azure is NOT configured |
+| `LocalStorage:BaseUrlPath` | Feature 10 (fallback only) | `"/files"` | Only needed if Azure is NOT configured |
+
+**If Azure blob storage is already configured in production** (which it almost
+certainly is), you do NOT need to set any new environment variables. The local
+storage fallback only activates when Azure keys are missing.
+
+No other new features require new environment variables. Notifications, search,
+pipeline, CSV export, and commissions all use the existing database connection
+and identity system - no new secrets or config keys needed.
+
+---
+
+## Deploy Sequence (What Happens When You Merge a PR)
+
+### For Schema PRs (PR #1: DB Prerequisites)
+
+This is the highest-risk PR and requires the most care.
+
+**If migrations run automatically on app startup:**
+1. Back up production database (see step 1 above)
+2. Test migration on staging clone first - run the app against staging and confirm
+   the new tables appear
+3. Merge the PR -> CI/CD deploys -> app restarts -> migration runs automatically
+4. Monitor logs for 15 minutes (see Post-Deploy Monitoring below)
+5. Verify new tables exist: `SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('Notifications', 'LeadFollowUpTasks')`
+
+**If migrations run manually:**
+1. Back up production database
+2. Test migration on staging clone
+3. Merge the PR -> CI/CD deploys new code (migration is in the code but not applied yet)
+4. Apply migration manually:
+   ```powershell
+   dotnet ef database update `
+     --project LeadManagementPortal/LeadManagementPortal.csproj `
+     --startup-project LeadManagementPortal/LeadManagementPortal.csproj `
+     --connection "<production-connection-string>"
+   ```
+5. Restart the app (so it picks up the new schema)
+6. Monitor logs for 15 minutes
+
+**Downtime:** A few seconds during app restart - this is normal for any deploy and
+is not specific to migrations. Users might see a brief loading delay; no data is
+affected.
+
+### For Non-Schema PRs (PRs #2-8)
+
+These PRs only add code (controllers, views, JS/CSS, tests). No database changes.
+
+1. Merge the PR
+2. CI/CD deploys -> app restarts
+3. Verify the feature works (smoke test items for that PR)
+4. No database backup needed - nothing changed in the DB
+
+### Wait Between PRs
+
+Deploy one PR at a time. Wait at least **15 minutes** between PR deploys and
+verify each one works before moving to the next. If something breaks, you want
+to know exactly which PR caused it.
+
+---
+
+## Emergency Rollback Runbook
+
+### If a Schema Migration Fails on Production
+
+**Symptoms:** App won't start, logs show `SqlException` or migration error.
+
+**Step 1: Don't panic.** On SQL Server, EF Core migrations are transactional - if
+the migration fails partway through, it rolls back automatically. Your data is safe.
+
+**Step 2: Revert the code deploy.**
+```powershell
+# In the work repo
+git revert <merge-commit-sha>
+git push origin main
+# Wait for CI/CD to redeploy the reverted code
+```
+
+**Step 3: If the migration DID apply but the app is broken:**
+```powershell
+# Find the name of the migration BEFORE the broken one
+dotnet ef migrations list `
+  --project LeadManagementPortal/LeadManagementPortal.csproj `
+  --startup-project LeadManagementPortal/LeadManagementPortal.csproj
+
+# Roll back to the previous migration
+dotnet ef database update <PreviousMigrationName> `
+  --project LeadManagementPortal/LeadManagementPortal.csproj `
+  --startup-project LeadManagementPortal/LeadManagementPortal.csproj `
+  --connection "<production-connection-string>"
+
+# Then revert the code (Step 2 above)
+```
+
+**Step 4: Nuclear option - restore from backup.**
+Only if Steps 2-3 don't work (extremely unlikely with additive-only migrations):
+```powershell
+# Azure Portal: SQL Database > Restore > Point-in-time restore
+# Pick a timestamp BEFORE the migration was applied
+# OR import the .bacpac you saved in Pre-Migration Setup step 1
+```
+
+### If a Non-Schema PR Breaks Something
+
+Much simpler - revert the merge commit:
+```powershell
+git revert <merge-commit-sha>
+git push origin main
+# CI/CD redeploys the reverted code. No database changes to worry about.
+```
+
+### Quick Reference: How To Find the Merge Commit SHA
+
+```powershell
+# See recent merges on main
+git log --oneline --merges -10
+# The SHA is the first column, e.g. "a1b2c3d Merge pull request #42 ..."
+```
+
+---
+
+## Post-Deploy Monitoring
+
+After deploying each PR to production, monitor for **15 minutes minimum** before
+deploying the next PR.
+
+### What To Watch
+
+| Check | How | Healthy |
+|---|---|---|
+| App starts | Azure Portal > App Service > Overview > Status | "Running" |
+| No startup errors | Azure Portal > App Service > Log stream (or Diagnose > Application Logs) | No `SqlException`, no `InvalidOperationException`, no `DependencyResolutionException` |
+| HTTP 200s | Hit the login page in a browser | Page loads without 500 error |
+| DB connectivity | Log in with a test account | Dashboard loads with real data |
+| New feature works | Run the smoke test items for that PR | All pass |
+
+### If Monitoring Reveals Issues
+
+1. **App crashes on startup** -> Likely a missing DI registration or missing table.
+   Check logs. Rollback immediately (see runbook above).
+2. **App starts but a page 500s** -> Likely a missing table, missing nav property,
+   or null reference. Check which URL fails. If it's a new feature URL, it won't
+   affect existing users. Fix-forward if possible, rollback if it affects core flows.
+3. **UI looks wrong** -> CSS regression. Not urgent. Fix-forward with a follow-up PR.
+4. **Existing feature broke** -> Rollback immediately. Something in the new code
+   changed existing behavior.
+
+---
+
 ## Latest Compatibility Audit (2026-02-25)
 
 - Sandbox: `D:\GitHub\SalesRepPortal-render`
 - Work snapshot zip: `D:\GitHub\SalesRepPortal-render\SalesRepPortal-main.zip`
   - Last write: 2026-02-24 22:41:36
   - SHA256: `32DFBB55EA654DE999E4B2CC1A0E0B921291D778559377C0B60169F7375E9DFC`
-- Sandbox HEAD at time of audit: `634473171a1eb1662dc778aa179f54d8dbbb72a8`
+- Sandbox HEAD at time of audit: `2180e7ea5a98d0e46fadcda4a798c1a30e9ab1fb`
 - Portable-file diff (using the same include/exclude rules as `scripts/ci/portability-target-dry-run.ps1`):
   - Total portable files considered: **150**
   - Present only in sandbox: **39**
@@ -125,7 +411,7 @@ Sandbox `Program.cs` has significant additions:
 - `INotificationService` registration
 - `LocalStorageOptions` configuration
 - `ForwardedHeadersOptions` + `UseForwardedHeaders()` (reverse proxy support)
-- `EnsureCreatedAsync()` SQLite branch (Render-only — do not port)
+- `EnsureCreatedAsync()` SQLite branch (Render-only - do not port)
 - Fail-fast re-throw on seed error (evaluate before porting)
 
 **Mitigation:** Port `Program.cs` changes surgically, line by line, not as a bulk
@@ -169,6 +455,29 @@ Suggested stack (adjust to match the work repo's current mainline):
    - Playwright `tests/browser/*` (and any CI workflows to run it).
    - Render deploy artifacts (`render.yaml`, `Dockerfile`, `.render/`, `RENDER.md`).
    - UI-only polish (large diffs in `site.css` and `_Layout.cshtml`).
+
+### Per-PR Hard Gates (Feature-Based Stack)
+
+Before opening EACH PR, check:
+
+- [ ] `dotnet build` exits 0 on the feature branch
+- [ ] `dotnet test` exits 0 (all existing + new tests pass)
+- [ ] No Render-only files in the PR diff
+- [ ] PR description lists exactly which sandbox feature(s) it covers
+
+**Additional gates for PR #1 (DB Prerequisites) only:**
+
+- [ ] Production database backed up (see Pre-Migration Setup)
+- [ ] Migration tested on staging clone - apply + rollback both succeed
+- [ ] Generated migration SQL reviewed - contains only `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX`
+- [ ] No `DROP TABLE`, `DROP COLUMN`, or `ALTER COLUMN` statements present
+
+**After EACH PR is merged and deployed:**
+
+- [ ] Monitor for 15 minutes (see Post-Deploy Monitoring)
+- [ ] Smoke test the specific features from that PR
+- [ ] Confirm existing features still work (login, leads list, customer list)
+- [ ] Only then proceed to the next PR
 
 ---
 
@@ -597,7 +906,7 @@ Built through a controlled integration branch with staged commits.
 - Step C: Startup + packages (service registration, CsvHelper)
 - Step D: Controllers (pipeline API, search, notifications API, customer edit, commissions)
 - Step E: Views and assets (pipeline board, login redesign, dashboard, layout overhaul)
-- Step F: Tests only (no CI workflows — private repo, paid minutes)
+- Step F: Tests only (no CI workflows - approval required)
 
 ## Schema changes
 
@@ -609,10 +918,9 @@ Built through a controlled integration branch with staged commits.
 
 - `render.yaml`
 - `Dockerfile`
-- **All `.github/workflows/` files** — work repo is private; Actions minutes are
-  billed. Only the existing `deploy-azure.yml` remains. If CI is ever wanted,
-  that requires a separate budget conversation with the owner.
-- `.github/actions/`, `.github/dependabot.yml` — same reason
+- **All `.github/workflows/` files** - approval required. Do not change the existing
+  Azure deploy workflow unless explicitly directed by the owner.
+- `.github/actions/`, `.github/dependabot.yml` - approval required
 - SQLite provider branch in `Program.cs`
 - `EnsureCreatedAsync()` startup path
 - Demo user seeding in `SeedData.cs`
@@ -638,7 +946,7 @@ Built through a controlled integration branch with staged commits.
 ## DB-Change Safety Rules (Required for Schema PRs)
 
 1. Treat schema changes as a separate first commit on the integration branch.
-2. Regenerate migrations in the work repo — never copy from sandbox.
+2. Regenerate migrations in the work repo - never copy from sandbox.
 3. Review generated migration for destructive ops:
    - **Safe by default:** `CreateTable`, `AddColumn`, `CreateIndex`
    - **Block by default:** `DropTable`, `DropColumn`, column type narrowing
@@ -650,10 +958,46 @@ Built through a controlled integration branch with staged commits.
 
 ## CI Guardrails (Scripts)
 
-```powershell
-# Always-on portability check
-./scripts/ci/check-portability-guardrails.ps1
+### check-portability-guardrails.ps1
 
-# Optional dry run against the work repo zip
-./scripts/ci/portability-target-dry-run.ps1 -TargetRepoZipPath "D:\GitHub\SalesRepPortal-main.zip"
+Run this in the **sandbox** repo after making changes. It verifies:
+- All migration files have proper metadata
+- If `LeadFollowUpTask` DbSet exists, a migration creates its table
+- If `INotificationService` is used, all notification files + DI registration exist
+- PR diffs don't mix Render-only files with product files
+
+```powershell
+./scripts/ci/check-portability-guardrails.ps1
 ```
+
+### portability-audit.ps1
+
+Compares the sandbox against a zip snapshot of the work repo. Reports which files
+are new, same, or different. Use this to understand the scope of work before porting.
+
+```powershell
+./scripts/ci/portability-audit.ps1 -TargetRepoZipPath .\SalesRepPortal-main.zip -ShowLists
+```
+
+### portability-target-dry-run.ps1
+
+**IMPORTANT: This is a VALIDATION tool, not a porting tool.** It copies all
+portable files into a temp copy of the work repo and runs `dotnet build` +
+`dotnet test` to check whether the sandbox code compiles against the work repo.
+
+It does NOT:
+- Create PRs or branches
+- Touch your actual work repo
+- Apply migrations to any database
+- Deploy anything
+
+Use it as a pre-flight check to confirm build compatibility:
+
+```powershell
+./scripts/ci/portability-target-dry-run.ps1 -TargetRepoZipPath .\SalesRepPortal-main.zip
+```
+
+**Do NOT use this script as a substitute for the feature-by-feature PR approach.**
+It copies everything at once (the "bulk" approach rated 9/10 risk). It's only
+useful for answering "would all this code compile together?" - not for safely
+deploying to production.

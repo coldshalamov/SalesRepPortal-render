@@ -55,7 +55,7 @@
 
         .corner-stripes {
             position: absolute;
-            top: calc(15% + 20px);
+            top: calc(15% + 60px);
             right: calc(-18% + 35px);
             width: min(76vw, 920px);
             height: min(70vh, 560px);
@@ -338,7 +338,14 @@
             border-radius: 8px;
             border: 1px solid #fecaca;
             margin-bottom: 20px;
-            display: none;
+        }
+
+        .validation-summary-valid {
+            display: none !important;
+        }
+
+        .validation-summary-errors {
+            display: block !important;
         }
 
         @@media (max-width: 768px) {
@@ -440,13 +447,6 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var validationSummary = document.querySelector('.validation-errors');
-            if (validationSummary && validationSummary.innerHTML.trim() !== '' && !validationSummary.querySelector('ul:empty')) {
-                validationSummary.style.display = 'block';
-            }
-        });
-    </script>
+
 </body>
 </html>

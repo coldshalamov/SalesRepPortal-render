@@ -1,6 +1,8 @@
 using LeadManagementPortal.Data;
 using LeadManagementPortal.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LeadManagementPortal.Services
 {
@@ -10,13 +12,25 @@ namespace LeadManagementPortal.Services
         private readonly ISettingsService _settingsService;
         private readonly ICustomerService _customerService;
         private readonly ILeadDocumentService _leadDocumentService;
+        private readonly ILogger<LeadService> _logger;
 
         public LeadService(ApplicationDbContext context, ICustomerService customerService, ISettingsService settingsService, ILeadDocumentService leadDocumentService)
+            : this(context, customerService, settingsService, leadDocumentService, NullLogger<LeadService>.Instance)
+        {
+        }
+
+        public LeadService(
+            ApplicationDbContext context,
+            ICustomerService customerService,
+            ISettingsService settingsService,
+            ILeadDocumentService leadDocumentService,
+            ILogger<LeadService> logger)
         {
             _context = context;
             _customerService = customerService;
             _settingsService = settingsService;
             _leadDocumentService = leadDocumentService;
+            _logger = logger;
         }
 
         public async Task<Lead?> GetByIdAsync(string id)
@@ -174,8 +188,9 @@ namespace LeadManagementPortal.Services
                 await _context.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.UpdateAsync failed for LeadId={LeadId}", lead.Id);
                 return false;
             }
         }
@@ -194,8 +209,9 @@ namespace LeadManagementPortal.Services
                 await _context.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.DeleteAsync failed for LeadId={LeadId}", id);
                 return false;
             }
         }
