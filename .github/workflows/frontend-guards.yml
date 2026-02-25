@@ -1,0 +1,34 @@
+name: Frontend Guards
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  multiselect-guards:
+    name: Multiselect Behavior Guards
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tests/js/package-lock.json
+
+      - name: Install frontend guard dependencies
+        working-directory: tests/js
+        run: npm ci
+
+      - name: Run frontend guard tests
+        working-directory: tests/js
+        run: npm test

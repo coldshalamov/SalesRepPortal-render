@@ -1,0 +1,11 @@
+{
+  "name": "salesrepportal-frontend-guards",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test *.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}
