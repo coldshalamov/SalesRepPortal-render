@@ -20,74 +20,90 @@ For every new commit in this sandbox repo, append an entry with:
 
 ## Current Commit Log
 
-### `WORKTREE-UNCOMMITTED` - Leads pipeline parity tranche (board + stage moves + follow-up tasks)
+### `AUDIT-2026-02-25` - Compatibility scan vs `D:\GitHub\SalesRepPortal-main.zip`
 
 - Scope:
+  - Full repo comparison between:
+    - sandbox: `D:\GitHub\SalesRepPortal-render`
+    - work snapshot zip: `D:\GitHub\SalesRepPortal-main.zip` (2026-02-24)
+- Findings:
+  - No files in the work snapshot are missing from sandbox.
+  - `119` shared-path files differ by content (`107` under `LeadManagementPortal/`).
+  - This confirms heavy drift and requires narrow PR slicing.
+- Classification: **Process gate (required)**
+- Exact port action: **Use `MIGRATION_PLAYBOOK.md` PR slicing + risk controls before any product PR**
+
+### `0502010` - Dashboard + layout + navigation overhaul
+
+- Scope (representative):
+  - `LeadManagementPortal/Views/Dashboard/Index.cshtml`
+  - `LeadManagementPortal/Views/Shared/_Layout.cshtml`
+  - `LeadManagementPortal/wwwroot/css/site.css`
+  - `LeadManagementPortal/Controllers/SalesGroupsController.cs` (related UX support)
+- Reason:
+  - Large UI/UX redesign and dashboard behavior changes.
+- Classification: **Portable with edits**
+- Exact port action:
+  - Port in dedicated UI PR(s), excluding unrelated startup/provider/seed changes.
+
+### `c0a83e3` (+ related files still present at HEAD) - Follow-up task and lead pipeline foundation
+
+- Scope:
+  - `LeadManagementPortal/Models/LeadFollowUpTask.cs`
+  - `LeadManagementPortal/Models/Lead.cs`
+  - `LeadManagementPortal/Data/ApplicationDbContext.cs`
+  - `LeadManagementPortal/Services/ILeadService.cs`
+  - `LeadManagementPortal/Services/LeadService.cs`
+  - `LeadManagementPortal/Controllers/LeadsController.cs`
   - `LeadManagementPortal/Views/Leads/Index.cshtml`
   - `LeadManagementPortal/wwwroot/js/leads-pipeline.js`
   - `LeadManagementPortal/wwwroot/css/leads-pipeline.css`
-  - `LeadManagementPortal/Controllers/LeadsController.cs`
-  - `LeadManagementPortal/Services/ILeadService.cs`
-  - `LeadManagementPortal/Services/LeadService.cs`
-  - `LeadManagementPortal/Models/Lead.cs`
-  - `LeadManagementPortal/Models/LeadFollowUpTask.cs`
-  - `LeadManagementPortal/Data/ApplicationDbContext.cs`
-  - `AGENTS.md`, `MIGRATION_PLAYBOOK.md`
 - Reason:
-  - Port TheRxSpot-style sales pipeline behavior safely into sandbox:
-    - Kanban-style lead movement
-    - Status update endpoint
-    - Follow-up task add/complete/delete workflow
-    - Overdue follow-up visibility in pipeline stats
-    - Converted-stage visibility in board columns
-    - Notes preview in pipeline cards and detail modal
-    - User-friendly board/table view preference persistence
-    - Explicit sandbox-to-prod portability guardrails in docs/instructions
+  - Add Kanban pipeline UX, status movement API, and follow-up task management.
+- Classification: **Portable with edits (high attention)**
+- Exact port action:
+  1. In work repo, generate and review SQL Server migration for `LeadFollowUpTask` before enabling endpoints.
+  2. Port lead pipeline changes without accidental coupling to unrelated features.
+  3. Add/adjust tests for role-based access and follow-up task lifecycle.
+
+### `6c6dca4` (+ related files) - Customer visibility hardening and service-layer changes
+
+- Scope (representative):
+  - `LeadManagementPortal/Services/CustomerService.cs`
+  - `LeadManagementPortal/Services/ICustomerService.cs`
+  - `LeadManagementPortal/Controllers/CustomersController.cs`
+  - `LeadManagementPortal/Views/Customers/*`
+  - `LeadManagementPortal.Tests/CustomerVisibilityHardeningTests.cs`
+- Reason:
+  - Tighten customer visibility and search behavior.
 - Classification: **Portable with edits**
 - Exact port action:
-  - **Port feature files**, but in the real repo:
-    1. generate a fresh EF migration there for `LeadFollowUpTask`;
-    2. verify migration on SQL Server staging clone before production;
-    3. avoid porting Render-specific infra files unless requested.
+  - Port as a separate behavior PR with tests included.
 
-### `e1422a3` - Revert "Seed demo users for each role"
+### `Render/deploy surface` - sandbox-only runtime and infra deltas
 
-- Scope: `LeadManagementPortal/Data/SeedData.cs`, `render.yaml`, `RENDER.md`
-- Reason: remove demo-access seeding so sandbox does not drift into product behavior.
+- Scope:
+  - `render.yaml`, `Dockerfile`, `.render/*`, `RENDER.md`
+  - SQLite/Render bootstrap-specific toggles in startup/config
+- Reason:
+  - Keep sandbox deployable on Render free tier.
 - Classification: **Render-only**
 - Exact port action: **Do not port**
 
-### `da7d143` - Add explicit porting log and safety workflow
+### `Notification stack` - currently coupled with lead workflows in sandbox
 
-- Scope: `PORTING_LOG.md`
-- Reason: establish controlled migration process.
-- Classification: **Process doc**
-- Exact port action: **Optional doc port only**
-
-### `af9e0eb` - Fix Render SQLite initialization and fail fast on seed errors
-
-- Scope: `LeadManagementPortal/Program.cs`, `LeadManagementPortal/Data/SeedData.cs`
-- Reason: Render free tier uses SQLite and hit startup/login failure.
-- Classification: **Render-only**
-- Port to work repo: **No** (work production uses SQL Server + migrations).
-
-### `51ad6e4` - Switch Render blueprint to free tier (no disk)
-
-- Scope: `render.yaml`, `RENDER.md`
-- Classification: **Render-only**
-- Port to work repo: **No**
-
-### `d4c9be2` - Seed demo users for each role (now reverted by `e1422a3`)
-
-- Scope: `LeadManagementPortal/Data/SeedData.cs`, `render.yaml`, `RENDER.md`
-- Classification: **Render-only by default**
-- Exact port action: **Do not port**
-
-### `d117b9f` - Initial Render-ready snapshot
-
-- Scope: baseline clone + Render deployment setup files.
-- Classification: **Mixed baseline**
-- Port to work repo: **No direct porting**; this is a sandbox repo baseline.
+- Scope:
+  - `LeadManagementPortal/Models/Notification.cs`
+  - `LeadManagementPortal/Services/INotificationService.cs`
+  - `LeadManagementPortal/Services/NotificationService.cs`
+  - `LeadManagementPortal/Controllers/NotificationsApiController.cs`
+  - `LeadManagementPortal/Migrations/20260224_AddNotifications.cs`
+  - notification UI assets
+- Reason:
+  - User-facing notification feature now referenced by lead flows.
+- Classification: **Portable with edits**
+- Exact port action:
+  - Port as prerequisite PR or remove dependency from lead PR.
 
 ## Safe Port Workflow
 
@@ -105,3 +121,7 @@ For every new commit in this sandbox repo, append an entry with:
 ## Working Agreement For Future Changes
 
 Every commit entry must be appended on the same day it is created.
+
+## Important Note
+
+Older entries from prior sandbox history may no longer represent current `main` branch contents. Use this file together with `git log --oneline` and the latest compatibility audit before each port PR.

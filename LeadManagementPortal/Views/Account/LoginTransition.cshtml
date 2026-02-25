@@ -130,11 +130,8 @@
             display: inline-flex;
             align-items: baseline;
             gap: 0;
-            background: linear-gradient(180deg, #fefeff 0%, #a9c9ff 58%, var(--accent-primary) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-shadow: 0 0 18px rgba(52, 108, 216, 0.22);
+            color: #1a4da3;
+            text-shadow: 0 0 14px rgba(52, 108, 216, 0.18);
             font-family: "Plus Jakarta Sans", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             letter-spacing: 0.02em;
         }
@@ -145,10 +142,11 @@
 
         .dirx-symbol .rx-part {
             display: inline-block;
+            margin-left: 0.01em;
             opacity: 0;
-            transform: translateX(-0.18em) scale(0.94);
-            filter: blur(2px);
-            transition: opacity 0.24s ease-out, transform 0.24s ease-out, filter 0.24s ease-out;
+            transform: translateX(-0.14em) scale(0.95);
+            filter: blur(1.5px);
+            transition: opacity 0.18s ease-out, transform 0.18s ease-out, filter 0.18s ease-out;
         }
 
         .dirx-symbol.show-rx .rx-part {
@@ -792,7 +790,7 @@
                 },
                 { delay: 300, action: () => elements.ring.classList.add("animate-ring") },
                 { delay: 750, action: () => elements.mark.classList.add("animate-logo") },
-                { delay: 1120, action: () => elements.symbol.classList.add("show-rx") },
+                { delay: 920, action: () => elements.symbol.classList.add("show-rx") },
                 {
                     delay: 2150,
                     action: () => {
