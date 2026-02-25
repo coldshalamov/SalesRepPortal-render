@@ -1,4 +1,5 @@
 @using LeadManagementPortal.Services
+@using System.Text.Json
 @{
     ViewData["Title"] = "Dashboard";
     var stats = ViewBag.Stats as DashboardStats;
@@ -158,7 +159,7 @@
     <div class="col-md-7">
         <div class="card h-100">
             <div class="card-header bg-white">
-                <h6 class="mb-0"><i class="bi bi-bar-chart-line"></i> Conversions – Last 30 Days</h6>
+                <h6 class="mb-0"><i class="bi bi-bar-chart-line"></i> Conversions &ndash; Last 30 Days</h6>
             </div>
             <div class="card-body">
                 <div id="conversionBarChart"></div>
@@ -281,8 +282,9 @@
     new ApexCharts(document.querySelector('#urgencyDonutChart'), urgencyOptions).render();
 
     // Conversion trend bar chart
-    var trendLabels = [@Html.Raw(string.Join(",", (stats?.ConversionTrend ?? new List<LeadManagementPortal.Services.ConversionDataPoint>()).Select(p => $"\"{p.Label}\"")))];
-    var trendData   = [@Html.Raw(string.Join(",", (stats?.ConversionTrend ?? new List<LeadManagementPortal.Services.ConversionDataPoint>()).Select(p => p.Count.ToString())))];
+    var trendPoints = @(Html.Raw(JsonSerializer.Serialize((stats?.ConversionTrend ?? new List<LeadManagementPortal.Services.ConversionDataPoint>()).Select(p => new { p.Label, p.Count }))));
+    var trendLabels = trendPoints.map(function (p) { return p.label; });
+    var trendData = trendPoints.map(function (p) { return p.count; });
     var barOptions = {
         series: [{ name: 'Conversions', data: trendData }],
         chart: { type: 'bar', height: 240, toolbar: { show: false } },
@@ -296,3 +298,4 @@
 }());
 </script>
 }
+

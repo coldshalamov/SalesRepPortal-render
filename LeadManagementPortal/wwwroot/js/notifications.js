@@ -18,12 +18,17 @@ class NotificationPoller {
         this.pollInFlight = false;
         this.pollPending = false;
         this.notificationLimit = 50;
+        this.listenersBound = false;
     }
 
     /**
      * Start polling for notifications.
      */
     start() {
+        if (this.pollerId !== null) {
+            return;
+        }
+
         void this.poll();
         this.pollerId = setInterval(() => void this.poll(), this.interval);
         this.setupEventListeners();
@@ -170,43 +175,46 @@ class NotificationPoller {
             return;
         }
 
-        // Bulk action header
         let html = `
             <div class="notif-bulk-bar" id="notifBulkBar" style="display:none;">
                 <label class="notif-bulk-select-all">
-                    <input type="checkbox" id="notifSelectAll" onclick="DiRxNotifications.toggleSelectAll(event)">
+                    <input type="checkbox" id="notifSelectAll">
                     <span id="notifSelectedCount">0</span> selected
                 </label>
                 <button class="notif-bulk-btn" id="notifBulkButton" type="button">Mark as read</button>
             </div>
         `;
 
-        html += notifications.map(n => `
-            <div class="notif-item${n.is_read === 0 || n.is_read === '0' ? ' unread' : ''}"
-                 data-notification-id="${n.id}">
-                <div class="notif-checkbox">
-                    <input type="checkbox"
-                           class="notif-select-cb"
-                           data-notif-id="${n.id}"
-                           ${this.selectedNotifications.has(this.normalizeId(n.id)) ? 'checked' : ''}
-                           onclick="event.stopPropagation(); DiRxNotifications.toggleSelection(${n.id})">
-                </div>
-                <div class="notif-content"
-                     onclick="DiRxNotifications.handleClick(${n.id}, '${this.escapeHtml(n.link || '')}', event)">
-                    <div class="notif-title">${this.escapeHtml(n.title)}</div>
-                    <div class="notif-message">${this.escapeHtml(n.message)}</div>
-                    <div class="notif-time">${this.formatTimeAgo(n.created_at)}</div>
-                </div>
-                <div class="notif-actions">
-                    <button type="button"
+        html += notifications.map(n => {
+            const id = this.normalizeId(n.id);
+            const isUnread = n.is_read === 0 || n.is_read === '0';
+
+            return `
+                <div class="notif-item${isUnread ? ' unread' : ''}"
+                    data-notification-id="${id}"
+                    data-is-read="${isUnread ? '0' : '1'}">
+                    <div class="notif-checkbox">
+                        <input type="checkbox"
+                            class="notif-select-cb"
+                            data-notif-id="${id}"
+                            ${this.selectedNotifications.has(id) ? 'checked' : ''}>
+                    </div>
+                    <div class="notif-content"
+                        data-link="${this.escapeHtmlAttribute(n.link || '')}">
+                        <div class="notif-title">${this.escapeHtml(n.title)}</div>
+                        <div class="notif-message">${this.escapeHtml(n.message)}</div>
+                        <div class="notif-time">${this.formatTimeAgo(n.created_at)}</div>
+                    </div>
+                    <div class="notif-actions">
+                        <button type="button"
                             class="notif-read-toggle"
-                            title="${n.is_read === 0 || n.is_read === '0' ? 'Mark as read' : 'Mark as unread'}"
-                            onclick="DiRxNotifications.toggleRead(${n.id}, ${n.is_read}, event)">
-                        <span class="notif-dot ${n.is_read === 0 || n.is_read === '0' ? 'unread' : 'read'}"></span>
-                    </button>
+                            title="${isUnread ? 'Mark as read' : 'Mark as unread'}">
+                            <span class="notif-dot ${isUnread ? 'unread' : 'read'}"></span>
+                        </button>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         html += `
             <div class="notif-footer">
@@ -229,20 +237,21 @@ class NotificationPoller {
         return Number.isInteger(id) ? id : 0;
     }
 
-    toggleSelection(id) {
-        const nid = this.normalizeId(id);
-        if (nid <= 0) return;
-        if (this.selectedNotifications.has(nid)) {
-            this.selectedNotifications.delete(nid);
+    markCheckboxSelection(id, checked) {
+        const notificationId = this.normalizeId(id);
+        if (notificationId <= 0) return;
+
+        if (checked) {
+            this.selectedNotifications.add(notificationId);
         } else {
-            this.selectedNotifications.add(nid);
+            this.selectedNotifications.delete(notificationId);
         }
+
         this.updateSelectAllCheckbox();
         this.updateBulkBar();
     }
 
-    toggleSelectAll(event) {
-        if (event) event.stopPropagation();
+    toggleSelectAll() {
         const checkboxes = document.querySelectorAll('.notif-select-cb');
         const selectAll = document.getElementById('notifSelectAll');
         const visibleIds = Array.from(checkboxes)
@@ -256,6 +265,7 @@ class NotificationPoller {
             visibleIds.forEach(id => this.selectedNotifications.delete(id));
             checkboxes.forEach(cb => { cb.checked = false; });
         }
+
         this.updateSelectAllCheckbox();
         this.updateBulkBar();
     }
@@ -270,7 +280,6 @@ class NotificationPoller {
             .filter(id => id > 0);
         const visibleSet = new Set(visibleIds);
 
-        // Drop stale selections
         Array.from(this.selectedNotifications).forEach(id => {
             if (!visibleSet.has(id)) this.selectedNotifications.delete(id);
         });
@@ -323,6 +332,7 @@ class NotificationPoller {
     async markSelectedAsRead() {
         const ids = Array.from(this.selectedNotifications).filter(id => id > 0);
         if (!ids.length) return;
+
         try {
             await Promise.all(ids.map(id => this.postNotificationAction('mark_read', id)));
             await this.poll();
@@ -334,6 +344,7 @@ class NotificationPoller {
     async markSelectedAsUnread() {
         const ids = Array.from(this.selectedNotifications).filter(id => id > 0);
         if (!ids.length) return;
+
         try {
             await Promise.all(ids.map(id => this.postNotificationAction('mark_unread', id)));
             await this.poll();
@@ -343,33 +354,95 @@ class NotificationPoller {
     }
 
     async handleClick(id, url, event) {
-        if (event && (event.target.closest('.notif-actions') || event.target.closest('.notif-checkbox'))) return;
-
-        try {
-            await this.postNotificationAction('mark_read', id);
-            this.toggleDropdown(false);
-
-            if (url && url !== '' && url !== 'null' && url !== 'undefined') {
-                let target = url;
-                if (!url.startsWith('http') && !url.startsWith('/')) target = '/' + url;
-                window.location.href = target;
-            } else {
-                void this.poll();
-            }
-        } catch (err) {
-            console.error('Failed to mark as read on click:', err);
+        if (event && (event.target.closest('.notif-actions') || event.target.closest('.notif-checkbox'))) {
+            return;
         }
+
+        const notificationId = this.normalizeId(id);
+        if (notificationId <= 0) return;
+
+        this.toggleDropdown(false);
+        this.setNotificationReadState(notificationId, true);
+
+        const markReadPromise = this.postNotificationAction('mark_read', notificationId)
+            .catch(err => {
+                console.error('Failed to mark as read on click:', err);
+            });
+
+        const target = this.sanitizeNavigationTarget(url);
+        if (target) {
+            window.location.href = target;
+            return;
+        }
+
+        await markReadPromise;
+        void this.poll();
     }
 
-    async toggleRead(id, currentStatus, event) {
+    async toggleRead(id, event) {
         if (event) event.stopPropagation();
-        const action = (currentStatus === 0 || currentStatus === '0') ? 'mark_read' : 'mark_unread';
+
+        const notificationId = this.normalizeId(id);
+        if (notificationId <= 0) return;
+
+        const item = document.querySelector(`[data-notification-id="${notificationId}"]`);
+        const isUnread = item?.classList.contains('unread') || item?.dataset.isRead === '0';
+        const action = isUnread ? 'mark_read' : 'mark_unread';
+
         try {
-            await this.postNotificationAction(action, id);
+            await this.postNotificationAction(action, notificationId);
+            this.setNotificationReadState(notificationId, action === 'mark_read');
             void this.poll();
         } catch (err) {
             console.error(`Failed to ${action} notification:`, err);
         }
+    }
+
+    setNotificationReadState(id, isRead) {
+        const notificationId = this.normalizeId(id);
+        if (notificationId <= 0) return;
+
+        const item = document.querySelector(`[data-notification-id="${notificationId}"]`);
+        if (!item) return;
+
+        item.dataset.isRead = isRead ? '1' : '0';
+        item.classList.toggle('unread', !isRead);
+
+        const dot = item.querySelector('.notif-dot');
+        if (dot) {
+            dot.classList.toggle('unread', !isRead);
+            dot.classList.toggle('read', isRead);
+        }
+
+        const btn = item.querySelector('.notif-read-toggle');
+        if (btn) {
+            btn.title = isRead ? 'Mark as unread' : 'Mark as read';
+        }
+
+        this.updateBulkBar();
+    }
+
+    sanitizeNavigationTarget(url) {
+        if (typeof url !== 'string') return null;
+
+        const trimmed = url.trim();
+        if (trimmed.length === 0 || trimmed === 'null' || trimmed === 'undefined') {
+            return null;
+        }
+
+        if (trimmed.startsWith('/')) {
+            return trimmed;
+        }
+
+        if (/^https?:\/\//i.test(trimmed)) {
+            return trimmed;
+        }
+
+        if (/^(javascript|data|vbscript):/i.test(trimmed)) {
+            return null;
+        }
+
+        return `/${trimmed.replace(/^\/+/, '')}`;
     }
 
     async markAllRead() {
@@ -385,19 +458,30 @@ class NotificationPoller {
 
     /**
      * Optimistically mark all visible items as read in the DOM before the
-     * server responds — gives instant feedback when the dropdown opens.
+     * server responds - gives instant feedback when the dropdown opens.
      */
     markCurrentListReadOptimistic() {
         document.querySelectorAll('#notifList .notif-item.unread').forEach(item => {
             item.classList.remove('unread');
+            item.dataset.isRead = '1';
+
             const dot = item.querySelector('.notif-dot');
-            if (dot) { dot.classList.remove('unread'); dot.classList.add('read'); }
+            if (dot) {
+                dot.classList.remove('unread');
+                dot.classList.add('read');
+            }
+
             const btn = item.querySelector('.notif-read-toggle');
             if (btn) btn.title = 'Mark as unread';
         });
 
         const badge = document.getElementById('notifBadge');
-        if (badge) { badge.style.display = 'none'; badge.textContent = '0'; }
+        if (badge) {
+            badge.style.display = 'none';
+            badge.textContent = '0';
+        }
+
+        this.updateBulkBar();
     }
 
     toggleDropdown(force) {
@@ -419,16 +503,63 @@ class NotificationPoller {
         }
     }
 
+    handleDropdownClick(event) {
+        const target = event.target;
+
+        const selectAll =
+            target.closest('#notifSelectAll') ||
+            target.closest('.notif-bulk-select-all')?.querySelector('#notifSelectAll');
+        if (selectAll) {
+            this.toggleSelectAll();
+            event.stopPropagation();
+            return;
+        }
+
+        const selectCheckbox = target.closest('.notif-select-cb');
+        if (selectCheckbox) {
+            this.markCheckboxSelection(selectCheckbox.dataset.notifId, selectCheckbox.checked);
+            event.stopPropagation();
+            return;
+        }
+
+        const readToggle = target.closest('.notif-read-toggle');
+        if (readToggle) {
+            const item = readToggle.closest('.notif-item');
+            void this.toggleRead(item?.dataset.notificationId, event);
+            return;
+        }
+
+        const content = target.closest('.notif-content');
+        if (content) {
+            const item = content.closest('.notif-item');
+            void this.handleClick(item?.dataset.notificationId, content.dataset.link || '', event);
+        }
+    }
+
     setupEventListeners() {
+        if (this.listenersBound) {
+            return;
+        }
+        this.listenersBound = true;
+
         const bellBtn = document.getElementById('notifBellBtn');
         if (bellBtn) {
-            bellBtn.addEventListener('click', e => { e.stopPropagation(); this.toggleDropdown(); });
+            bellBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                this.toggleDropdown();
+            });
+        }
+
+        const dropdown = document.getElementById('notifDropdown');
+        if (dropdown) {
+            dropdown.addEventListener('click', e => this.handleDropdownClick(e));
         }
 
         document.addEventListener('click', e => {
-            const dropdown = document.getElementById('notifDropdown');
+            const currentDropdown = document.getElementById('notifDropdown');
             const bell = document.getElementById('notifBellBtn');
-            if (dropdown && !dropdown.contains(e.target) && e.target !== bell && !bell?.contains(e.target)) {
+
+            if (currentDropdown && !currentDropdown.contains(e.target) && e.target !== bell && !bell?.contains(e.target)) {
                 this.toggleDropdown(false);
             }
         });
@@ -450,17 +581,38 @@ class NotificationPoller {
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text || '';
-        return div.innerHTML;
+        const input = String(text ?? '');
+        return input.replace(/[&<>"']/g, char => {
+            switch (char) {
+                case '&':
+                    return '&amp;';
+                case '<':
+                    return '&lt;';
+                case '>':
+                    return '&gt;';
+                case '"':
+                    return '&quot;';
+                case "'":
+                    return '&#39;';
+                default:
+                    return char;
+            }
+        });
+    }
+
+    escapeHtmlAttribute(text) {
+        return this.escapeHtml(text).replace(/`/g, '&#96;');
     }
 }
 
-// Create global instance
-window.DiRxNotifications = new NotificationPoller();
+if (!window.DiRxNotifications) {
+    window.DiRxNotifications = new NotificationPoller();
+}
+
+const startNotifications = () => window.DiRxNotifications.start();
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => window.DiRxNotifications.start());
+    document.addEventListener('DOMContentLoaded', startNotifications, { once: true });
 } else {
-    window.DiRxNotifications.start();
+    startNotifications();
 }
