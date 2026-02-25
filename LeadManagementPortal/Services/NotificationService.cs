@@ -130,6 +130,63 @@ namespace LeadManagementPortal.Services
             return true;
         }
 
+        public async Task<int> MarkReadBulkAsync(IReadOnlyCollection<int> notificationIds, string userId, string role)
+        {
+            if (notificationIds == null || notificationIds.Count == 0) return 0;
+
+            var ids = notificationIds
+                .Where(id => id > 0)
+                .Distinct()
+                .Take(200)
+                .ToArray();
+
+            if (ids.Length == 0) return 0;
+
+            var notifications = await _context.Notifications
+                .Where(n => ids.Contains(n.Id) && (n.UserId == userId || n.Role == role) && !n.IsRead)
+                .ToListAsync();
+
+            if (notifications.Count == 0) return 0;
+
+            var now = DateTime.UtcNow;
+            foreach (var n in notifications)
+            {
+                n.IsRead = true;
+                n.ReadAt = now;
+            }
+
+            await _context.SaveChangesAsync();
+            return notifications.Count;
+        }
+
+        public async Task<int> MarkUnreadBulkAsync(IReadOnlyCollection<int> notificationIds, string userId, string role)
+        {
+            if (notificationIds == null || notificationIds.Count == 0) return 0;
+
+            var ids = notificationIds
+                .Where(id => id > 0)
+                .Distinct()
+                .Take(200)
+                .ToArray();
+
+            if (ids.Length == 0) return 0;
+
+            var notifications = await _context.Notifications
+                .Where(n => ids.Contains(n.Id) && (n.UserId == userId || n.Role == role) && n.IsRead)
+                .ToListAsync();
+
+            if (notifications.Count == 0) return 0;
+
+            foreach (var n in notifications)
+            {
+                n.IsRead = false;
+                n.ReadAt = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return notifications.Count;
+        }
+
         public async Task<bool> MarkAllReadAsync(string userId, string role)
         {
             var unread = await _context.Notifications
