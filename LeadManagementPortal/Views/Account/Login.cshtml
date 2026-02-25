@@ -61,7 +61,7 @@
             height: min(70vh, 560px);
             opacity: 0.94;
             filter: blur(4.5px);
-            animation: stripeDrift 4.8s cubic-bezier(0.38, 0.05, 0.24, 0.98) infinite;
+            animation: stripeDrift 5.52s cubic-bezier(0.38, 0.05, 0.24, 0.98) infinite;
             will-change: transform;
             overflow: visible;
         }
@@ -79,7 +79,7 @@
             stroke-width: 76;
             opacity: 0.88;
             filter: drop-shadow(0 0 8px rgba(29, 78, 216, 0.36));
-            animation: stripeWaveOne 2.9s ease-in-out infinite;
+            animation: stripeWaveOne 3.34s ease-in-out infinite;
         }
 
         .stripe-2 {
@@ -87,7 +87,7 @@
             stroke-width: 58;
             opacity: 0.8;
             filter: drop-shadow(0 0 10px rgba(109, 40, 217, 0.3));
-            animation: stripeWaveTwo 3.25s ease-in-out infinite;
+            animation: stripeWaveTwo 3.74s ease-in-out infinite;
         }
 
         .stripe-3 {
@@ -95,7 +95,7 @@
             stroke-width: 40;
             opacity: 0.68;
             filter: drop-shadow(0 0 9px rgba(59, 130, 246, 0.28));
-            animation: stripeWaveThree 2.6s ease-in-out infinite;
+            animation: stripeWaveThree 2.99s ease-in-out infinite;
         }
 
         .stripe-4 {
@@ -103,23 +103,23 @@
             stroke-width: 20;
             opacity: 0.58;
             filter: drop-shadow(0 0 8px rgba(219, 234, 254, 0.45));
-            animation: stripeWaveFour 2.2s ease-in-out infinite;
+            animation: stripeWaveFour 2.53s ease-in-out infinite;
         }
 
         .stripe-5 {
             stroke: url(#stripeYellow);
             stroke-width: 35;
-            opacity: 0.85;
-            filter: drop-shadow(0 0 8px rgba(234, 179, 8, 0.36));
-            animation: stripeWaveOne 3.1s ease-in-out infinite;
+            opacity: 0.9;
+            filter: drop-shadow(0 0 10px rgba(255, 220, 0, 0.45));
+            animation: stripeWaveOne 3.57s ease-in-out infinite;
         }
 
         .stripe-6 {
             stroke: url(#stripeRed);
             stroke-width: 25;
             opacity: 0.75;
-            filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.3));
-            animation: stripeWaveTwo 2.8s ease-in-out infinite;
+            filter: drop-shadow(0 0 10px rgba(74, 222, 128, 0.3));
+            animation: stripeWaveTwo 3.22s ease-in-out infinite;
         }
 
         .stripe-7 {
@@ -127,7 +127,7 @@
             stroke-width: 15;
             opacity: 0.65;
             filter: drop-shadow(0 0 9px rgba(59, 130, 246, 0.28));
-            animation: stripeWaveThree 3.4s ease-in-out infinite;
+            animation: stripeWaveThree 3.91s ease-in-out infinite;
         }
 
         .stripe-8 {
@@ -135,7 +135,7 @@
             stroke-width: 8;
             opacity: 0.55;
             filter: drop-shadow(0 0 8px rgba(219, 234, 254, 0.45));
-            animation: stripeWaveFour 2.5s ease-in-out infinite;
+            animation: stripeWaveFour 2.88s ease-in-out infinite;
         }
 
         .corner-glow {
@@ -184,37 +184,37 @@
             }
 
             50% {
-                transform: translate3d(-40px, 28px, 0) scale(1.09);
+                transform: translate3d(-48px, 34px, 0) scale(1.11);
             }
         }
 
         @@keyframes stripeWaveOne {
             0%, 100% {
-                transform: rotate(-0.4deg) translateY(0);
+                transform: rotate(-0.48deg) translateY(0);
             }
 
             50% {
-                transform: rotate(1.35deg) translateY(10px);
+                transform: rotate(1.62deg) translateY(12px);
             }
         }
 
         @@keyframes stripeWaveTwo {
             0%, 100% {
-                transform: rotate(0.3deg) translateY(0);
+                transform: rotate(0.36deg) translateY(0);
             }
 
             50% {
-                transform: rotate(-1.05deg) translateY(-10px);
+                transform: rotate(-1.26deg) translateY(-12px);
             }
         }
 
         @@keyframes stripeWaveThree {
             0%, 100% {
-                transform: rotate(-0.25deg) translateY(0);
+                transform: rotate(-0.3deg) translateY(0);
             }
 
             50% {
-                transform: rotate(1.5deg) translateY(12px);
+                transform: rotate(1.8deg) translateY(14.4px);
             }
         }
 
@@ -224,7 +224,7 @@
             }
 
             50% {
-                transform: rotate(-1.8deg) translateY(-14px);
+                transform: rotate(-2.16deg) translateY(-16.8px);
             }
         }
 
@@ -445,14 +445,14 @@
                     <stop offset="100%" stop-color="rgba(191, 219, 254, 0.42)" />
                 </linearGradient>
                 <linearGradient id="stripeYellow" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="rgba(253, 224, 71, 0.9)" />
-                    <stop offset="52%" stop-color="rgba(234, 179, 8, 0.9)" />
-                    <stop offset="100%" stop-color="rgba(202, 138, 4, 0.86)" />
+                    <stop offset="0%" stop-color="rgba(255, 245, 0, 1)" />
+                    <stop offset="52%" stop-color="rgba(255, 220, 0, 1)" />
+                    <stop offset="100%" stop-color="rgba(250, 200, 0, 0.95)" />
                 </linearGradient>
                 <linearGradient id="stripeRed" x1="6%" y1="8%" x2="100%" y2="92%">
-                    <stop offset="0%" stop-color="rgba(252, 165, 165, 0.82)" />
-                    <stop offset="52%" stop-color="rgba(239, 68, 68, 0.9)" />
-                    <stop offset="100%" stop-color="rgba(185, 28, 28, 0.8)" />
+                    <stop offset="0%" stop-color="rgba(134, 239, 172, 0.9)" />
+                    <stop offset="52%" stop-color="rgba(74, 222, 128, 0.92)" />
+                    <stop offset="100%" stop-color="rgba(34, 197, 94, 0.85)" />
                 </linearGradient>
             </defs>
             <path class="stripe stripe-1" d="M 120 -180 C 390 72 470 204 740 510" />

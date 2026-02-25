@@ -36,7 +36,11 @@ namespace LeadManagementPortal.Controllers
             if (!await CanAccessLeadAsync(leadId)) return Forbid();
             if (file == null || file.Length == 0)
             {
-                TempData["Error"] = "Please choose a file.";
+                if (TempData != null)
+                {
+                    TempData["Error"] = "Please choose a file.";
+                }
+
                 return RedirectToAction("Details", "Leads", new { id = leadId });
             }
 
@@ -59,7 +63,11 @@ namespace LeadManagementPortal.Controllers
                 uploadedByUserId: uploadedByUserId,
                 ct: ct);
 
-            TempData["Success"] = "Document uploaded.";
+            if (TempData != null)
+            {
+                TempData["Success"] = "Document uploaded.";
+            }
+
             return RedirectToAction("Details", "Leads", new { id = leadId });
         }
 

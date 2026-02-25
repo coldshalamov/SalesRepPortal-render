@@ -26,9 +26,15 @@ namespace LeadManagementPortal.Tests
 
             // Try to find the real appsettings.json if not in base dir
             string projectDir = AppContext.BaseDirectory;
-            while (!System.IO.File.Exists(System.IO.Path.Combine(projectDir, "appsettings.json")) && System.IO.Directory.GetParent(projectDir) != null)
+            while (!System.IO.File.Exists(System.IO.Path.Combine(projectDir, "appsettings.json")))
             {
-                projectDir = System.IO.Directory.GetParent(projectDir).FullName;
+                var parent = System.IO.Directory.GetParent(projectDir);
+                if (parent == null)
+                {
+                    break;
+                }
+
+                projectDir = parent.FullName;
             }
             
             // If we found the web project dir, use its appsettings

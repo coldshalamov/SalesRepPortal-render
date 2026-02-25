@@ -130,7 +130,7 @@ namespace LeadManagementPortal.Tests
 
             leadDocs
                 .Setup(s => s.ListAsync("lead-1", It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new[] { });
+                .ReturnsAsync(Array.Empty<LeadDocument>());
 
             var controller = new LeadDocumentsController(leadDocs.Object, leadService.Object, userManager.Object)
             {

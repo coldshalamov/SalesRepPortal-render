@@ -42,6 +42,18 @@ namespace LeadManagementPortal.Tests
             var svc = CreateLeadService(context);
 
             var now = DateTime.UtcNow;
+            context.Users.Add(new ApplicationUser
+            {
+                Id = "rep-1",
+                UserName = "rep-1@example.com",
+                Email = "rep-1@example.com",
+                FirstName = "Rep",
+                LastName = "One",
+                IsActive = true,
+                SalesGroupId = "group-1"
+            });
+            context.SalesGroups.Add(new SalesGroup { Id = "group-1", Name = "Group 1" });
+
             context.Leads.Add(new Lead
             {
                 Id = "lead-1",
@@ -80,6 +92,18 @@ namespace LeadManagementPortal.Tests
             var svc = CreateLeadService(context);
 
             var now = DateTime.UtcNow;
+            context.Users.Add(new ApplicationUser
+            {
+                Id = "rep-1",
+                UserName = "rep-1@example.com",
+                Email = "rep-1@example.com",
+                FirstName = "Rep",
+                LastName = "One",
+                IsActive = true,
+                SalesGroupId = "group-1"
+            });
+            context.SalesGroups.Add(new SalesGroup { Id = "group-1", Name = "Group 1" });
+
             context.Leads.Add(new Lead
             {
                 Id = "lead-1",
@@ -122,4 +146,3 @@ namespace LeadManagementPortal.Tests
         }
     }
 }
-
