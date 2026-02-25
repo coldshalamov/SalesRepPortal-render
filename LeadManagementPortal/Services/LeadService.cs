@@ -451,13 +451,58 @@ namespace LeadManagementPortal.Services
             }
         }
 
-        public async Task ExpireOldLeadsAsync()
+        public async Task<List<LeadExpiryCandidate>> GetLeadsExpiringSoonAsync(DateTime utcNow, int daysThreshold)
+        {
+            if (daysThreshold <= 0)
+            {
+                return new List<LeadExpiryCandidate>();
+            }
+
+            // Matches the existing DaysRemaining behavior:
+            // DaysRemaining = max((ExpiryDate - now).Days, 0)
+            // Warning window is 1..daysThreshold inclusive, i.e. ExpiryDate in [now+1d, now+(daysThreshold+1)d).
+            var windowStart = utcNow.AddDays(1);
+            var windowEnd = utcNow.AddDays(daysThreshold + 1);
+
+            return await _context.Leads
+                .AsNoTracking()
+                .Where(l =>
+                    !l.IsExpired &&
+                    l.Status != LeadStatus.Converted &&
+                    l.Status != LeadStatus.Lost &&
+                    l.Status != LeadStatus.Expired &&
+                    !string.IsNullOrWhiteSpace(l.AssignedToId) &&
+                    l.ExpiryDate >= windowStart &&
+                    l.ExpiryDate < windowEnd)
+                .Select(l => new LeadExpiryCandidate(
+                    l.Id,
+                    l.Company,
+                    l.ExpiryDate,
+                    string.IsNullOrWhiteSpace(l.AssignedToId) ? null : l.AssignedToId,
+                    l.SalesOrgId))
+                .ToListAsync();
+        }
+
+        public async Task<List<LeadExpiryCandidate>> ExpireOldLeadsAsync(DateTime utcNow)
         {
             var expiredLeads = await _context.Leads
-                .Where(l => l.ExpiryDate <= DateTime.UtcNow 
-                    && !l.IsExpired 
-                    && l.Status != LeadStatus.Converted)
+                .Where(l =>
+                    l.ExpiryDate <= utcNow &&
+                    !l.IsExpired &&
+                    l.Status != LeadStatus.Converted)
                 .ToListAsync();
+
+            if (expiredLeads.Count == 0)
+            {
+                return new List<LeadExpiryCandidate>();
+            }
+
+            var expiredSnapshot = expiredLeads.Select(l => new LeadExpiryCandidate(
+                l.Id,
+                l.Company,
+                l.ExpiryDate,
+                string.IsNullOrWhiteSpace(l.AssignedToId) ? null : l.AssignedToId,
+                l.SalesOrgId)).ToList();
 
             foreach (var lead in expiredLeads)
             {
@@ -466,6 +511,7 @@ namespace LeadManagementPortal.Services
             }
 
             await _context.SaveChangesAsync();
+            return expiredSnapshot;
         }
 
         public async Task<IEnumerable<Lead>> SearchAsync(string searchTerm, string userId, string userRole)
@@ -648,8 +694,9 @@ namespace LeadManagementPortal.Services
 
                 return result;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.GetFollowUpsForLeadsAsync failed for userId={UserId} role={UserRole}", userId, userRole);
                 return result;
             }
         }
@@ -675,8 +722,9 @@ namespace LeadManagementPortal.Services
                     .ThenBy(task => task.CreatedAt)
                     .ToListAsync();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.GetFollowUpsForLeadAsync failed for leadId={LeadId} userId={UserId} role={UserRole}", leadId, userId, userRole);
                 return new List<LeadFollowUpTask>();
             }
         }
@@ -710,8 +758,9 @@ namespace LeadManagementPortal.Services
                 await _context.SaveChangesAsync();
                 return task;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.AddFollowUpAsync failed for leadId={LeadId} userId={UserId} role={UserRole}", leadId, userId, userRole);
                 return null;
             }
         }
@@ -747,8 +796,9 @@ namespace LeadManagementPortal.Services
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.CompleteFollowUpAsync failed for leadId={LeadId} followUpId={FollowUpId} userId={UserId} role={UserRole}", leadId, followUpId, userId, userRole);
                 return false;
             }
         }
@@ -785,8 +835,9 @@ namespace LeadManagementPortal.Services
                 await _context.SaveChangesAsync();
                 return tasks.Count;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.DeleteFollowUpsAsync failed for leadId={LeadId} userId={UserId} role={UserRole}", leadId, userId, userRole);
                 return 0;
             }
         }
@@ -806,8 +857,9 @@ namespace LeadManagementPortal.Services
                     .Where(task => scopedIds.Contains(task.LeadId) && !task.IsCompleted && task.DueDate.HasValue && task.DueDate.Value.Date < today)
                     .CountAsync();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "LeadService.GetOverdueFollowUpCountAsync failed for userId={UserId} role={UserRole}", userId, userRole);
                 return 0;
             }
         }
