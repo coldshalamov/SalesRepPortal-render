@@ -18,6 +18,16 @@ const ADMIN_ROUTES = [
 ];
 
 test.describe("Authenticated Render Smoke", () => {
+  async function ensureNavbarLinksVisible(page, linkToReveal) {
+    if (await linkToReveal.isVisible()) return;
+
+    const toggler = page.locator("nav button.navbar-toggler");
+    if (await toggler.isVisible()) {
+      await toggler.click();
+      await expect(linkToReveal).toBeVisible();
+    }
+  }
+
   test("organization admin can render core portal routes without client errors", async ({
     page,
   }) => {
@@ -47,6 +57,7 @@ test.describe("Authenticated Render Smoke", () => {
       const href = await link.getAttribute("href");
       if (!href || href === "#") continue;
 
+      await ensureNavbarLinksVisible(page, link);
       await link.click();
       await page.waitForLoadState("domcontentloaded");
       expect(page.url(), `clicked nav link href=${href}`).toContain(href.split("?")[0]);
