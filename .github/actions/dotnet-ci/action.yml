@@ -36,6 +36,11 @@ runs:
         restore-keys: |
           nuget-${{ runner.os }}-
 
+    - name: Validate Razor CSS At-Rules
+      shell: pwsh
+      run: |
+        ./scripts/ci/check-razor-css-at-rules.ps1
+
     - name: Restore
       shell: pwsh
       run: |
@@ -64,4 +69,3 @@ runs:
           --logger "trx;LogFileName=test-results.trx" `
           --collect "XPlat Code Coverage" `
           @filterArg
-
