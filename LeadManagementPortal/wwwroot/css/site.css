@@ -54,6 +54,8 @@ body {
 .navbar-dark .navbar-nav .nav-link {
   position: relative;
   transition: color 0.15s ease;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .navbar-dark .navbar-nav .nav-link.active {

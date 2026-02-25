@@ -11,12 +11,16 @@
     <title>Welcome - DiRX</title>
     <style>
         :root {
-            --accent-primary: #0ea5e9;
-            --accent-cyan: #22d3ee;
-            --particle-color: rgba(79, 195, 247, 0.6);
-            --particle-glow: rgba(56, 189, 248, 0.35);
-            --bg-gradient-start: rgba(56, 189, 248, 0.14);
-            --bg-gradient-mid: rgba(14, 165, 233, 0.1);
+            --accent-primary: #1e64dc;
+            --accent-secondary: #2d7dff;
+            --accent-soft: #8cb8ff;
+            --particle-color: rgba(66, 127, 236, 0.48);
+            --particle-glow: rgba(45, 110, 224, 0.2);
+            --bg-gradient-start: rgba(105, 156, 255, 0.16);
+            --bg-gradient-mid: rgba(55, 115, 236, 0.12);
+            --surface-strong: rgba(17, 42, 88, 0.34);
+            --surface-border: rgba(163, 194, 239, 0.36);
+            --text-primary: #123a8a;
         }
 
         * {
@@ -30,7 +34,9 @@
             height: 100%;
             overflow: hidden;
             font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            background: radial-gradient(ellipse at center, #0d1a2d 0%, #050810 100%);
+            background:
+                radial-gradient(78% 62% at 92% -10%, rgba(182, 209, 255, 0.54) 0%, rgba(206, 225, 255, 0.28) 35%, transparent 76%),
+                radial-gradient(110% 94% at 50% 100%, #e6edf9 0%, #eef4ff 45%, #f6f9ff 100%);
         }
 
         #transition-container {
@@ -59,7 +65,7 @@
             border-radius: 50%;
             border: 3px solid transparent;
             background: linear-gradient(135deg, var(--bg-gradient-mid), var(--bg-gradient-start)) padding-box,
-                linear-gradient(135deg, var(--accent-primary), var(--accent-cyan), var(--accent-primary)) border-box;
+                linear-gradient(135deg, var(--accent-primary), var(--accent-soft), var(--accent-secondary)) border-box;
             background-size: 300% 300%;
             animation: ringGlow 2s ease-in-out infinite, ringSpin 8s linear infinite;
             box-shadow: 0 0 60px var(--particle-glow), 0 0 120px var(--particle-glow), inset 0 0 60px var(--particle-glow);
@@ -123,11 +129,11 @@
         .rx-symbol {
             font-size: 120px;
             font-weight: 700;
-            background: linear-gradient(180deg, var(--accent-cyan) 0%, var(--accent-primary) 100%);
+            background: linear-gradient(180deg, #fefeff 0%, #a9c9ff 35%, var(--accent-primary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            text-shadow: 0 0 40px var(--particle-glow);
+            text-shadow: 0 0 24px rgba(52, 108, 216, 0.22);
             font-family: "Times New Roman", serif;
             letter-spacing: -8px;
         }
@@ -137,14 +143,14 @@
             text-align: center;
             opacity: 0;
             transform: translateY(30px);
-            background: rgba(2, 18, 38, 0.38);
-            border: 1px solid rgba(167, 223, 244, 0.32);
+            background: var(--surface-strong);
+            border: 1px solid var(--surface-border);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             padding: 20px;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 14px 36px rgba(2, 12, 28, 0.45), 0 0 24px rgba(34, 211, 238, 0.16), inset 0 0 0 1px rgba(2, 12, 28, 0.35);
+            box-shadow: 0 14px 36px rgba(18, 37, 78, 0.2), 0 0 18px rgba(94, 147, 237, 0.15), inset 0 0 0 1px rgba(17, 42, 88, 0.2);
             will-change: transform, opacity;
         }
 
@@ -153,7 +159,7 @@
             position: absolute;
             inset: 6px 10px;
             border-radius: 10px;
-            background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 40%, rgba(2, 18, 38, 0.22) 100%);
+            background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.1) 42%, rgba(17, 42, 88, 0.16) 100%);
             pointer-events: none;
         }
 
@@ -162,15 +168,15 @@
             z-index: 1;
             font-size: 46px;
             font-weight: 900;
-            background: linear-gradient(180deg, #ffffff 0%, #d6f3ff 44%, #8ddfff 100%);
+            background: linear-gradient(180deg, #ffffff 0%, #d7e7ff 44%, #8eb6ff 100%);
             background-size: 200% auto;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            -webkit-text-stroke: 0.6px rgba(2, 27, 52, 0.55);
+            -webkit-text-stroke: 0.6px rgba(14, 43, 93, 0.45);
             letter-spacing: 2.4px;
             text-transform: uppercase;
-            text-shadow: 0 2px 0 rgba(4, 32, 56, 0.78), 0 0 18px rgba(255, 255, 255, 0.6), 0 0 32px rgba(34, 211, 238, 0.5);
+            text-shadow: 0 2px 0 rgba(18, 50, 98, 0.62), 0 0 16px rgba(255, 255, 255, 0.5), 0 0 22px rgba(108, 156, 241, 0.36);
             animation: shimmer 3s linear infinite;
         }
 
@@ -188,11 +194,11 @@
             width: 100px;
             height: 100px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #00c853, #00e676);
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 0 40px rgba(0, 200, 83, 0.5), 0 0 80px rgba(0, 200, 83, 0.3);
+            box-shadow: 0 0 32px rgba(33, 108, 229, 0.36), 0 0 64px rgba(33, 108, 229, 0.22);
             position: relative;
         }
 
@@ -201,7 +207,7 @@
             position: absolute;
             inset: -5px;
             border-radius: 50%;
-            border: 2px solid rgba(0, 230, 118, 0.5);
+            border: 2px solid rgba(112, 165, 255, 0.52);
             animation: successPulse 1s ease-out infinite;
         }
 
@@ -219,10 +225,10 @@
         .welcome-text {
             font-size: 28px;
             font-weight: 600;
-            color: #00e676;
+            color: var(--text-primary);
             letter-spacing: 3px;
             text-transform: uppercase;
-            text-shadow: 0 0 20px rgba(0, 230, 118, 0.5);
+            text-shadow: 0 0 14px rgba(60, 125, 234, 0.26);
         }
 
         .progress-ring {
@@ -299,12 +305,14 @@
             gap: 20px;
             z-index: 10000;
             opacity: 1;
-            background: radial-gradient(ellipse at center, #0d1a2d 0%, #050810 100%);
+            background:
+                radial-gradient(78% 62% at 92% -10%, rgba(182, 209, 255, 0.54) 0%, rgba(206, 225, 255, 0.28) 35%, transparent 76%),
+                radial-gradient(110% 94% at 50% 100%, #e6edf9 0%, #eef4ff 45%, #f6f9ff 100%);
             transition: opacity 0.3s ease-out;
         }
 
         .warmup-text {
-            color: #a7dff4;
+            color: rgba(18, 58, 138, 0.82);
             font-size: 14px;
             letter-spacing: 2px;
             text-transform: uppercase;
@@ -313,7 +321,7 @@
         .warmup-bar-container {
             width: 200px;
             height: 3px;
-            background: rgba(14, 165, 233, 0.2);
+            background: rgba(45, 110, 224, 0.18);
             border-radius: 3px;
             overflow: hidden;
         }
@@ -321,7 +329,7 @@
         .warmup-bar {
             width: 0%;
             height: 100%;
-            background: linear-gradient(90deg, var(--accent-primary), var(--accent-cyan));
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-soft));
             border-radius: 3px;
             transition: width 0.1s ease-out;
         }
@@ -563,9 +571,9 @@
     <svg width="0" height="0" aria-hidden="true">
         <defs>
             <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" style="stop-color:#0ea5e9" />
-                <stop offset="50%" style="stop-color:#06b6d4" />
-                <stop offset="100%" style="stop-color:#0ea5e9" />
+                <stop offset="0%" style="stop-color:#1e64dc" />
+                <stop offset="50%" style="stop-color:#8cb8ff" />
+                <stop offset="100%" style="stop-color:#2d7dff" />
             </linearGradient>
         </defs>
     </svg>
@@ -632,7 +640,7 @@
             }
 
             init() {
-                const particleCount = 80;
+                const particleCount = 56;
                 for (let i = 0; i < particleCount; i++) {
                     this.particles.push(this.createParticle());
                 }
@@ -652,7 +660,7 @@
             }
 
             getParticleColor() {
-                return "rgba(79, 195, 247, {opacity})";
+                return "rgba(66, 127, 236, {opacity})";
             }
 
             start() {
@@ -686,11 +694,11 @@
                         const dx = particle.x - otherParticle.x;
                         const dy = particle.y - otherParticle.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
-                        if (distance < 120) {
+                        if (distance < 96) {
                             this.ctx.beginPath();
                             this.ctx.moveTo(particle.x, particle.y);
                             this.ctx.lineTo(otherParticle.x, otherParticle.y);
-                            this.ctx.strokeStyle = this.getParticleColor().replace("{opacity}", (0.1 * (1 - distance / 120)).toString());
+                            this.ctx.strokeStyle = this.getParticleColor().replace("{opacity}", (0.08 * (1 - distance / 96)).toString());
                             this.ctx.stroke();
                         }
                     });
