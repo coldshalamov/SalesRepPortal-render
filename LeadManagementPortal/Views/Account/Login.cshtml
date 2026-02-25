@@ -55,37 +55,54 @@
 
         .corner-stripes {
             position: absolute;
-            top: -10%;       /* Moved more into screen (was -22%) */
-            right: -2%;      /* Moved more into screen (was -10%) */
+            top: -10%;
+            right: -2%;
             width: min(76vw, 920px);
             height: min(70vh, 560px);
-            opacity: 0.85;
-            filter: blur(28px); /* Stripe aesthetic */
-            animation: stripeDrift 7.5s ease-in-out infinite; /* 25% faster than 10s */
+            opacity: 0.94;
+            filter: blur(9px);
+            animation: stripeDrift 4.8s cubic-bezier(0.38, 0.05, 0.24, 0.98) infinite;
+            will-change: transform;
         }
 
         .stripe {
             fill: none;
             stroke-linecap: round;
             stroke-linejoin: round;
+            transform-box: fill-box;
+            transform-origin: 68% 16%;
         }
 
         .stripe-1 {
             stroke: url(#stripeBlue);
-            stroke-width: 90;
-            opacity: 0.8;
+            stroke-width: 76;
+            opacity: 0.88;
+            filter: drop-shadow(0 0 8px rgba(29, 78, 216, 0.36));
+            animation: stripeWaveOne 2.9s ease-in-out infinite;
         }
 
         .stripe-2 {
             stroke: url(#stripePurple);
-            stroke-width: 70;
-            opacity: 0.7;
+            stroke-width: 58;
+            opacity: 0.8;
+            filter: drop-shadow(0 0 10px rgba(109, 40, 217, 0.3));
+            animation: stripeWaveTwo 3.25s ease-in-out infinite;
         }
 
         .stripe-3 {
-            stroke: url(#stripeCyan);
-            stroke-width: 50;
-            opacity: 0.6;
+            stroke: url(#stripeSky);
+            stroke-width: 40;
+            opacity: 0.68;
+            filter: drop-shadow(0 0 9px rgba(59, 130, 246, 0.28));
+            animation: stripeWaveThree 2.6s ease-in-out infinite;
+        }
+
+        .stripe-4 {
+            stroke: url(#stripeHighlight);
+            stroke-width: 20;
+            opacity: 0.58;
+            filter: drop-shadow(0 0 8px rgba(219, 234, 254, 0.45));
+            animation: stripeWaveFour 2.2s ease-in-out infinite;
         }
 
         .corner-glow {
@@ -95,9 +112,9 @@
             width: min(58vw, 760px);
             height: min(58vh, 520px);
             background:
-                radial-gradient(58% 60% at 66% 38%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 46%, transparent 76%),
-                radial-gradient(64% 66% at 54% 50%, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 50%, transparent 80%);
-            filter: blur(20px);
+                radial-gradient(56% 58% at 66% 36%, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 38%, transparent 72%),
+                radial-gradient(62% 64% at 54% 48%, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 46%, transparent 78%);
+            filter: blur(12px);
         }
 
         .subtle-grid {
@@ -125,7 +142,47 @@
             }
 
             50% {
-                transform: translate3d(-30px, 20px, 0) scale(1.05);
+                transform: translate3d(-40px, 28px, 0) scale(1.09);
+            }
+        }
+
+        @@keyframes stripeWaveOne {
+            0%, 100% {
+                transform: rotate(-0.4deg) translateY(0);
+            }
+
+            50% {
+                transform: rotate(1.35deg) translateY(10px);
+            }
+        }
+
+        @@keyframes stripeWaveTwo {
+            0%, 100% {
+                transform: rotate(0.3deg) translateY(0);
+            }
+
+            50% {
+                transform: rotate(-1.05deg) translateY(-10px);
+            }
+        }
+
+        @@keyframes stripeWaveThree {
+            0%, 100% {
+                transform: rotate(-0.25deg) translateY(0);
+            }
+
+            50% {
+                transform: rotate(1.5deg) translateY(12px);
+            }
+        }
+
+        @@keyframes stripeWaveFour {
+            0%, 100% {
+                transform: rotate(0deg) translateY(0);
+            }
+
+            50% {
+                transform: rotate(-1.8deg) translateY(-14px);
             }
         }
 
@@ -290,7 +347,8 @@
                 right: -10%;
                 width: 120vw;
                 height: 50vh;
-                opacity: 0.6;
+                opacity: 0.72;
+                filter: blur(8px);
             }
 
             .top-right-line {
@@ -313,24 +371,29 @@
             <defs>
                 <linearGradient id="stripeBlue" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stop-color="rgba(59, 130, 246, 0.9)" />
-                    <stop offset="50%" stop-color="rgba(37, 99, 235, 0.85)" />
-                    <stop offset="100%" stop-color="rgba(29, 78, 216, 0.8)" />
+                    <stop offset="52%" stop-color="rgba(37, 99, 235, 0.9)" />
+                    <stop offset="100%" stop-color="rgba(29, 78, 216, 0.86)" />
                 </linearGradient>
-                <!-- Corrected below -->
                 <linearGradient id="stripePurple" x1="6%" y1="8%" x2="100%" y2="92%">
-                    <stop offset="0%" stop-color="rgba(167, 139, 250, 0.8)" />
-                    <stop offset="52%" stop-color="rgba(139, 92, 246, 0.85)" />
-                    <stop offset="100%" stop-color="rgba(109, 40, 217, 0.75)" />
+                    <stop offset="0%" stop-color="rgba(196, 181, 253, 0.82)" />
+                    <stop offset="52%" stop-color="rgba(139, 92, 246, 0.9)" />
+                    <stop offset="100%" stop-color="rgba(109, 40, 217, 0.8)" />
                 </linearGradient>
-                <linearGradient id="stripeCyan" x1="0%" y1="0%" x2="92%" y2="90%">
-                    <stop offset="0%" stop-color="rgba(94, 234, 212, 0.8)" />
-                    <stop offset="56%" stop-color="rgba(45, 212, 191, 0.7)" />
-                    <stop offset="100%" stop-color="rgba(15, 118, 110, 0.6)" />
+                <linearGradient id="stripeSky" x1="0%" y1="0%" x2="92%" y2="90%">
+                    <stop offset="0%" stop-color="rgba(147, 197, 253, 0.88)" />
+                    <stop offset="56%" stop-color="rgba(96, 165, 250, 0.82)" />
+                    <stop offset="100%" stop-color="rgba(59, 130, 246, 0.72)" />
+                </linearGradient>
+                <linearGradient id="stripeHighlight" x1="4%" y1="0%" x2="94%" y2="96%">
+                    <stop offset="0%" stop-color="rgba(255, 255, 255, 0.58)" />
+                    <stop offset="50%" stop-color="rgba(219, 234, 254, 0.62)" />
+                    <stop offset="100%" stop-color="rgba(191, 219, 254, 0.42)" />
                 </linearGradient>
             </defs>
             <path class="stripe stripe-1" d="M 256 -90 C 390 72 470 204 740 510" />
             <path class="stripe stripe-2" d="M 334 -118 C 436 56 518 188 786 496" />
             <path class="stripe stripe-3" d="M 196 -58 C 318 90 380 198 632 478" />
+            <path class="stripe stripe-4" d="M 282 -76 C 410 68 478 198 708 486" />
         </svg>
     </div>
 

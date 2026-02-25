@@ -125,49 +125,15 @@
         }
 
         .rx-symbol {
-            font-size: 120px;
-            font-weight: 700;
+            font-size: clamp(64px, 9vw, 82px);
+            font-weight: 800;
             background: linear-gradient(180deg, #fefeff 0%, #a9c9ff 35%, var(--accent-primary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
             text-shadow: 0 0 24px rgba(52, 108, 216, 0.22);
-            font-family: "Times New Roman", serif;
-            letter-spacing: -8px;
-        }
-
-        .brand-text {
-            position: absolute;
-            text-align: center;
-            opacity: 0;
-            transform: translateY(16px);
-            background: transparent;
-            border: 0;
-            padding: 0;
-            border-radius: 0;
-            overflow: visible;
-            box-shadow: none;
-            will-change: transform, opacity;
-        }
-
-        .brand-text::before {
-            content: "";
-            position: absolute;
-            inset: -8px -12px;
-            border-radius: 999px;
-            background: radial-gradient(circle at 50% 50%, rgba(123, 168, 245, 0.18) 0%, rgba(123, 168, 245, 0.08) 36%, transparent 72%);
-            pointer-events: none;
-        }
-
-        .brand-text .dirx-text {
-            position: relative;
-            z-index: 1;
-            font-size: clamp(34px, 5vw, 42px);
-            font-weight: 700;
-            color: #194b9f;
-            letter-spacing: 0.04em;
-            text-transform: none;
-            text-shadow: 0 2px 12px rgba(25, 75, 159, 0.14);
+            font-family: "Plus Jakarta Sans", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            letter-spacing: 0.02em;
         }
 
         .success-container {
@@ -210,15 +176,6 @@
             transform: rotate(-45deg) translate(3px, -3px);
             animation: checkmarkDraw 0.4s ease-out forwards;
             animation-play-state: paused;
-        }
-
-        .welcome-text {
-            font-size: 28px;
-            font-weight: 600;
-            color: var(--text-primary);
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            text-shadow: 0 0 14px rgba(60, 125, 234, 0.26);
         }
 
         .progress-ring {
@@ -301,13 +258,6 @@
             transition: opacity 0.3s ease-out;
         }
 
-        .warmup-text {
-            color: rgba(18, 58, 138, 0.82);
-            font-size: 14px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
         .warmup-bar-container {
             width: 200px;
             height: 3px;
@@ -335,10 +285,6 @@
 
         .animate-logo {
             animation: logoReveal 0.76s cubic-bezier(0.22, 0.61, 0.36, 1) forwards !important;
-        }
-
-        .animate-text {
-            animation: textSlideUp 0.6s ease-out forwards !important;
         }
 
         .animate-success {
@@ -502,13 +448,6 @@
             }
         }
 
-        @@keyframes textSlideUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         @@keyframes successReveal {
             0% {
                 opacity: 0;
@@ -578,11 +517,7 @@
         </div>
 
         <div class="rx-container" id="rx-container">
-            <span class="rx-symbol">Rx</span>
-        </div>
-
-        <div class="brand-text" id="brand-text">
-            <div class="dirx-text">DiRx</div>
+            <span class="rx-symbol">DiRx</span>
         </div>
 
         <div class="loading-dots" id="loading-dots">
@@ -595,7 +530,6 @@
             <div class="checkmark-circle">
                 <div class="checkmark" id="checkmark"></div>
             </div>
-            <div class="welcome-text">Welcome</div>
         </div>
     </div>
     <div style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
@@ -748,7 +682,6 @@
             const warmupOverlay = document.createElement("div");
             warmupOverlay.className = "warmup-overlay";
             warmupOverlay.innerHTML = `
-                <div class="warmup-text">Initializing Portal</div>
                 <div class="warmup-bar-container">
                     <div class="warmup-bar" id="warmup-bar"></div>
                 </div>
@@ -791,7 +724,6 @@
                 container,
                 ring: document.getElementById("logo-ring"),
                 rx: document.getElementById("rx-container"),
-                brand: document.getElementById("brand-text"),
                 progress: document.getElementById("progress-ring"),
                 progressCircle: document.getElementById("progress-circle"),
                 streams: document.getElementById("data-streams"),
@@ -805,7 +737,6 @@
                     element.classList.remove(
                         "animate-ring",
                         "animate-logo",
-                        "animate-text",
                         "animate-success",
                         "animate-exit",
                         "animate-progress",
@@ -816,7 +747,6 @@
 
             elements.ring.style.opacity = "0";
             elements.rx.style.opacity = "0";
-            elements.brand.style.opacity = "0";
             elements.progress.style.opacity = "0";
             elements.streams.style.opacity = "0";
             elements.loading.style.opacity = "0";
@@ -833,20 +763,18 @@
                 },
                 { delay: 300, action: () => elements.ring.classList.add("animate-ring") },
                 { delay: 750, action: () => elements.rx.classList.add("animate-logo") },
-                { delay: 1200, action: () => elements.brand.classList.add("animate-text") },
                 {
-                    delay: 2400,
+                    delay: 2150,
                     action: () => {
                         elements.ring.style.opacity = "0";
                         elements.rx.style.opacity = "0";
-                        elements.brand.style.opacity = "0";
                         elements.progress.style.opacity = "0";
                         elements.success.classList.add("animate-success");
                         window.setTimeout(() => elements.checkmark.classList.add("play-checkmark"), 100);
                     }
                 },
                 {
-                    delay: 3000,
+                    delay: 2850,
                     action: () => {
                         particleSystem.stop();
                         elements.streams.style.transition = "opacity 0.3s ease-out";
@@ -856,13 +784,13 @@
                     }
                 },
                 {
-                    delay: 3200,
+                    delay: 3050,
                     action: () => {
                         elements.container.classList.add("animate-exit");
                     }
                 },
                 {
-                    delay: 3650,
+                    delay: 3480,
                     action: () => {
                         safeRedirect();
                     }
