@@ -508,11 +508,7 @@ namespace LeadManagementPortal.Controllers
             }
 
             var newAssignee = await _userManager.FindByIdAsync(model.NewAssigneeId);
-            bool isValidAssignee = newAssignee != null
-                && newAssignee.IsActive
-                && newAssignee.SalesOrgId == leadOrgId.Value;
-
-            if (!isValidAssignee)
+            if (newAssignee == null || !newAssignee.IsActive || newAssignee.SalesOrgId != leadOrgId.Value)
             {
                 ModelState.AddModelError(string.Empty, "Select a valid active sales rep in the same sales organization.");
                 ViewBag.SalesReps = new SelectList(await GetRepsQuery().ToListAsync(), "Id", "FullName", model.NewAssigneeId);
@@ -1077,8 +1073,16 @@ namespace LeadManagementPortal.Controllers
             ViewBag.Statuses = new SelectList(statuses);
         }
 
-        private async Task PopulateAssignmentDropdowns(ApplicationUser user, string? selectedGroupId = null, int? selectedOrgId = null, string? selectedRepId = null)
+        private async Task PopulateAssignmentDropdowns(ApplicationUser? user, string? selectedGroupId = null, int? selectedOrgId = null, string? selectedRepId = null)
         {
+            if (user == null)
+            {
+                ViewBag.SalesGroups = new SelectList(Enumerable.Empty<SalesGroup>(), "Id", "Name");
+                ViewBag.SalesOrgs = new SelectList(Enumerable.Empty<SalesOrg>(), "Id", "Name");
+                ViewBag.SalesReps = new SelectList(Enumerable.Empty<ApplicationUser>(), "Id", "FullName");
+                return;
+            }
+
             // Default to user's context if not provided
             if (string.IsNullOrEmpty(selectedGroupId)) selectedGroupId = user.SalesGroupId;
             if (!selectedOrgId.HasValue) selectedOrgId = user.SalesOrgId;

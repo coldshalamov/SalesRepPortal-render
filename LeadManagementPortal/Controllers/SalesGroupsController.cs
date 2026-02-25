@@ -105,7 +105,7 @@ namespace LeadManagementPortal.Controllers
 
         [HttpGet]
         [Authorize(Roles = LeadManagementPortal.Models.UserRoles.OrganizationAdmin)]
-        public async Task<IActionResult> Create()
+        public IActionResult Create()
         {
             return View();
         }

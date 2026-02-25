@@ -26,9 +26,8 @@ namespace LeadManagementPortal.Services
                 ? Path.Combine(env.ContentRootPath, "App_Data", "uploads")
                 : configuredRoot;
 
-            _baseUrlPath = options.Value.BaseUrlPath?.Trim();
-            if (string.IsNullOrWhiteSpace(_baseUrlPath))
-                _baseUrlPath = "/files";
+            var baseUrlPath = options.Value.BaseUrlPath?.Trim();
+            _baseUrlPath = string.IsNullOrWhiteSpace(baseUrlPath) ? "/files" : baseUrlPath;
 
             _protector = dataProtectionProvider.CreateProtector("LeadManagementPortal.LocalFiles.v1");
             _httpContextAccessor = httpContextAccessor;

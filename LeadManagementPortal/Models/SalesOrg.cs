@@ -11,13 +11,13 @@ namespace LeadManagementPortal.Models
 
         [Required]
         [MaxLength(200)]
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
 
         public string? LogoUrl { get; set; }
 
         [Required]
         [ForeignKey(nameof(SalesGroup))]
-        public string SalesGroupId { get; set; }
+        public string SalesGroupId { get; set; } = string.Empty;
 
         public SalesGroup? SalesGroup { get; set; }
 
