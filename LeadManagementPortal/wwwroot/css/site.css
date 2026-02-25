@@ -80,26 +80,46 @@ body {
   /* Subtle blue hover for tables */
 }
 
+/* Full-width line runs across the entire bottom of the nav.
+   Nav items stretch to that same bottom edge; the active tab's
+   own border-bottom sits at the exact same Y position and
+   "lights up" its segment — identical to how GitHub/Vercel do it. */
 .navbar {
   box-shadow: none;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  border-bottom: none;
   padding-bottom: 0;
+  position: relative;
 }
 
-/* Nav items stretch to fill full navbar height */
+/* The continuous full-width line — edge to edge */
+.navbar::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+/* Nav items stretch to fill the full navbar height */
 .navbar .navbar-nav .nav-item {
   display: flex;
 }
 
-/* Nav links fill that height; text hugs the bottom */
+/* Nav links fill that height; text near the bottom; border-bottom
+   aligns flush with .navbar::after at the same Y = bottom of navbar */
 .navbar-dark .navbar-nav .nav-link {
   position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-end;
   align-self: stretch;
   padding: 0.5rem 0.6rem 10px;
   font-size: 0.875rem;
-  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   white-space: nowrap;
   opacity: 0.8;
 }
@@ -108,23 +128,12 @@ body {
   opacity: 1;
 }
 
+/* Active tab: bright white border-bottom covers its slice of the full-width line */
 .navbar-dark .navbar-nav .nav-link.active {
   color: #fff !important;
   font-weight: 600;
   opacity: 1;
-}
-
-/* Highlighted segment of the full-width bottom line */
-.navbar-dark .navbar-nav .nav-link.active::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #fff;
-  border-radius: 0;
-  z-index: 1;
+  border-bottom-color: #fff;
 }
 
 .badge {

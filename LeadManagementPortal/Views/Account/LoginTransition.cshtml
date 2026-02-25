@@ -8,7 +8,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Welcome - DiRX</title>
+    <title>Welcome - DiRx</title>
     <style>
         :root {
             --accent-primary: #1e64dc;
@@ -33,7 +33,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Plus Jakarta Sans", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             background:
                 radial-gradient(78% 62% at 92% -10%, rgba(182, 209, 255, 0.54) 0%, rgba(206, 225, 255, 0.28) 35%, transparent 76%),
                 radial-gradient(110% 94% at 50% 100%, #e6edf9 0%, #eef4ff 45%, #f6f9ff 100%);
@@ -60,17 +60,15 @@
 
         .logo-ring {
             position: absolute;
-            width: 280px;
-            height: 280px;
+            width: 264px;
+            height: 264px;
             border-radius: 50%;
-            border: 3px solid transparent;
+            border: 2px solid transparent;
             background: linear-gradient(135deg, var(--bg-gradient-mid), var(--bg-gradient-start)) padding-box,
                 linear-gradient(135deg, var(--accent-primary), var(--accent-soft), var(--accent-secondary)) border-box;
             background-size: 300% 300%;
-            animation: ringGlow 2s ease-in-out infinite, ringSpin 8s linear infinite;
-            box-shadow: 0 0 60px var(--particle-glow), 0 0 120px var(--particle-glow), inset 0 0 60px var(--particle-glow);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+            animation: ringGlow 3s ease-in-out infinite, ringSpin 14s linear infinite;
+            box-shadow: 0 0 30px rgba(45, 110, 224, 0.22), inset 0 0 30px rgba(45, 110, 224, 0.16);
             opacity: 0;
             transform: scale(0.5);
             will-change: transform, opacity;
@@ -97,11 +95,11 @@
 
         .inner-ring {
             position: absolute;
-            width: 240px;
-            height: 240px;
+            width: 220px;
+            height: 220px;
             border-radius: 50%;
-            border: 2px solid var(--particle-color);
-            animation: counterSpin 12s linear infinite;
+            border: 1px solid rgba(66, 127, 236, 0.35);
+            animation: counterSpin 18s linear infinite;
         }
 
         .inner-ring::before {
@@ -121,7 +119,7 @@
             align-items: center;
             justify-content: center;
             opacity: 0;
-            transform: scale(0.3) rotateY(180deg);
+            transform: scale(0.3);
             will-change: transform, opacity;
             filter: drop-shadow(0 0 30px var(--particle-glow));
         }
@@ -142,42 +140,34 @@
             position: absolute;
             text-align: center;
             opacity: 0;
-            transform: translateY(30px);
-            background: var(--surface-strong);
-            border: 1px solid var(--surface-border);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            padding: 20px;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 14px 36px rgba(18, 37, 78, 0.2), 0 0 18px rgba(94, 147, 237, 0.15), inset 0 0 0 1px rgba(17, 42, 88, 0.2);
+            transform: translateY(16px);
+            background: transparent;
+            border: 0;
+            padding: 0;
+            border-radius: 0;
+            overflow: visible;
+            box-shadow: none;
             will-change: transform, opacity;
         }
 
         .brand-text::before {
             content: "";
             position: absolute;
-            inset: 6px 10px;
-            border-radius: 10px;
-            background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.1) 42%, rgba(17, 42, 88, 0.16) 100%);
+            inset: -8px -12px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 50% 50%, rgba(123, 168, 245, 0.18) 0%, rgba(123, 168, 245, 0.08) 36%, transparent 72%);
             pointer-events: none;
         }
 
         .brand-text .dirx-text {
             position: relative;
             z-index: 1;
-            font-size: 46px;
-            font-weight: 900;
-            background: linear-gradient(180deg, #ffffff 0%, #d7e7ff 44%, #8eb6ff 100%);
-            background-size: 200% auto;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            -webkit-text-stroke: 0.6px rgba(14, 43, 93, 0.45);
-            letter-spacing: 2.4px;
-            text-transform: uppercase;
-            text-shadow: 0 2px 0 rgba(18, 50, 98, 0.62), 0 0 16px rgba(255, 255, 255, 0.5), 0 0 22px rgba(108, 156, 241, 0.36);
-            animation: shimmer 3s linear infinite;
+            font-size: clamp(34px, 5vw, 42px);
+            font-weight: 700;
+            color: #194b9f;
+            letter-spacing: 0.04em;
+            text-transform: none;
+            text-shadow: 0 2px 12px rgba(25, 75, 159, 0.14);
         }
 
         .success-container {
@@ -344,7 +334,7 @@
         }
 
         .animate-logo {
-            animation: logoReveal 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+            animation: logoReveal 0.76s cubic-bezier(0.22, 0.61, 0.36, 1) forwards !important;
         }
 
         .animate-text {
@@ -352,7 +342,7 @@
         }
 
         .animate-success {
-            animation: successReveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+            animation: successReveal 0.42s cubic-bezier(0.22, 0.61, 0.36, 1) forwards !important;
         }
 
         .animate-exit {
@@ -481,21 +471,17 @@
         @@keyframes logoReveal {
             0% {
                 opacity: 0;
-                transform: scale(0.3) rotateY(180deg);
+                transform: scale(0.84);
             }
 
             50% {
                 opacity: 1;
-                transform: scale(1.1) rotateY(0deg);
-            }
-
-            70% {
-                transform: scale(0.95) rotateY(0deg);
+                transform: scale(1.02);
             }
 
             100% {
                 opacity: 1;
-                transform: scale(1) rotateY(0deg);
+                transform: scale(1);
             }
         }
 
@@ -507,7 +493,7 @@
 
             50% {
                 opacity: 1;
-                transform: scale(1.05);
+                transform: scale(1.02);
             }
 
             100% {
@@ -531,7 +517,7 @@
 
             50% {
                 opacity: 1;
-                transform: scale(1.05);
+                transform: scale(1.02);
             }
 
             100% {
@@ -578,7 +564,7 @@
         </defs>
     </svg>
 
-    <div id="transition-container" aria-label="Login transition">
+    <div id="transition-container" aria-hidden="true">
         <canvas id="particle-canvas"></canvas>
         <div class="data-streams" id="data-streams"></div>
 
@@ -596,7 +582,7 @@
         </div>
 
         <div class="brand-text" id="brand-text">
-            <div class="dirx-text">DiRX</div>
+            <div class="dirx-text">DiRx</div>
         </div>
 
         <div class="loading-dots" id="loading-dots">
@@ -611,6 +597,12 @@
             </div>
             <div class="welcome-text">Welcome</div>
         </div>
+    </div>
+    <div style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
+         role="status"
+         aria-live="polite"
+         aria-atomic="true">
+        Signing you in. Redirecting now.
     </div>
 
     <noscript>
@@ -640,7 +632,7 @@
             }
 
             init() {
-                const particleCount = 56;
+                const particleCount = 36;
                 for (let i = 0; i < particleCount; i++) {
                     this.particles.push(this.createParticle());
                 }
@@ -694,11 +686,11 @@
                         const dx = particle.x - otherParticle.x;
                         const dy = particle.y - otherParticle.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
-                        if (distance < 96) {
+                        if (distance < 80) {
                             this.ctx.beginPath();
                             this.ctx.moveTo(particle.x, particle.y);
                             this.ctx.lineTo(otherParticle.x, otherParticle.y);
-                            this.ctx.strokeStyle = this.getParticleColor().replace("{opacity}", (0.08 * (1 - distance / 96)).toString());
+                            this.ctx.strokeStyle = this.getParticleColor().replace("{opacity}", (0.08 * (1 - distance / 80)).toString());
                             this.ctx.stroke();
                         }
                     });
@@ -731,6 +723,15 @@
         }
 
         let particleSystem = null;
+        let redirectGuard = 0;
+
+        function safeRedirect() {
+            if (redirectGuard) {
+                window.clearTimeout(redirectGuard);
+                redirectGuard = 0;
+            }
+            window.location.replace(redirectUrl);
+        }
 
         function initVisualizer() {
             const canvas = document.getElementById("particle-canvas");
@@ -740,9 +741,7 @@
 
         function startTransition() {
             if (reducedMotion) {
-                window.setTimeout(() => {
-                    window.location.href = redirectUrl;
-                }, 220);
+                safeRedirect();
                 return;
             }
 
@@ -760,6 +759,10 @@
             if (!particleSystem) {
                 initVisualizer();
             }
+            if (redirectGuard) {
+                window.clearTimeout(redirectGuard);
+            }
+            redirectGuard = window.setTimeout(safeRedirect, 4500);
 
             const warmupBar = document.getElementById("warmup-bar");
             let progress = 0;
@@ -831,11 +834,9 @@
                 { delay: 300, action: () => elements.ring.classList.add("animate-ring") },
                 { delay: 750, action: () => elements.rx.classList.add("animate-logo") },
                 { delay: 1200, action: () => elements.brand.classList.add("animate-text") },
-                { delay: 1700, action: () => elements.loading.classList.add("animate-loading") },
                 {
                     delay: 2400,
                     action: () => {
-                        elements.loading.style.opacity = "0";
                         elements.ring.style.opacity = "0";
                         elements.rx.style.opacity = "0";
                         elements.brand.style.opacity = "0";
@@ -863,7 +864,7 @@
                 {
                     delay: 3650,
                     action: () => {
-                        window.location.href = redirectUrl;
+                        safeRedirect();
                     }
                 }
             ];
@@ -876,7 +877,7 @@
                 startTransition();
             } catch (error) {
                 console.error("Transition failed, redirecting:", error);
-                window.location.href = redirectUrl;
+                safeRedirect();
             }
         });
     </script>
