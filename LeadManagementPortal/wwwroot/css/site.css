@@ -198,14 +198,14 @@ body {
   background: #f6f9ff;
 }
 
-.product-card-input:checked + .product-card-option {
-  border-color: var(--clinical-blue);
-  background: rgba(15, 98, 254, 0.1);
-  color: #0a4bc5;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.16);
+.product-card-input:checked+.product-card-option {
+  border-color: #0043ce;
+  background: rgba(15, 98, 254, 0.2);
+  color: #002d9c;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
-.product-card-input:focus-visible + .product-card-option {
+.product-card-input:focus-visible+.product-card-option {
   outline: 2px solid rgba(13, 110, 253, 0.45);
   outline-offset: 2px;
 }
