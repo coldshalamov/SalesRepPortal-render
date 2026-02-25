@@ -73,5 +73,12 @@ namespace LeadManagementPortal.Services
             var blobClient = _containerClient.GetBlobClient(key);
             return await blobClient.ExistsAsync(ct);
         }
+
+        public async Task<bool> DeleteAsync(string key, CancellationToken ct = default)
+        {
+            var blobClient = _containerClient.GetBlobClient(key);
+            var response = await blobClient.DeleteIfExistsAsync(DeleteSnapshotsOption.IncludeSnapshots, conditions: null, cancellationToken: ct);
+            return response.Value;
+        }
     }
 }

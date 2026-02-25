@@ -54,6 +54,18 @@ namespace LeadManagementPortal.Services
             return Task.FromResult(System.IO.File.Exists(filePath));
         }
 
+        public Task<bool> DeleteAsync(string key, CancellationToken ct = default)
+        {
+            var filePath = GetSafeFilePath(key);
+            if (!System.IO.File.Exists(filePath))
+            {
+                return Task.FromResult(false);
+            }
+
+            System.IO.File.Delete(filePath);
+            return Task.FromResult(true);
+        }
+
         public Task<string> GetPreSignedDownloadUrlAsync(string key, TimeSpan expires, CancellationToken ct = default)
         {
             var userId = _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
