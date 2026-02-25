@@ -83,16 +83,25 @@ body {
 .navbar {
   box-shadow: none;
   border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 0;
 }
 
-/* Active nav tab indicator — white underline matching GitHub/Vercel pattern */
+/* Nav items stretch to fill full navbar height */
+.navbar .navbar-nav .nav-item {
+  display: flex;
+}
+
+/* Nav links fill that height; text hugs the bottom */
 .navbar-dark .navbar-nav .nav-link {
   position: relative;
+  display: flex;
+  align-items: flex-end;
+  align-self: stretch;
+  padding: 0.5rem 0.6rem 10px;
+  font-size: 0.875rem;
   transition: all 0.2s ease;
-  text-align: center;
   white-space: nowrap;
   opacity: 0.8;
-  padding: 0.5rem 1rem;
 }
 
 .navbar-dark .navbar-nav .nav-link:hover {
@@ -105,15 +114,16 @@ body {
   opacity: 1;
 }
 
+/* Highlighted segment of the full-width bottom line */
 .navbar-dark .navbar-nav .nav-link.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
-  left: 0.75rem;
-  right: 0.75rem;
-  height: 3px;
+  left: 0;
+  right: 0;
+  height: 2px;
   background: #fff;
-  border-radius: 3px 3px 0 0;
+  border-radius: 0;
   z-index: 1;
 }
 
@@ -152,6 +162,57 @@ body {
   box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
+.product-card-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.product-card-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--text-dark);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.product-card-option:hover {
+  border-color: #9fb5ff;
+  background: #f6f9ff;
+}
+
+.product-card-input:checked + .product-card-option {
+  border-color: var(--clinical-blue);
+  background: rgba(15, 98, 254, 0.1);
+  color: #0a4bc5;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.16);
+}
+
+.product-card-input:focus-visible + .product-card-option {
+  outline: 2px solid rgba(13, 110, 253, 0.45);
+  outline-offset: 2px;
+}
+
+@media (max-width: 991.98px) {
+  .product-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 575.98px) {
+  .product-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Buttons */
 .btn {
   font-weight: 500;
@@ -186,6 +247,7 @@ body {
 #navbarSearch {
   max-width: 520px;
   width: 100%;
+  min-width: 160px;
 }
 
 .navbar-search-input {

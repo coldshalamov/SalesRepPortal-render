@@ -1,6 +1,8 @@
 @model Lead
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Create Lead";
+    var products = (ViewBag.Products as IEnumerable<SelectListItem>)?.ToList() ?? new List<SelectListItem>();
 }
 
 <div class="row mb-3">
@@ -84,8 +86,29 @@
             <div class="row mb-3">
                 <div class="col-md-12">
                     <label class="form-label">Products</label>
-                    <select name="productIds" class="form-select" multiple asp-items="ViewBag.Products" data-enhance="multiselect"></select>
-                    <small class="text-muted">Click to select/unselect products. Click outside to close.</small>
+                    @if (products.Count > 0)
+                    {
+                        <div class="product-card-grid" role="group" aria-label="Products">
+                            @for (var i = 0; i < products.Count; i++)
+                            {
+                                var product = products[i];
+                                var inputId = $"product-option-{i}";
+                                <input class="btn-check product-card-input"
+                                       type="checkbox"
+                                       id="@inputId"
+                                       name="productIds"
+                                       value="@product.Value"
+                                       autocomplete="off"
+                                       @(product.Selected ? "checked" : "") />
+                                <label class="product-card-option" for="@inputId">@product.Text</label>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0">No products available.</p>
+                    }
+                    <small class="text-muted">Click cards to select or unselect products.</small>
                 </div>
             </div>
 
