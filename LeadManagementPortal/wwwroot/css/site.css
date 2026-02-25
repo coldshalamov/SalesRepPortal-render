@@ -1,3 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --clinical-blue: #0f62fe;
+  /* Clean, modern, trustworthy medical/tech blue */
+  --clinical-blue-hover: #0353e9;
+  --bg-color: #f8fafc;
+  /* Very subtle off-white */
+  --text-dark: #334155;
+}
+
 html {
   font-size: 14px;
 }
@@ -23,7 +34,29 @@ html {
 
 body {
   margin-bottom: 60px;
-  background-color: #f8f9fa;
+  background-color: var(--bg-color);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text-dark);
+}
+
+/* Override bootstrap default primary color */
+.bg-primary {
+  background-color: var(--clinical-blue) !important;
+}
+
+.text-primary {
+  color: var(--clinical-blue) !important;
+}
+
+.btn-primary {
+  background-color: var(--clinical-blue);
+  border-color: var(--clinical-blue);
+}
+
+.btn-primary:hover,
+.btn-primary:active {
+  background-color: var(--clinical-blue-hover);
+  border-color: var(--clinical-blue-hover);
 }
 
 .footer {
@@ -36,13 +69,15 @@ body {
 }
 
 .card {
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  border: none;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(226, 232, 240, 0.8);
   margin-bottom: 1.5rem;
+  border-radius: 12px;
 }
 
 .table-hover tbody tr:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: rgba(15, 98, 254, 0.03);
+  /* Subtle blue hover for tables */
 }
 
 .navbar {
@@ -53,25 +88,32 @@ body {
 /* Active nav tab indicator — white underline matching GitHub/Vercel pattern */
 .navbar-dark .navbar-nav .nav-link {
   position: relative;
-  transition: color 0.15s ease;
+  transition: all 0.2s ease;
   text-align: center;
   white-space: nowrap;
+  opacity: 0.8;
+  padding: 0.5rem 1rem;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+  opacity: 1;
 }
 
 .navbar-dark .navbar-nav .nav-link.active {
   color: #fff !important;
-  font-weight: 500;
+  font-weight: 600;
+  opacity: 1;
 }
 
 .navbar-dark .navbar-nav .nav-link.active::after {
   content: '';
   position: absolute;
   bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
+  left: 0.75rem;
+  right: 0.75rem;
+  height: 3px;
   background: #fff;
-  border-radius: 0;
+  border-radius: 3px 3px 0 0;
   z-index: 1;
 }
 
