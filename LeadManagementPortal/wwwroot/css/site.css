@@ -94,10 +94,25 @@ body {
   overflow: visible !important;
 }
 
+/* Prevent any parent container from clipping the negative-margin borders */
+.navbar > .container,
+.navbar > .container-fluid {
+  overflow: visible !important;
+}
+
+.navbar-collapse {
+  overflow: visible !important;
+}
+
+.navbar-nav {
+  overflow: visible !important;
+}
+
 /* Nav items stretch full height so links can fill to the bottom */
 .navbar .navbar-nav .nav-item {
   display: flex;
   align-items: stretch;
+  overflow: visible !important;
 }
 
 /* All nav links: reserve space for the 3px indicator,
@@ -114,6 +129,8 @@ body {
   border-bottom: 3px solid transparent;
   transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
+  position: relative;
+  z-index: 1;
 }
 
 .navbar-dark .navbar-nav .nav-link:hover {
@@ -126,6 +143,7 @@ body {
   color: #fff !important;
   font-weight: 600;
   border-bottom-color: #fff;
+  z-index: 2;
 }
 
 .badge {

@@ -4,3 +4,4 @@ LeadManagementPortal/wwwroot/js/leads-pipeline.js
 LeadManagementPortal/Controllers/CommissionsController.cs
 LeadManagementPortal/Services/LeadDocumentService.cs
 LeadManagementPortal/Services/LeadExpiryBackgroundService.cs
+LeadManagementPortal/Services/LeadService.cs

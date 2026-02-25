@@ -104,6 +104,98 @@ namespace LeadManagementPortal.Tests
             mockLeadDocs.Verify(s => s.DeleteForLeadAsync("lead-1", default), Times.Once);
             Assert.Null(await context.Leads.FirstOrDefaultAsync(l => l.Id == "lead-1"));
         }
+
+        [Fact]
+        public async Task CanRegisterLeadForGroupAsync_BlocksOnCompanyMatch_EvenIfAddressDiffers()
+        {
+            using var context = GetInMemoryDbContext();
+
+            context.Leads.Add(new Lead
+            {
+                Id = "lead-1",
+                FirstName = "A",
+                LastName = "B",
+                Email = "a@example.com",
+                Phone = "1111111111",
+                Company = "Acme",
+                Address = "123 Main",
+                City = "Austin",
+                State = "TX",
+                ZipCode = "12345",
+                Status = LeadStatus.New,
+                IsExpired = false,
+                SalesGroupId = "group-a",
+                AssignedToId = "rep-1",
+                CreatedById = "rep-1",
+                CreatedDate = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+
+            var mockCustomerService = new Mock<ICustomerService>();
+            var mockSettingsService = CreateSettingsMock();
+            var mockLeadDocs = new Mock<ILeadDocumentService>();
+            var svc = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object, mockLeadDocs.Object);
+
+            var allowed = await svc.CanRegisterLeadForGroupAsync(
+                company: "Acme",
+                salesGroupId: "group-a",
+                address: "999 Other St",
+                city: "Austin",
+                state: "TX",
+                zip: "12345");
+
+            Assert.False(allowed);
+        }
+
+        [Fact]
+        public async Task CanRegisterLeadForGroupAsync_AllowsDifferentGroup_WhenAllConflictsAreLost()
+        {
+            using var context = GetInMemoryDbContext();
+
+            context.Leads.Add(new Lead
+            {
+                Id = "lost-1",
+                FirstName = "A",
+                LastName = "B",
+                Email = "a@example.com",
+                Phone = "1111111111",
+                Company = "Acme",
+                Address = "123 Main",
+                City = "Austin",
+                State = "TX",
+                ZipCode = "12345",
+                Status = LeadStatus.Lost,
+                IsExpired = false,
+                SalesGroupId = "group-a",
+                AssignedToId = "rep-1",
+                CreatedById = "rep-1",
+                CreatedDate = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+
+            var mockCustomerService = new Mock<ICustomerService>();
+            var mockSettingsService = CreateSettingsMock();
+            var mockLeadDocs = new Mock<ILeadDocumentService>();
+            var svc = new LeadService(context, mockCustomerService.Object, mockSettingsService.Object, mockLeadDocs.Object);
+
+            var allowedOtherGroup = await svc.CanRegisterLeadForGroupAsync(
+                company: "Acme",
+                salesGroupId: "group-b",
+                address: "123 Main",
+                city: "Austin",
+                state: "TX",
+                zip: "12345");
+
+            var allowedSameGroup = await svc.CanRegisterLeadForGroupAsync(
+                company: "Acme",
+                salesGroupId: "group-a",
+                address: "123 Main",
+                city: "Austin",
+                state: "TX",
+                zip: "12345");
+
+            Assert.True(allowedOtherGroup);
+            Assert.False(allowedSameGroup);
+        }
     }
 }
-

@@ -136,6 +136,32 @@ namespace LeadManagementPortal.Tests
             Assert.False(lead2.IsExpired);
             Assert.Equal(LeadStatus.Converted, lead2.Status);
         }
+
+        [Fact]
+        public async Task ExpireOldLeadsAsync_DoesNotOverwriteLostStatus()
+        {
+            using var context = GetInMemoryDbContext();
+            var svc = CreateLeadService(context);
+            var now = new DateTime(2030, 1, 10, 12, 0, 0, DateTimeKind.Utc);
+
+            context.Leads.Add(new Lead
+            {
+                Id = "lead-lost",
+                Company = "Lost Lead",
+                AssignedToId = "rep-1",
+                CreatedById = "rep-1",
+                ExpiryDate = now.AddDays(-5),
+                IsExpired = false,
+                Status = LeadStatus.Lost
+            });
+            await context.SaveChangesAsync();
+
+            var expired = await svc.ExpireOldLeadsAsync(now);
+            Assert.Empty(expired);
+
+            var lead = await context.Leads.SingleAsync(l => l.Id == "lead-lost");
+            Assert.False(lead.IsExpired);
+            Assert.Equal(LeadStatus.Lost, lead.Status);
+        }
     }
 }
-

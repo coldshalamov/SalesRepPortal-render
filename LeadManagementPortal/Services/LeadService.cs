@@ -1,8 +1,10 @@
 using LeadManagementPortal.Data;
 using LeadManagementPortal.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Data;
 
 namespace LeadManagementPortal.Services
 {
@@ -295,16 +297,12 @@ namespace LeadManagementPortal.Services
                             && l.Status != LeadStatus.Converted
                             && (
                                 (!string.IsNullOrEmpty(normalizedCompany) && l.Company != null && l.Company.ToLower() == normalizedCompany)
-                                &&
-                                (
-                                    string.IsNullOrEmpty(nAddr)
-                                    ||
-                                     (!string.IsNullOrEmpty(nAddr) && l.Address != null && l.Address.ToLower() == nAddr
-                                         && (string.IsNullOrEmpty(nCity) || (l.City != null && l.City.ToLower() == nCity))
-                                         && (string.IsNullOrEmpty(nState) || (l.State != null && l.State.ToLower() == nState))
-                                         && (string.IsNullOrEmpty(nZip) || (l.ZipCode != null && (l.ZipCode.Length >= 5 ? l.ZipCode.Substring(0, 5) : l.ZipCode).ToLower() == nZip))
-                                     )
-                                 )
+                                ||
+                                (!string.IsNullOrEmpty(nAddr) && l.Address != null && l.Address.ToLower() == nAddr
+                                     && (string.IsNullOrEmpty(nCity) || (l.City != null && l.City.ToLower() == nCity))
+                                     && (string.IsNullOrEmpty(nState) || (l.State != null && l.State.ToLower() == nState))
+                                     && (string.IsNullOrEmpty(nZip) || (l.ZipCode != null && (l.ZipCode.Length >= 5 ? l.ZipCode.Substring(0, 5) : l.ZipCode).ToLower() == nZip))
+                                )
                              ))
                 .Select(l => new { l.Status, l.SalesGroupId })
                 .ToListAsync();
@@ -317,16 +315,12 @@ namespace LeadManagementPortal.Services
                     .AnyAsync(c => c.ConversionDate >= DateTime.UtcNow.AddDays(-settings2.CoolingPeriodDays)
                                    && (
                                         (!string.IsNullOrEmpty(normalizedCompany) && c.Company != null && c.Company.ToLower() == normalizedCompany)
-                                        &&
-                                        (
-                                            string.IsNullOrEmpty(nAddr)
-                                            ||
-                                             (!string.IsNullOrEmpty(nAddr) && c.Address != null && c.Address.ToLower() == nAddr
-                                                 && (string.IsNullOrEmpty(nCity) || (c.City != null && c.City.ToLower() == nCity))
-                                                 && (string.IsNullOrEmpty(nState) || (c.State != null && c.State.ToLower() == nState))
-                                                 && (string.IsNullOrEmpty(nZip) || (c.ZipCode != null && (c.ZipCode.Length >= 5 ? c.ZipCode.Substring(0, 5) : c.ZipCode).ToLower() == nZip))
-                                             )
-                                         )
+                                        ||
+                                        (!string.IsNullOrEmpty(nAddr) && c.Address != null && c.Address.ToLower() == nAddr
+                                             && (string.IsNullOrEmpty(nCity) || (c.City != null && c.City.ToLower() == nCity))
+                                             && (string.IsNullOrEmpty(nState) || (c.State != null && c.State.ToLower() == nState))
+                                             && (string.IsNullOrEmpty(nZip) || (c.ZipCode != null && (c.ZipCode.Length >= 5 ? c.ZipCode.Substring(0, 5) : c.ZipCode).ToLower() == nZip))
+                                        )
                                     ));
                 return !recentCustomerExists;
             }
@@ -358,36 +352,69 @@ namespace LeadManagementPortal.Services
                 if (lead == null || lead.Status == LeadStatus.Converted || lead.Status == LeadStatus.Lost || lead.IsExpired)
                     return false;
 
-                // Create customer from lead
-                var customer = new Customer
+                IDbContextTransaction? transaction = null;
+                try
                 {
-                    FirstName = lead.FirstName,
-                    LastName = lead.LastName,
-                    Email = lead.Email,
-                    Phone = lead.Phone,
-                    Company = lead.Company,
-                    Address = lead.Address,
-                    City = lead.City,
-                    State = lead.State,
-                    ZipCode = lead.ZipCode,
-                    Notes = lead.Notes,
-                    ConvertedById = userId,
-                    SalesRepId = lead.AssignedToId,
-                    SalesGroupId = lead.SalesGroupId,
-                    ConversionDate = DateTime.UtcNow,
-                    OriginalLeadId = lead.Id,
-                    LeadCreatedDate = lead.CreatedDate,
-                    DaysToConvert = (DateTime.UtcNow - lead.CreatedDate).Days
-                };
+                    transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                }
+                catch (Exception ex)
+                {
+                    // InMemory provider (tests) does not support transactions. Treat as best-effort.
+                    _logger.LogDebug(ex, "ConvertToCustomerAsync: transactions not supported by current provider.");
+                }
 
-                await _customerService.CreateAsync(customer);
+                try
+                {
+                    var alreadyConverted = await _context.Customers
+                        .AsNoTracking()
+                        .AnyAsync(c => !c.IsDeleted && c.OriginalLeadId == lead.Id);
+                    if (alreadyConverted)
+                    {
+                        return false;
+                    }
 
-                // Update lead status
-                lead.Status = LeadStatus.Converted;
-                lead.ConvertedDate = DateTime.UtcNow;
-                await UpdateAsync(lead);
+                    var utcNow = DateTime.UtcNow;
 
-                return true;
+                    // Create customer from lead (single SaveChanges to prevent partial commits).
+                    _context.Customers.Add(new Customer
+                    {
+                        FirstName = lead.FirstName,
+                        LastName = lead.LastName,
+                        Email = lead.Email,
+                        Phone = lead.Phone,
+                        Company = lead.Company,
+                        Address = lead.Address,
+                        City = lead.City,
+                        State = lead.State,
+                        ZipCode = lead.ZipCode,
+                        Notes = lead.Notes,
+                        ConvertedById = userId,
+                        SalesRepId = lead.AssignedToId,
+                        SalesGroupId = lead.SalesGroupId,
+                        ConversionDate = utcNow,
+                        OriginalLeadId = lead.Id,
+                        LeadCreatedDate = lead.CreatedDate,
+                        DaysToConvert = (utcNow - lead.CreatedDate).Days
+                    });
+
+                    lead.Status = LeadStatus.Converted;
+                    lead.ConvertedDate = utcNow;
+
+                    await _context.SaveChangesAsync();
+                    if (transaction != null)
+                    {
+                        await transaction.CommitAsync();
+                    }
+
+                    return true;
+                }
+                finally
+                {
+                    if (transaction != null)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -441,7 +468,7 @@ namespace LeadManagementPortal.Services
                     NewExpiry = lead.ExpiryDate
                 });
 
-                await UpdateAsync(lead);
+                await _context.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)
@@ -489,7 +516,8 @@ namespace LeadManagementPortal.Services
                 .Where(l =>
                     l.ExpiryDate <= utcNow &&
                     !l.IsExpired &&
-                    l.Status != LeadStatus.Converted)
+                    l.Status != LeadStatus.Converted &&
+                    l.Status != LeadStatus.Lost)
                 .ToListAsync();
 
             if (expiredLeads.Count == 0)
@@ -674,8 +702,17 @@ namespace LeadManagementPortal.Services
 
             try
             {
-                var scopedIds = await GetScopedLeadIdsAsync(userId, userRole);
-                var allowedIds = ids.Where(id => scopedIds.Contains(id)).ToList();
+                List<string> allowedIds;
+                if (userRole == UserRoles.OrganizationAdmin)
+                {
+                    allowedIds = ids;
+                }
+                else
+                {
+                    var scopedIds = await GetScopedLeadIdsAsync(userId, userRole);
+                    allowedIds = ids.Where(id => scopedIds.Contains(id)).ToList();
+                }
+
                 if (!allowedIds.Any())
                 {
                     return result;
@@ -846,13 +883,20 @@ namespace LeadManagementPortal.Services
         {
             try
             {
+                var today = DateTime.UtcNow.Date;
+                if (userRole == UserRoles.OrganizationAdmin)
+                {
+                    return await _context.LeadFollowUpTasks
+                        .Where(task => !task.IsCompleted && task.DueDate.HasValue && task.DueDate.Value.Date < today)
+                        .CountAsync();
+                }
+
                 var scopedIds = await GetScopedLeadIdsAsync(userId, userRole);
                 if (!scopedIds.Any())
                 {
                     return 0;
                 }
 
-                var today = DateTime.UtcNow.Date;
                 return await _context.LeadFollowUpTasks
                     .Where(task => scopedIds.Contains(task.LeadId) && !task.IsCompleted && task.DueDate.HasValue && task.DueDate.Value.Date < today)
                     .CountAsync();
@@ -906,6 +950,13 @@ namespace LeadManagementPortal.Services
 
         private async Task<bool> CanUserAccessLeadAsync(string leadId, string userId, string userRole)
         {
+            if (userRole == UserRoles.OrganizationAdmin)
+            {
+                return await _context.Leads
+                    .AsNoTracking()
+                    .AnyAsync(l => l.Id == leadId);
+            }
+
             var scopedLeadIds = await GetScopedLeadIdsAsync(userId, userRole);
             return scopedLeadIds.Contains(leadId);
         }
