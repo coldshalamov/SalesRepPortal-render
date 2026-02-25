@@ -81,9 +81,9 @@ body {
 }
 
 /* Full-width line runs across the entire bottom of the nav.
-   Nav items stretch to that same bottom edge; the active tab's
-   own border-bottom sits at the exact same Y position and
-   "lights up" its segment — identical to how GitHub/Vercel do it. */
+   Nav items use negative margin so their border-bottom sits
+   exactly on top of this line. The active tab "lights up" its
+   segment — identical to GitHub / Vercel. */
 .navbar {
   box-shadow: none;
   border-bottom: none;
@@ -91,7 +91,7 @@ body {
   position: relative;
 }
 
-/* The continuous full-width line — edge to edge */
+/* The continuous full-width line — edge to edge, always visible */
 .navbar::after {
   content: '';
   position: absolute;
@@ -99,33 +99,39 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.18);
   pointer-events: none;
+  z-index: 0;
 }
 
 /* Nav items stretch to fill the full navbar height */
 .navbar .navbar-nav .nav-item {
   display: flex;
+  align-items: stretch;
 }
 
-/* Nav links fill that height; text near the bottom; border-bottom
-   aligns flush with .navbar::after at the same Y = bottom of navbar */
+/* Nav links: negative margin pulls border-bottom down so it
+   overlaps exactly on top of  .navbar::after  (the 2px line).
+   This makes the active tab "light up" a segment of the line. */
 .navbar-dark .navbar-nav .nav-link {
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   align-self: stretch;
-  padding: 0.5rem 0.6rem 10px;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: -2px;
+  /* overlap the ::after line */
   font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.84);
   border-bottom: 2px solid transparent;
-  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
-  opacity: 0.8;
 }
 
 .navbar-dark .navbar-nav .nav-link:hover {
-  opacity: 1;
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom-color: rgba(255, 255, 255, 0.45);
 }
 
 /* Active tab: bright white border-bottom covers its slice of the full-width line */
@@ -257,6 +263,8 @@ body {
   max-width: 520px;
   width: 100%;
   min-width: 160px;
+  transform: translateY(-3px);
+  /* nudge search bar up 3px */
 }
 
 .navbar-search-input {

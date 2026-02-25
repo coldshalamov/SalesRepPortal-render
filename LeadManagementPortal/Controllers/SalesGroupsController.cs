@@ -26,7 +26,26 @@ namespace LeadManagementPortal.Controllers
 
         public async Task<IActionResult> Index()
         {
-            var groups = await _salesGroupService.GetAllAsync();
+            IEnumerable<SalesGroup> groups;
+
+            if (User.IsInRole(UserRoles.GroupAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                var currentUser = await _userManager.GetUserAsync(User);
+                if (currentUser?.SalesGroupId == null)
+                {
+                    TempData["ErrorMessage"] = "You are not assigned to a sales group.";
+                    groups = Enumerable.Empty<SalesGroup>();
+                }
+                else
+                {
+                    var ownGroup = await _salesGroupService.GetByIdAsync(currentUser.SalesGroupId);
+                    groups = ownGroup == null ? Enumerable.Empty<SalesGroup>() : new[] { ownGroup };
+                }
+            }
+            else
+            {
+                groups = await _salesGroupService.GetAllAsync();
+            }
 
             var allGroupAdmins = await _userManager.GetUsersInRoleAsync(UserRoles.GroupAdmin);
             var adminsByGroup = allGroupAdmins
@@ -65,6 +84,15 @@ namespace LeadManagementPortal.Controllers
                 return NotFound();
             }
 
+            if (User.IsInRole(UserRoles.GroupAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                var currentUser = await _userManager.GetUserAsync(User);
+                if (currentUser?.SalesGroupId != id)
+                {
+                    return Forbid();
+                }
+            }
+
             var members = await _salesGroupService.GetGroupMembersAsync(id);
             ViewBag.Members = members;
 
@@ -76,6 +104,7 @@ namespace LeadManagementPortal.Controllers
         }
 
         [HttpGet]
+        [Authorize(Roles = LeadManagementPortal.Models.UserRoles.OrganizationAdmin)]
         public async Task<IActionResult> Create()
         {
             return View();
@@ -83,6 +112,7 @@ namespace LeadManagementPortal.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = LeadManagementPortal.Models.UserRoles.OrganizationAdmin)]
         public async Task<IActionResult> Create(SalesGroup salesGroup)
         {
             if (ModelState.IsValid)
@@ -108,6 +138,15 @@ namespace LeadManagementPortal.Controllers
                 return NotFound();
             }
 
+            if (User.IsInRole(UserRoles.GroupAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                var currentUser = await _userManager.GetUserAsync(User);
+                if (currentUser?.SalesGroupId != id)
+                {
+                    return Forbid();
+                }
+            }
+
             return View(group);
         }
 
@@ -118,6 +157,15 @@ namespace LeadManagementPortal.Controllers
             if (id != salesGroup.Id)
             {
                 return NotFound();
+            }
+
+            if (User.IsInRole(UserRoles.GroupAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                var currentUser = await _userManager.GetUserAsync(User);
+                if (currentUser?.SalesGroupId != id)
+                {
+                    return Forbid();
+                }
             }
 
             if (ModelState.IsValid)

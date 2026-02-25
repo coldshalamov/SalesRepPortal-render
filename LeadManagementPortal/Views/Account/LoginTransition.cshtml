@@ -121,32 +121,40 @@
             opacity: 0;
             transform: scale(0.3);
             will-change: transform, opacity;
-            filter: drop-shadow(0 0 30px var(--particle-glow));
+            filter: drop-shadow(0 0 22px var(--particle-glow));
         }
 
         .dirx-symbol {
             font-size: clamp(64px, 9vw, 82px);
             font-weight: 800;
-            background: linear-gradient(180deg, #fefeff 0%, #a9c9ff 35%, var(--accent-primary) 100%);
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0;
+            background: linear-gradient(180deg, #fefeff 0%, #a9c9ff 58%, var(--accent-primary) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            text-shadow: 0 0 24px rgba(52, 108, 216, 0.22);
+            text-shadow: 0 0 18px rgba(52, 108, 216, 0.22);
             font-family: "Plus Jakarta Sans", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
             letter-spacing: 0.02em;
         }
 
-        .rx-pop-text {
-            position: absolute;
-            text-align: center;
+        .dirx-symbol .di-part {
+            display: inline-block;
+        }
+
+        .dirx-symbol .rx-part {
+            display: inline-block;
             opacity: 0;
-            transform: translateY(16px) scale(0.96);
-            font-size: clamp(46px, 7vw, 64px);
-            font-weight: 800;
-            color: #1a4da3;
-            letter-spacing: 0.03em;
-            text-shadow: 0 2px 14px rgba(25, 75, 159, 0.18);
-            will-change: transform, opacity;
+            transform: translateX(-0.18em) scale(0.94);
+            filter: blur(2px);
+            transition: opacity 0.24s ease-out, transform 0.24s ease-out, filter 0.24s ease-out;
+        }
+
+        .dirx-symbol.show-rx .rx-part {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            filter: blur(0);
         }
 
         .success-container {
@@ -298,10 +306,6 @@
 
         .animate-logo {
             animation: logoReveal 0.76s cubic-bezier(0.22, 0.61, 0.36, 1) forwards !important;
-        }
-
-        .animate-text {
-            animation: textSlideUp 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) forwards !important;
         }
 
         .animate-success {
@@ -465,13 +469,6 @@
             }
         }
 
-        @@keyframes textSlideUp {
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
         @@keyframes successReveal {
             0% {
                 opacity: 0;
@@ -541,9 +538,10 @@
         </div>
 
         <div class="dirx-container" id="dirx-container">
-            <span class="dirx-symbol" id="dirx-symbol">Di</span>
+            <span class="dirx-symbol" id="dirx-symbol">
+                <span class="di-part">Di</span><span class="rx-part">Rx</span>
+            </span>
         </div>
-        <div class="rx-pop-text" id="rx-pop-text">Rx</div>
 
         <div class="loading-dots" id="loading-dots">
             <div class="dot"></div>
@@ -746,19 +744,15 @@
 
         function runTransitionSequence(container) {
             const dirxSymbol = document.getElementById("dirx-symbol");
-            const rxPopText = document.getElementById("rx-pop-text");
             if (dirxSymbol) {
-                dirxSymbol.textContent = "Di";
-            }
-            if (rxPopText) {
-                rxPopText.textContent = "Rx";
+                dirxSymbol.classList.remove("show-rx");
             }
 
             const elements = {
                 container,
                 ring: document.getElementById("logo-ring"),
                 mark: document.getElementById("dirx-container"),
-                popText: document.getElementById("rx-pop-text"),
+                symbol: document.getElementById("dirx-symbol"),
                 progress: document.getElementById("progress-ring"),
                 progressCircle: document.getElementById("progress-circle"),
                 streams: document.getElementById("data-streams"),
@@ -772,7 +766,6 @@
                     element.classList.remove(
                         "animate-ring",
                         "animate-logo",
-                        "animate-text",
                         "animate-success",
                         "animate-exit",
                         "animate-progress",
@@ -783,7 +776,6 @@
 
             elements.ring.style.opacity = "0";
             elements.mark.style.opacity = "0";
-            elements.popText.style.opacity = "0";
             elements.progress.style.opacity = "0";
             elements.streams.style.opacity = "0";
             elements.loading.style.opacity = "0";
@@ -800,13 +792,12 @@
                 },
                 { delay: 300, action: () => elements.ring.classList.add("animate-ring") },
                 { delay: 750, action: () => elements.mark.classList.add("animate-logo") },
-                { delay: 1200, action: () => elements.popText.classList.add("animate-text") },
+                { delay: 1120, action: () => elements.symbol.classList.add("show-rx") },
                 {
                     delay: 2150,
                     action: () => {
                         elements.ring.style.opacity = "0";
                         elements.mark.style.opacity = "0";
-                        elements.popText.style.opacity = "0";
                         elements.progress.style.opacity = "0";
                         elements.success.classList.add("animate-success");
                         window.setTimeout(() => elements.checkmark.classList.add("play-checkmark"), 100);
