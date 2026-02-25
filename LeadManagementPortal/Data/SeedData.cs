@@ -96,6 +96,123 @@ namespace LeadManagementPortal.Data
                 });
                 await db.SaveChangesAsync();
             }
+
+            // Demo / sandbox seed — only runs when SEED_DEMO_DATA=true
+            var seedDemo = string.Equals(
+                configuration["SeedDemoData"] ?? Environment.GetEnvironmentVariable("SEED_DEMO_DATA"),
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (seedDemo)
+            {
+                await SeedDemoData(db, userManager, logger);
+            }
+        }
+
+        private static async Task SeedDemoData(
+            ApplicationDbContext db,
+            UserManager<ApplicationUser> userManager,
+            ILogger logger)
+        {
+            const string demoGroupId = "demo-group-001";
+
+            // 1. SalesGroup
+            if (!await db.SalesGroups.AnyAsync(g => g.Id == demoGroupId))
+            {
+                db.SalesGroups.Add(new SalesGroup
+                {
+                    Id = demoGroupId,
+                    Name = "Demo Group",
+                    Description = "Sandbox demo group — safe to delete",
+                    IsActive = true,
+                    CreatedDate = DateTime.UtcNow
+                });
+                await db.SaveChangesAsync();
+            }
+
+            // 2. SalesOrg (int PK — find-or-create by name)
+            var demoOrg = await db.SalesOrgs.FirstOrDefaultAsync(o => o.Name == "Demo Org");
+            if (demoOrg == null)
+            {
+                demoOrg = new SalesOrg { Name = "Demo Org", SalesGroupId = demoGroupId };
+                db.SalesOrgs.Add(demoOrg);
+                await db.SaveChangesAsync(); // flush to get the auto-assigned Id
+            }
+
+            // 3. GroupAdmin user
+            var groupAdmin = await userManager.FindByEmailAsync("groupadmin@demo.com");
+            if (groupAdmin == null)
+            {
+                groupAdmin = new ApplicationUser
+                {
+                    UserName = "groupadmin@demo.com",
+                    Email = "groupadmin@demo.com",
+                    FirstName = "Demo",
+                    LastName = "GroupAdmin",
+                    EmailConfirmed = true,
+                    IsActive = true,
+                    SalesGroupId = demoGroupId
+                };
+                var result = await userManager.CreateAsync(groupAdmin, "GroupAdmin@123");
+                if (result.Succeeded)
+                    await userManager.AddToRoleAsync(groupAdmin, UserRoles.GroupAdmin);
+                else
+                    logger.LogWarning("Demo GroupAdmin seed failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Description)));
+            }
+
+            // 4. Wire GroupAdmin back onto the SalesGroup
+            var demoGroup = await db.SalesGroups.FindAsync(demoGroupId);
+            if (demoGroup != null && demoGroup.GroupAdminId != groupAdmin.Id)
+            {
+                demoGroup.GroupAdminId = groupAdmin.Id;
+                await db.SaveChangesAsync();
+            }
+
+            // 5. SalesOrgAdmin user
+            var orgAdmin = await userManager.FindByEmailAsync("orgadmin@demo.com");
+            if (orgAdmin == null)
+            {
+                orgAdmin = new ApplicationUser
+                {
+                    UserName = "orgadmin@demo.com",
+                    Email = "orgadmin@demo.com",
+                    FirstName = "Demo",
+                    LastName = "OrgAdmin",
+                    EmailConfirmed = true,
+                    IsActive = true,
+                    SalesGroupId = demoGroupId,
+                    SalesOrgId = demoOrg.Id
+                };
+                var result = await userManager.CreateAsync(orgAdmin, "OrgAdmin@123");
+                if (result.Succeeded)
+                    await userManager.AddToRoleAsync(orgAdmin, UserRoles.SalesOrgAdmin);
+                else
+                    logger.LogWarning("Demo OrgAdmin seed failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Description)));
+            }
+
+            // 6. SalesRep user
+            var salesRep = await userManager.FindByEmailAsync("rep@demo.com");
+            if (salesRep == null)
+            {
+                salesRep = new ApplicationUser
+                {
+                    UserName = "rep@demo.com",
+                    Email = "rep@demo.com",
+                    FirstName = "Demo",
+                    LastName = "Rep",
+                    EmailConfirmed = true,
+                    IsActive = true,
+                    SalesGroupId = demoGroupId,
+                    SalesOrgId = demoOrg.Id
+                };
+                var result = await userManager.CreateAsync(salesRep, "SalesRep@123");
+                if (result.Succeeded)
+                    await userManager.AddToRoleAsync(salesRep, UserRoles.SalesRep);
+                else
+                    logger.LogWarning("Demo SalesRep seed failed: {Errors}", string.Join("; ", result.Errors.Select(e => e.Description)));
+            }
+
+            logger.LogInformation("Demo seed complete: group={Group}, org={Org}", demoGroupId, demoOrg.Id);
         }
     }
 }

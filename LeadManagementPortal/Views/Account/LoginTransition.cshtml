@@ -137,23 +137,40 @@
             text-align: center;
             opacity: 0;
             transform: translateY(30px);
+            background: rgba(2, 18, 38, 0.38);
+            border: 1px solid rgba(167, 223, 244, 0.32);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             padding: 20px;
             border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 14px 36px rgba(2, 12, 28, 0.45), 0 0 24px rgba(34, 211, 238, 0.16), inset 0 0 0 1px rgba(2, 12, 28, 0.35);
             will-change: transform, opacity;
         }
 
+        .brand-text::before {
+            content: "";
+            position: absolute;
+            inset: 6px 10px;
+            border-radius: 10px;
+            background: radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 40%, rgba(2, 18, 38, 0.22) 100%);
+            pointer-events: none;
+        }
+
         .brand-text .dirx-text {
-            font-size: 42px;
-            font-weight: 700;
-            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-primary), var(--accent-cyan));
+            position: relative;
+            z-index: 1;
+            font-size: 46px;
+            font-weight: 900;
+            background: linear-gradient(180deg, #ffffff 0%, #d6f3ff 44%, #8ddfff 100%);
             background-size: 200% auto;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            letter-spacing: 2px;
+            -webkit-text-stroke: 0.6px rgba(2, 27, 52, 0.55);
+            letter-spacing: 2.4px;
             text-transform: uppercase;
+            text-shadow: 0 2px 0 rgba(4, 32, 56, 0.78), 0 0 18px rgba(255, 255, 255, 0.6), 0 0 32px rgba(34, 211, 238, 0.5);
             animation: shimmer 3s linear infinite;
         }
 
