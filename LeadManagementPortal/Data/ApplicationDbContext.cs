@@ -21,6 +21,7 @@ namespace LeadManagementPortal.Data
         public DbSet<CustomerAudit> CustomerAudits { get; set; }
         public DbSet<LeadAudit> LeadAudits { get; set; }
         public DbSet<LeadDocument> LeadDocuments { get; set; }
+        public DbSet<LeadFollowUpTask> LeadFollowUpTasks { get; set; }
         public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -202,6 +203,21 @@ namespace LeadManagementPortal.Data
                 entity.Property(e => e.StorageKey).HasMaxLength(500).IsRequired();
                 entity.HasOne<Lead>()
                     .WithMany(l => l.Documents)
+                    .HasForeignKey(e => e.LeadId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // LeadFollowUpTask configuration
+            builder.Entity<LeadFollowUpTask>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.LeadId);
+                entity.HasIndex(e => e.DueDate);
+                entity.HasIndex(e => e.IsCompleted);
+                entity.Property(e => e.Type).HasMaxLength(32).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
+                entity.HasOne(e => e.Lead)
+                    .WithMany(l => l.FollowUpTasks)
                     .HasForeignKey(e => e.LeadId)
                     .OnDelete(DeleteBehavior.Cascade);
             });

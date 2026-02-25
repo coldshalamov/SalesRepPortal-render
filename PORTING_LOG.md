@@ -20,6 +20,33 @@ For every new commit in this sandbox repo, append an entry with:
 
 ## Current Commit Log
 
+### `WORKTREE-UNCOMMITTED` - Leads pipeline parity tranche (board + stage moves + follow-up tasks)
+
+- Scope:
+  - `LeadManagementPortal/Views/Leads/Index.cshtml`
+  - `LeadManagementPortal/wwwroot/js/leads-pipeline.js`
+  - `LeadManagementPortal/wwwroot/css/leads-pipeline.css`
+  - `LeadManagementPortal/Controllers/LeadsController.cs`
+  - `LeadManagementPortal/Services/ILeadService.cs`
+  - `LeadManagementPortal/Services/LeadService.cs`
+  - `LeadManagementPortal/Models/Lead.cs`
+  - `LeadManagementPortal/Models/LeadFollowUpTask.cs`
+  - `LeadManagementPortal/Data/ApplicationDbContext.cs`
+  - `AGENTS.md`, `MIGRATION_PLAYBOOK.md`
+- Reason:
+  - Port TheRxSpot-style sales pipeline behavior safely into sandbox:
+    - Kanban-style lead movement
+    - Status update endpoint
+    - Follow-up task add/complete/delete workflow
+    - Overdue follow-up visibility in pipeline stats
+    - Explicit sandbox-to-prod portability guardrails in docs/instructions
+- Classification: **Portable with edits**
+- Exact port action:
+  - **Port feature files**, but in the real repo:
+    1. generate a fresh EF migration there for `LeadFollowUpTask`;
+    2. verify migration on SQL Server staging clone before production;
+    3. avoid porting Render-specific infra files unless requested.
+
 ### `e1422a3` - Revert "Seed demo users for each role"
 
 - Scope: `LeadManagementPortal/Data/SeedData.cs`, `render.yaml`, `RENDER.md`

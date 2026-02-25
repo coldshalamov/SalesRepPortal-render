@@ -71,6 +71,7 @@ namespace LeadManagementPortal.Models
         public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 
         public virtual ICollection<LeadDocument> Documents { get; set; } = new List<LeadDocument>();
+        public virtual ICollection<LeadFollowUpTask> FollowUpTasks { get; set; } = new List<LeadFollowUpTask>();
 
         public int DaysRemaining
         {

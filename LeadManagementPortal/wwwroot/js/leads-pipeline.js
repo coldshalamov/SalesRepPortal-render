@@ -3,9 +3,7 @@
 
   const seedEl = document.getElementById("leadsPipelineSeed");
   const configEl = document.getElementById("leadsPipelineConfig");
-  if (!seedEl || !configEl) {
-    return;
-  }
+  if (!seedEl || !configEl) return;
 
   const boardRoot = document.getElementById("pipelineColumns");
   const boardView = document.getElementById("pipelineBoardView");
@@ -15,18 +13,24 @@
   const statTotal = document.getElementById("pipelineStatTotal");
   const statActive = document.getElementById("pipelineStatActive");
   const statConversion = document.getElementById("pipelineStatConversion");
-  const statUrgent = document.getElementById("pipelineStatUrgent");
-  const csrfToken = document.querySelector("#pipelineCsrfTokenForm input[name='__RequestVerificationToken']")?.value ?? "";
+  const statOverdue = document.getElementById("pipelineStatUrgent");
   const pipelineWorkspace = document.getElementById("pipelineWorkspace");
+  const csrfToken = document.querySelector("#pipelineCsrfTokenForm input[name='__RequestVerificationToken']")?.value ?? "";
 
   let seed = [];
-  let config = { updateStatusUrl: "", canConvert: false };
+  let config = {
+    updateStatusUrl: "",
+    addFollowUpUrl: "",
+    completeFollowUpUrl: "",
+    deleteFollowUpsUrl: "",
+    canConvert: false
+  };
 
   try {
     seed = JSON.parse(seedEl.textContent || "[]");
     config = JSON.parse(configEl.textContent || "{}");
   } catch (error) {
-    console.error("Unable to parse pipeline data:", error);
+    console.error("Unable to parse pipeline payload.", error);
     return;
   }
 
@@ -42,11 +46,48 @@
     Lost: "Lost"
   };
 
+  const quickTaskTemplates = {
+    call_tomorrow: { type: "call", description: "Call tomorrow to review next step.", dueOffsetDays: 1, autoSave: true },
+    send_proposal: { type: "email", description: "Send proposal with updated pricing.", dueOffsetDays: null, autoSave: false },
+    schedule_demo: { type: "meeting", description: "Schedule product demonstration.", dueOffsetDays: null, autoSave: false },
+    check_in_week: { type: "check-in", description: "Check in next week on decision timeline.", dueOffsetDays: 7, autoSave: true }
+  };
+
   const state = {
-    leads: Array.isArray(seed) ? seed.slice() : [],
+    leads: Array.isArray(seed) ? seed.map(normalizeLead) : [],
     selectedLeadId: null,
     dragLeadId: null
   };
+
+  function normalizeLead(lead) {
+    const tasks = Array.isArray(lead.tasks) ? lead.tasks.map(normalizeTask) : [];
+    return { ...lead, tasks };
+  }
+
+  function normalizeTask(task) {
+    return {
+      id: Number(task.id || 0),
+      type: String(task.type || "call"),
+      description: String(task.description || ""),
+      dueDate: task.dueDate ? String(task.dueDate) : "",
+      isCompleted: !!task.isCompleted,
+      completedAt: task.completedAt ? String(task.completedAt) : ""
+    };
+  }
+
+  function toIsoDate(dateObj) {
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function daysFromNow(days) {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() + Number(days || 0));
+    return toIsoDate(date);
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -59,18 +100,7 @@
 
   function normalizeStatus(rawStatus) {
     const status = String(rawStatus || "").trim();
-    if (statusLabels()[status]) {
-      return status;
-    }
-    return status;
-  }
-
-  function statusLabels() {
-    return stageLabels;
-  }
-
-  function getLeadById(leadId) {
-    return state.leads.find((lead) => String(lead.id) === String(leadId)) || null;
+    return stageLabels[status] ? status : "New";
   }
 
   function urgencyClass(urgency) {
@@ -81,6 +111,38 @@
     return "pipeline-urgency-low";
   }
 
+  function getLeadById(leadId) {
+    return state.leads.find((lead) => String(lead.id) === String(leadId)) || null;
+  }
+
+  function getPendingTasks(lead) {
+    return (lead.tasks || [])
+      .filter((task) => !task.isCompleted)
+      .sort((left, right) => {
+        const leftDue = left.dueDate || "9999-12-31";
+        const rightDue = right.dueDate || "9999-12-31";
+        return leftDue.localeCompare(rightDue);
+      });
+  }
+
+  function getOverdueCount(lead) {
+    const today = toIsoDate(new Date());
+    return getPendingTasks(lead).filter((task) => task.dueDate && task.dueDate < today).length;
+  }
+
+  function getGlobalOverdueCount() {
+    const today = toIsoDate(new Date());
+    let count = 0;
+    state.leads.forEach((lead) => {
+      (lead.tasks || []).forEach((task) => {
+        if (!task.isCompleted && task.dueDate && task.dueDate < today) {
+          count += 1;
+        }
+      });
+    });
+    return count;
+  }
+
   function updateStats() {
     const total = state.leads.length;
     const active = state.leads.filter((lead) => activeStatuses.includes(normalizeStatus(lead.status))).length;
@@ -88,27 +150,29 @@
     const lost = state.leads.filter((lead) => normalizeStatus(lead.status) === "Lost").length;
     const conversionBase = converted + lost;
     const conversionRate = conversionBase > 0 ? ((converted / conversionBase) * 100).toFixed(1) : "0.0";
-    const urgent = state.leads.filter((lead) => {
-      const status = normalizeStatus(lead.status);
-      if (status === "Converted" || status === "Lost") return false;
-      const urgency = String(lead.urgency || "").toLowerCase();
-      return urgency === "critical" || urgency === "high";
-    }).length;
+    const overdue = getGlobalOverdueCount();
 
     if (statTotal) statTotal.textContent = String(total);
     if (statActive) statActive.textContent = String(active);
     if (statConversion) statConversion.textContent = `${conversionRate}%`;
-    if (statUrgent) statUrgent.textContent = String(urgent);
+    if (statOverdue) statOverdue.textContent = String(overdue);
   }
 
   function renderBoard() {
     if (!boardRoot) return;
 
-    const columnsHtml = columnStatuses.map((status) => {
+    const html = columnStatuses.map((status) => {
       const leads = state.leads.filter((lead) => normalizeStatus(lead.status) === status);
       const cards = leads.map((lead) => {
         const fullName = [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() || "No contact";
         const daysLabel = lead.isExpired ? "Expired" : `${Math.max(0, Number(lead.daysRemaining || 0))} days`;
+        const pendingTasks = getPendingTasks(lead);
+        const overdueCount = getOverdueCount(lead);
+        const nextTask = pendingTasks[0];
+        const taskSummary = nextTask
+          ? `${nextTask.type.toUpperCase()}: ${nextTask.description.substring(0, 35)}${nextTask.description.length > 35 ? "..." : ""}`
+          : "No open tasks";
+
         return `
           <article class="pipeline-card" draggable="true" data-lead-id="${escapeHtml(lead.id)}">
             <div class="pipeline-card-top">
@@ -127,6 +191,14 @@
                 <span class="pipeline-meta-label">Urgency</span>
                 <span class="pipeline-urgency-badge ${urgencyClass(lead.urgency)}">${escapeHtml(lead.urgency || "Low")}</span>
               </div>
+              <div class="pipeline-meta-row">
+                <span class="pipeline-meta-label">Tasks</span>
+                <span class="pipeline-meta-value">${pendingTasks.length} open${overdueCount > 0 ? ` (${overdueCount} overdue)` : ""}</span>
+              </div>
+              <div class="pipeline-meta-row">
+                <span class="pipeline-meta-label">Next</span>
+                <span class="pipeline-meta-value">${escapeHtml(taskSummary)}</span>
+              </div>
             </div>
           </article>
         `;
@@ -135,7 +207,7 @@
       return `
         <section class="pipeline-column" data-status="${status}">
           <header class="pipeline-column-header">
-            <span class="pipeline-column-title">${escapeHtml(statusLabels()[status])}</span>
+            <span class="pipeline-column-title">${escapeHtml(stageLabels[status])}</span>
             <span class="pipeline-column-count">${leads.length}</span>
           </header>
           <div class="pipeline-column-body">
@@ -145,19 +217,48 @@
       `;
     }).join("");
 
-    boardRoot.innerHTML = columnsHtml;
+    boardRoot.innerHTML = html;
   }
 
   function showToast(message, variant) {
     if (!pipelineWorkspace) return;
-
-    const color = variant === "success" ? "success" : variant === "danger" ? "danger" : "info";
+    const alertColor = variant === "success" ? "success" : variant === "danger" ? "danger" : "info";
     const alert = document.createElement("div");
-    alert.className = `alert alert-${color} py-2 px-3 mt-2`;
+    alert.className = `alert alert-${alertColor} py-2 px-3 mt-2`;
     alert.setAttribute("role", "alert");
     alert.textContent = message;
     pipelineWorkspace.insertAdjacentElement("afterend", alert);
     setTimeout(() => alert.remove(), 2600);
+  }
+
+  async function postJson(url, payload) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "RequestVerificationToken": csrfToken
+      },
+      body: JSON.stringify(payload),
+      credentials: "same-origin"
+    });
+
+    let body = {};
+    try {
+      body = await response.json();
+    } catch {
+      body = {};
+    }
+
+    if (!response.ok || body.success === false) {
+      throw new Error(body.message || "Request failed.");
+    }
+    return body;
+  }
+
+  function applyReturnedTasks(leadId, tasks) {
+    const lead = getLeadById(leadId);
+    if (!lead) return;
+    lead.tasks = Array.isArray(tasks) ? tasks.map(normalizeTask) : [];
   }
 
   async function updateLeadStatus(leadId, targetStatus, closeModalAfter) {
@@ -168,44 +269,16 @@
 
     const lead = getLeadById(leadId);
     if (!lead) return;
-
-    const originalStatus = normalizeStatus(lead.status);
-    if (originalStatus === targetStatus) {
-      return;
-    }
+    if (normalizeStatus(lead.status) === targetStatus) return;
 
     try {
-      const response = await fetch(config.updateStatusUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "RequestVerificationToken": csrfToken
-        },
-        body: JSON.stringify({
-          leadId: String(leadId),
-          status: targetStatus
-        }),
-        credentials: "same-origin"
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || "Unable to move lead.");
-      }
-
-      const payload = await response.json().catch(() => ({}));
-      if (!payload.success) {
-        throw new Error(payload.message || "Unable to move lead.");
-      }
-
+      const result = await postJson(config.updateStatusUrl, { leadId: String(leadId), status: targetStatus });
       lead.status = targetStatus;
-      if (targetStatus === "Converted" || targetStatus === "Lost") {
-        lead.daysRemaining = 0;
-      }
+      if (targetStatus === "Converted" || targetStatus === "Lost") lead.daysRemaining = 0;
       renderBoard();
       updateStats();
       refreshModalIfOpen();
-      showToast(payload.message || "Lead moved successfully.", "success");
+      showToast(result.message || "Lead moved successfully.", "success");
 
       if (closeModalAfter) {
         const modalEl = document.getElementById("pipelineLeadModal");
@@ -235,23 +308,167 @@
   function renderModalStageButtons(lead) {
     const container = document.getElementById("pipelineStageButtons");
     if (!container || !lead) return;
-
     const statuses = columnStatuses.slice();
-    if (config.canConvert) {
-      statuses.push("Converted");
-    }
+    if (config.canConvert) statuses.push("Converted");
 
     container.innerHTML = statuses.map((status) => {
       const isCurrent = normalizeStatus(lead.status) === status;
-      const styleClass = isCurrent ? "btn btn-primary btn-sm" : "btn btn-outline-secondary btn-sm";
-      return `<button type="button" class="${styleClass}" data-target-status="${status}" data-pipeline-stage-btn="1">${escapeHtml(statusLabels()[status])}</button>`;
+      const buttonClass = isCurrent ? "btn btn-primary btn-sm" : "btn btn-outline-secondary btn-sm";
+      return `<button type="button" class="${buttonClass}" data-target-status="${status}" data-pipeline-stage-btn="1">${escapeHtml(stageLabels[status])}</button>`;
     }).join("");
+  }
+
+  function renderTasksList(lead) {
+    const container = document.getElementById("pipelineTasksList");
+    const deleteButton = document.getElementById("pipelineDeleteTasksBtn");
+    if (!container || !lead) return;
+
+    const tasks = (lead.tasks || []).slice().sort((left, right) => {
+      if (left.isCompleted !== right.isCompleted) return left.isCompleted ? 1 : -1;
+      const leftDue = left.dueDate || "9999-12-31";
+      const rightDue = right.dueDate || "9999-12-31";
+      return leftDue.localeCompare(rightDue);
+    });
+
+    if (!tasks.length) {
+      container.innerHTML = `<div class="text-muted small border rounded p-3">No follow-up tasks yet.</div>`;
+      if (deleteButton) deleteButton.classList.add("d-none");
+      return;
+    }
+
+    const today = toIsoDate(new Date());
+    const html = tasks.map((task) => {
+      const overdue = !task.isCompleted && task.dueDate && task.dueDate < today;
+      const dueLabel = task.dueDate ? (overdue ? `${task.dueDate} (Overdue)` : task.dueDate) : "No due date";
+      return `
+        <div class="d-flex align-items-start gap-2 border rounded p-2 mb-2 ${task.isCompleted ? "bg-light" : ""}">
+          <input type="checkbox" class="form-check-input mt-1" data-task-select="1" value="${task.id}" />
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between gap-2">
+              <div class="${task.isCompleted ? "text-decoration-line-through text-muted" : ""}">${escapeHtml(task.description)}</div>
+              <span class="badge ${overdue ? "bg-danger" : task.isCompleted ? "bg-secondary" : "bg-info text-dark"}">${escapeHtml(task.type.toUpperCase())}</span>
+            </div>
+            <div class="small ${overdue ? "text-danger" : "text-muted"}">Due: ${escapeHtml(dueLabel)}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-success ${task.isCompleted ? "d-none" : ""}" data-task-complete="1" data-task-id="${task.id}">Done</button>
+        </div>
+      `;
+    }).join("");
+
+    container.innerHTML = html;
+    if (deleteButton) deleteButton.classList.add("d-none");
+  }
+
+  function setTaskFormVisible(isVisible) {
+    const card = document.getElementById("pipelineTaskFormCard");
+    if (!card) return;
+    card.classList.toggle("d-none", !isVisible);
+  }
+
+  function resetTaskForm() {
+    const typeEl = document.getElementById("pipelineTaskType");
+    const dueEl = document.getElementById("pipelineTaskDueDate");
+    const descriptionEl = document.getElementById("pipelineTaskDescription");
+    if (typeEl) typeEl.value = "call";
+    if (dueEl) dueEl.value = "";
+    if (descriptionEl) descriptionEl.value = "";
+  }
+
+  async function saveTaskFromForm() {
+    if (!state.selectedLeadId || !config.addFollowUpUrl) return;
+    const typeEl = document.getElementById("pipelineTaskType");
+    const dueEl = document.getElementById("pipelineTaskDueDate");
+    const descriptionEl = document.getElementById("pipelineTaskDescription");
+    const description = descriptionEl?.value?.trim() || "";
+    if (!description) {
+      showToast("Task description is required.", "danger");
+      return;
+    }
+
+    try {
+      const result = await postJson(config.addFollowUpUrl, {
+        leadId: state.selectedLeadId,
+        type: typeEl?.value || "call",
+        description,
+        dueDate: dueEl?.value || null
+      });
+      applyReturnedTasks(state.selectedLeadId, result.tasks);
+      renderBoard();
+      renderTasksList(getLeadById(state.selectedLeadId));
+      updateStats();
+      resetTaskForm();
+      setTaskFormVisible(false);
+      showToast(result.message || "Task added.", "success");
+    } catch (error) {
+      showToast(error?.message || "Unable to add task.", "danger");
+    }
+  }
+
+  async function completeTask(taskId) {
+    if (!state.selectedLeadId || !config.completeFollowUpUrl) return;
+    try {
+      const result = await postJson(config.completeFollowUpUrl, {
+        leadId: state.selectedLeadId,
+        followUpId: Number(taskId)
+      });
+      applyReturnedTasks(state.selectedLeadId, result.tasks);
+      renderBoard();
+      renderTasksList(getLeadById(state.selectedLeadId));
+      updateStats();
+      showToast(result.message || "Task completed.", "success");
+    } catch (error) {
+      showToast(error?.message || "Unable to complete task.", "danger");
+    }
+  }
+
+  async function deleteSelectedTasks() {
+    if (!state.selectedLeadId || !config.deleteFollowUpsUrl) return;
+    const selected = Array.from(document.querySelectorAll("#pipelineTasksList [data-task-select='1']:checked"))
+      .map((element) => Number(element.value))
+      .filter((id) => id > 0);
+
+    if (!selected.length) return;
+    const shouldDelete = window.confirm(`Delete ${selected.length} selected task(s)?`);
+    if (!shouldDelete) return;
+
+    try {
+      const result = await postJson(config.deleteFollowUpsUrl, {
+        leadId: state.selectedLeadId,
+        followUpIds: selected
+      });
+      applyReturnedTasks(state.selectedLeadId, result.tasks);
+      renderBoard();
+      renderTasksList(getLeadById(state.selectedLeadId));
+      updateStats();
+      showToast(result.message || "Tasks deleted.", "success");
+    } catch (error) {
+      showToast(error?.message || "Unable to delete tasks.", "danger");
+    }
+  }
+
+  async function applyQuickTask(templateKey) {
+    const template = quickTaskTemplates[templateKey];
+    if (!template || !state.selectedLeadId) return;
+
+    const typeEl = document.getElementById("pipelineTaskType");
+    const dueEl = document.getElementById("pipelineTaskDueDate");
+    const descriptionEl = document.getElementById("pipelineTaskDescription");
+
+    if (typeEl) typeEl.value = template.type;
+    if (descriptionEl) descriptionEl.value = template.description;
+    if (dueEl) dueEl.value = template.dueOffsetDays == null ? "" : daysFromNow(template.dueOffsetDays);
+    setTaskFormVisible(true);
+
+    if (template.autoSave) {
+      await saveTaskFromForm();
+    } else {
+      showToast("Task template loaded. Click Save Task to confirm.", "info");
+    }
   }
 
   function openLeadModal(leadId) {
     const lead = getLeadById(leadId);
     if (!lead) return;
-
     state.selectedLeadId = String(lead.id);
 
     const modalTitle = document.getElementById("pipelineLeadModalTitle");
@@ -274,7 +491,6 @@
       const element = document.getElementById(id);
       if (element) element.textContent = value;
     };
-
     setText("pipelineDetailName", fullName);
     setText("pipelineDetailCompany", lead.company || "-");
     setText("pipelineDetailEmail", lead.email || "-");
@@ -283,6 +499,9 @@
     setText("pipelineDetailOrg", lead.salesOrg || "-");
 
     renderModalStageButtons(lead);
+    renderTasksList(lead);
+    resetTaskForm();
+    setTaskFormVisible(false);
 
     const modalEl = document.getElementById("pipelineLeadModal");
     if (!modalEl) return;
@@ -298,13 +517,8 @@
   }
 
   function bindEvents() {
-    if (pipelineBtn) {
-      pipelineBtn.addEventListener("click", () => setView("pipeline"));
-    }
-    if (tableBtn) {
-      tableBtn.addEventListener("click", () => setView("table"));
-    }
-
+    if (pipelineBtn) pipelineBtn.addEventListener("click", () => setView("pipeline"));
+    if (tableBtn) tableBtn.addEventListener("click", () => setView("table"));
     if (!boardRoot) return;
 
     boardRoot.addEventListener("click", (event) => {
@@ -328,9 +542,7 @@
 
     boardRoot.addEventListener("dragend", (event) => {
       event.target.closest(".pipeline-card")?.classList.remove("is-dragging");
-      boardRoot.querySelectorAll(".pipeline-column.is-drop-target").forEach((column) => {
-        column.classList.remove("is-drop-target");
-      });
+      boardRoot.querySelectorAll(".pipeline-column.is-drop-target").forEach((column) => column.classList.remove("is-drop-target"));
       state.dragLeadId = null;
     });
 
@@ -339,15 +551,13 @@
       if (!column) return;
       event.preventDefault();
       column.classList.add("is-drop-target");
-      event.dataTransfer.dropEffect = "move";
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     });
 
     boardRoot.addEventListener("dragleave", (event) => {
       const column = event.target.closest(".pipeline-column");
       if (!column) return;
-      if (!column.contains(event.relatedTarget)) {
-        column.classList.remove("is-drop-target");
-      }
+      if (!column.contains(event.relatedTarget)) column.classList.remove("is-drop-target");
     });
 
     boardRoot.addEventListener("drop", async (event) => {
@@ -366,12 +576,57 @@
     if (modalEl) {
       modalEl.addEventListener("click", async (event) => {
         const stageButton = event.target.closest("[data-pipeline-stage-btn='1']");
-        if (!stageButton || !state.selectedLeadId) return;
-        const targetStatus = stageButton.getAttribute("data-target-status");
-        if (!targetStatus) return;
-        await updateLeadStatus(state.selectedLeadId, targetStatus, targetStatus === "Converted");
+        if (stageButton && state.selectedLeadId) {
+          const targetStatus = stageButton.getAttribute("data-target-status");
+          if (targetStatus) {
+            await updateLeadStatus(state.selectedLeadId, targetStatus, targetStatus === "Converted");
+          }
+          return;
+        }
+
+        const completeButton = event.target.closest("[data-task-complete='1']");
+        if (completeButton) {
+          await completeTask(Number(completeButton.getAttribute("data-task-id")));
+          return;
+        }
+
+        const quickButton = event.target.closest("[data-quick-task]");
+        if (quickButton) {
+          await applyQuickTask(quickButton.getAttribute("data-quick-task"));
+          return;
+        }
+
+        if (event.target.id === "pipelineAddTaskBtn") {
+          setTaskFormVisible(true);
+          return;
+        }
+
+        if (event.target.id === "pipelineTaskCancelBtn") {
+          setTaskFormVisible(false);
+          resetTaskForm();
+          return;
+        }
+
+        if (event.target.id === "pipelineTaskSaveBtn") {
+          await saveTaskFromForm();
+          return;
+        }
+
+        if (event.target.id === "pipelineDeleteTasksBtn") {
+          await deleteSelectedTasks();
+          return;
+        }
       });
     }
+
+    document.addEventListener("change", (event) => {
+      if (!event.target.matches("#pipelineTasksList [data-task-select='1']")) return;
+      const deleteButton = document.getElementById("pipelineDeleteTasksBtn");
+      if (!deleteButton) return;
+      const selectedCount = document.querySelectorAll("#pipelineTasksList [data-task-select='1']:checked").length;
+      deleteButton.classList.toggle("d-none", selectedCount === 0);
+      deleteButton.textContent = selectedCount > 0 ? `Delete Selected (${selectedCount})` : "Delete Selected";
+    });
   }
 
   renderBoard();

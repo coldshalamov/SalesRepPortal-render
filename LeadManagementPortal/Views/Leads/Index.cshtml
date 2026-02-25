@@ -4,9 +4,21 @@
     ViewData["Title"] = "Leads";
     var selectedStatuses = ViewBag.SelectedStatuses as List<LeadStatus> ?? new List<LeadStatus>();
     var canConvertInPipeline = User.IsInRole(UserRoles.OrganizationAdmin);
+    var followUpLookup = ViewBag.FollowUpsByLead as Dictionary<string, List<LeadFollowUpTask>> ?? new Dictionary<string, List<LeadFollowUpTask>>();
+    var overdueFollowUpCount = (int?)(ViewBag.OverdueFollowUpCount) ?? 0;
 
     var pipelineSeed = (Model ?? Enumerable.Empty<Lead>()).Select(lead => new
     {
+        tasks = (followUpLookup.TryGetValue(lead.Id, out var tasks) ? tasks : new List<LeadFollowUpTask>())
+            .Select(task => new
+            {
+                id = task.Id,
+                type = task.Type,
+                description = task.Description,
+                dueDate = task.DueDate?.ToString("yyyy-MM-dd"),
+                isCompleted = task.IsCompleted,
+                completedAt = task.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss")
+            }),
         id = lead.Id,
         company = lead.Company,
         firstName = lead.FirstName,
@@ -161,9 +173,9 @@
             </div>
             <div class="col-md-3 col-6">
                 <div class="pipeline-stat-card">
-                    <div class="pipeline-stat-label">Urgent Leads</div>
+                    <div class="pipeline-stat-label">Overdue Tasks</div>
                     <div class="pipeline-stat-value text-danger" id="pipelineStatUrgent">0</div>
-                    <div class="pipeline-stat-sub">High/Critical urgency</div>
+                    <div class="pipeline-stat-sub">Past due follow-ups</div>
                 </div>
             </div>
         </div>
@@ -325,6 +337,53 @@
 
                 <h6 class="mb-2">Move Lead</h6>
                 <div class="pipeline-stage-actions" id="pipelineStageButtons"></div>
+
+                <hr class="my-4" />
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Follow-up Tasks</h6>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-danger d-none" id="pipelineDeleteTasksBtn">Delete Selected</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="pipelineAddTaskBtn">Add Task</button>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-quick-task="call_tomorrow">Call Tomorrow</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-quick-task="send_proposal">Send Proposal</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-quick-task="schedule_demo">Schedule Demo</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-quick-task="check_in_week">Check-in +1 Week</button>
+                </div>
+
+                <div class="card d-none mb-3" id="pipelineTaskFormCard">
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label for="pipelineTaskType" class="form-label mb-1">Type</label>
+                                <select id="pipelineTaskType" class="form-select form-select-sm">
+                                    <option value="call">Call</option>
+                                    <option value="email">Email</option>
+                                    <option value="meeting">Meeting</option>
+                                    <option value="check-in">Check-in</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="pipelineTaskDueDate" class="form-label mb-1">Due Date</label>
+                                <input id="pipelineTaskDueDate" type="date" class="form-control form-control-sm" />
+                            </div>
+                            <div class="col-md-12">
+                                <label for="pipelineTaskDescription" class="form-label mb-1">Description</label>
+                                <input id="pipelineTaskDescription" type="text" maxlength="500" class="form-control form-control-sm" placeholder="Actionable follow-up..." />
+                            </div>
+                            <div class="col-md-12 d-flex justify-content-end gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-light" id="pipelineTaskCancelBtn">Cancel</button>
+                                <button type="button" class="btn btn-sm btn-primary" id="pipelineTaskSaveBtn">Save Task</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="pipelineTasksList"></div>
             </div>
             <div class="modal-footer">
                 <a href="#" id="pipelineLeadDetailsLink" class="btn btn-outline-primary">Open Details</a>
@@ -340,6 +399,10 @@
     @Html.Raw(JsonSerializer.Serialize(new
     {
         updateStatusUrl = Url.Action("UpdateStatus", "Leads"),
+        addFollowUpUrl = Url.Action("AddFollowUp", "Leads"),
+        completeFollowUpUrl = Url.Action("CompleteFollowUp", "Leads"),
+        deleteFollowUpsUrl = Url.Action("DeleteFollowUps", "Leads"),
+        overdueFollowUpCount = overdueFollowUpCount,
         canConvert = canConvertInPipeline
     }))
 </script>

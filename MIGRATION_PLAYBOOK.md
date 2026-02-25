@@ -51,3 +51,19 @@ Include two sections in each PR:
 
 - Render-only operational commits stay in sandbox.
 - Product feature commits will be ported one-by-one after your approval.
+
+## DB-change safety checklist (required for parity features)
+
+When a feature adds EF entities/tables/columns (like pipeline follow-up tasks):
+
+1. Treat schema changes as a separate PR step in the work repo.
+2. Generate migration in the work repo (do not hand-copy generated files from sandbox):
+   - `dotnet ef migrations add <Name> --project LeadManagementPortal/LeadManagementPortal.csproj`
+3. Review migration for destructive operations:
+   - Allowed by default: `CreateTable`, `AddColumn`, `CreateIndex`
+   - Block by default: `DropTable`, `DropColumn`, column type narrowing, destructive data updates
+4. Validate migration against a production-like SQL Server backup clone before merge.
+5. Verify rollback path (down migration or backup restore plan) before production apply.
+6. Roll out application code + migration together and monitor startup logs for migration/apply errors.
+
+If any step fails, stop porting and keep the feature sandbox-only until fixed.

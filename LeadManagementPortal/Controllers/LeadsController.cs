@@ -107,7 +107,11 @@ namespace LeadManagementPortal.Controllers
             // Populate filter dropdowns based on role
             await PopulateIndexFilters(userRole, userId);
 
-            return View(leads);
+            var leadList = leads.ToList();
+            ViewBag.FollowUpsByLead = await _leadService.GetFollowUpsForLeadsAsync(leadList.Select(l => l.Id), userId, userRole);
+            ViewBag.OverdueFollowUpCount = await _leadService.GetOverdueFollowUpCountAsync(userId, userRole);
+
+            return View(leadList);
         }
 
         [HttpPost]
@@ -215,6 +219,135 @@ namespace LeadManagementPortal.Controllers
             await _leadAuditService.LogAsync(lead, userId, "Update", $"Status changed to {targetStatus} from pipeline board");
 
             return Json(new { success = true, status = targetStatus.ToString(), message = "Status updated." });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AddFollowUp([FromBody] LeadFollowUpCreateRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { success = false, message = "Invalid follow-up request." });
+            }
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+
+            var lead = await _leadService.GetByIdAsync(request.LeadId);
+            if (lead == null)
+            {
+                return NotFound(new { success = false, message = "Lead not found." });
+            }
+
+            if (!await CanEditLead(lead, userId, userRole))
+            {
+                return Forbid();
+            }
+
+            var dueDate = request.DueDate?.Date;
+            var task = await _leadService.AddFollowUpAsync(
+                request.LeadId,
+                userId,
+                userRole,
+                request.Type,
+                request.Description,
+                dueDate
+            );
+
+            if (task == null)
+            {
+                return StatusCode(500, new { success = false, message = "Unable to add follow-up task." });
+            }
+
+            await _leadAuditService.LogAsync(request.LeadId, userId, "AddFollowUp", $"type={task.Type};due={task.DueDate:yyyy-MM-dd}");
+
+            var tasks = await _leadService.GetFollowUpsForLeadAsync(request.LeadId, userId, userRole);
+            return Json(new
+            {
+                success = true,
+                message = "Follow-up task added.",
+                tasks = tasks.Select(MapTask)
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CompleteFollowUp([FromBody] LeadFollowUpCompleteRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { success = false, message = "Invalid follow-up completion request." });
+            }
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+
+            var lead = await _leadService.GetByIdAsync(request.LeadId);
+            if (lead == null)
+            {
+                return NotFound(new { success = false, message = "Lead not found." });
+            }
+
+            if (!await CanEditLead(lead, userId, userRole))
+            {
+                return Forbid();
+            }
+
+            var completed = await _leadService.CompleteFollowUpAsync(request.LeadId, request.FollowUpId, userId, userRole);
+            if (!completed)
+            {
+                return BadRequest(new { success = false, message = "Unable to complete follow-up task." });
+            }
+
+            await _leadAuditService.LogAsync(request.LeadId, userId, "CompleteFollowUp", $"followUpId={request.FollowUpId}");
+
+            var tasks = await _leadService.GetFollowUpsForLeadAsync(request.LeadId, userId, userRole);
+            return Json(new
+            {
+                success = true,
+                message = "Follow-up task completed.",
+                tasks = tasks.Select(MapTask)
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteFollowUps([FromBody] LeadFollowUpDeleteRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { success = false, message = "Invalid follow-up delete request." });
+            }
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+
+            var lead = await _leadService.GetByIdAsync(request.LeadId);
+            if (lead == null)
+            {
+                return NotFound(new { success = false, message = "Lead not found." });
+            }
+
+            if (!await CanEditLead(lead, userId, userRole))
+            {
+                return Forbid();
+            }
+
+            var deletedCount = await _leadService.DeleteFollowUpsAsync(request.LeadId, request.FollowUpIds, userId, userRole);
+            if (deletedCount <= 0)
+            {
+                return BadRequest(new { success = false, message = "No follow-up tasks were deleted." });
+            }
+
+            await _leadAuditService.LogAsync(request.LeadId, userId, "DeleteFollowUps", $"deletedCount={deletedCount}");
+
+            var tasks = await _leadService.GetFollowUpsForLeadAsync(request.LeadId, userId, userRole);
+            return Json(new
+            {
+                success = true,
+                message = $"{deletedCount} follow-up task(s) deleted.",
+                tasks = tasks.Select(MapTask)
+            });
         }
 
         private async Task PopulateIndexFilters(string userRole, string userId)
@@ -1061,6 +1194,21 @@ namespace LeadManagementPortal.Controllers
             
             return Json(reps.Select(u => new { id = u.Id, fullName = u.FullName }));
         }
+
+        private static object MapTask(LeadFollowUpTask task)
+        {
+            return new
+            {
+                id = task.Id,
+                leadId = task.LeadId,
+                type = task.Type,
+                description = task.Description,
+                dueDate = task.DueDate?.ToString("yyyy-MM-dd"),
+                isCompleted = task.IsCompleted,
+                completedAt = task.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                createdAt = task.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+        }
     }
 
     public class LeadReassignViewModel
@@ -1082,5 +1230,39 @@ namespace LeadManagementPortal.Controllers
 
         [Required]
         public string Status { get; set; } = string.Empty;
+    }
+
+    public class LeadFollowUpCreateRequest
+    {
+        [Required]
+        public string LeadId { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(32)]
+        public string Type { get; set; } = "call";
+
+        [Required]
+        [StringLength(500)]
+        public string Description { get; set; } = string.Empty;
+
+        public DateTime? DueDate { get; set; }
+    }
+
+    public class LeadFollowUpCompleteRequest
+    {
+        [Required]
+        public string LeadId { get; set; } = string.Empty;
+
+        [Required]
+        public int FollowUpId { get; set; }
+    }
+
+    public class LeadFollowUpDeleteRequest
+    {
+        [Required]
+        public string LeadId { get; set; } = string.Empty;
+
+        [Required]
+        public List<int> FollowUpIds { get; set; } = new();
     }
 }

@@ -505,5 +505,246 @@ namespace LeadManagementPortal.Services
 
             return await query.OrderByDescending(l => l.CreatedDate).ToListAsync();
         }
+
+        public async Task<Dictionary<string, List<LeadFollowUpTask>>> GetFollowUpsForLeadsAsync(IEnumerable<string> leadIds, string userId, string userRole)
+        {
+            var result = new Dictionary<string, List<LeadFollowUpTask>>();
+            var ids = leadIds?.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList() ?? new List<string>();
+            if (!ids.Any())
+            {
+                return result;
+            }
+
+            try
+            {
+                var scopedIds = await GetScopedLeadIdsAsync(userId, userRole);
+                var allowedIds = ids.Where(id => scopedIds.Contains(id)).ToList();
+                if (!allowedIds.Any())
+                {
+                    return result;
+                }
+
+                var tasks = await _context.LeadFollowUpTasks
+                    .Where(task => allowedIds.Contains(task.LeadId))
+                    .OrderBy(task => task.IsCompleted)
+                    .ThenBy(task => task.DueDate)
+                    .ThenBy(task => task.CreatedAt)
+                    .ToListAsync();
+
+                result = tasks
+                    .GroupBy(task => task.LeadId)
+                    .ToDictionary(group => group.Key, group => group.ToList());
+
+                return result;
+            }
+            catch
+            {
+                return result;
+            }
+        }
+
+        public async Task<List<LeadFollowUpTask>> GetFollowUpsForLeadAsync(string leadId, string userId, string userRole)
+        {
+            if (string.IsNullOrWhiteSpace(leadId))
+            {
+                return new List<LeadFollowUpTask>();
+            }
+
+            try
+            {
+                if (!await CanUserAccessLeadAsync(leadId, userId, userRole))
+                {
+                    return new List<LeadFollowUpTask>();
+                }
+
+                return await _context.LeadFollowUpTasks
+                    .Where(task => task.LeadId == leadId)
+                    .OrderBy(task => task.IsCompleted)
+                    .ThenBy(task => task.DueDate)
+                    .ThenBy(task => task.CreatedAt)
+                    .ToListAsync();
+            }
+            catch
+            {
+                return new List<LeadFollowUpTask>();
+            }
+        }
+
+        public async Task<LeadFollowUpTask?> AddFollowUpAsync(string leadId, string userId, string userRole, string type, string description, DateTime? dueDate)
+        {
+            if (string.IsNullOrWhiteSpace(leadId) || string.IsNullOrWhiteSpace(description))
+            {
+                return null;
+            }
+
+            try
+            {
+                if (!await CanUserAccessLeadAsync(leadId, userId, userRole))
+                {
+                    return null;
+                }
+
+                var normalizedType = string.IsNullOrWhiteSpace(type) ? "call" : type.Trim().ToLowerInvariant();
+                var task = new LeadFollowUpTask
+                {
+                    LeadId = leadId,
+                    Type = normalizedType.Length > 32 ? normalizedType.Substring(0, 32) : normalizedType,
+                    Description = description.Trim().Length > 500 ? description.Trim().Substring(0, 500) : description.Trim(),
+                    DueDate = dueDate?.Date,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedById = userId
+                };
+
+                _context.LeadFollowUpTasks.Add(task);
+                await _context.SaveChangesAsync();
+                return task;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<bool> CompleteFollowUpAsync(string leadId, int followUpId, string userId, string userRole)
+        {
+            if (string.IsNullOrWhiteSpace(leadId) || followUpId <= 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (!await CanUserAccessLeadAsync(leadId, userId, userRole))
+                {
+                    return false;
+                }
+
+                var task = await _context.LeadFollowUpTasks
+                    .FirstOrDefaultAsync(item => item.Id == followUpId && item.LeadId == leadId);
+                if (task == null)
+                {
+                    return false;
+                }
+
+                if (!task.IsCompleted)
+                {
+                    task.IsCompleted = true;
+                    task.CompletedAt = DateTime.UtcNow;
+                    task.CompletedById = userId;
+                    await _context.SaveChangesAsync();
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<int> DeleteFollowUpsAsync(string leadId, IEnumerable<int> followUpIds, string userId, string userRole)
+        {
+            if (string.IsNullOrWhiteSpace(leadId))
+            {
+                return 0;
+            }
+
+            var ids = followUpIds?.Distinct().Where(id => id > 0).ToList() ?? new List<int>();
+            if (!ids.Any())
+            {
+                return 0;
+            }
+
+            try
+            {
+                if (!await CanUserAccessLeadAsync(leadId, userId, userRole))
+                {
+                    return 0;
+                }
+
+                var tasks = await _context.LeadFollowUpTasks
+                    .Where(task => task.LeadId == leadId && ids.Contains(task.Id))
+                    .ToListAsync();
+                if (!tasks.Any())
+                {
+                    return 0;
+                }
+
+                _context.LeadFollowUpTasks.RemoveRange(tasks);
+                await _context.SaveChangesAsync();
+                return tasks.Count;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public async Task<int> GetOverdueFollowUpCountAsync(string userId, string userRole)
+        {
+            try
+            {
+                var scopedIds = await GetScopedLeadIdsAsync(userId, userRole);
+                if (!scopedIds.Any())
+                {
+                    return 0;
+                }
+
+                var today = DateTime.UtcNow.Date;
+                return await _context.LeadFollowUpTasks
+                    .Where(task => scopedIds.Contains(task.LeadId) && !task.IsCompleted && task.DueDate.HasValue && task.DueDate.Value.Date < today)
+                    .CountAsync();
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private async Task<HashSet<string>> GetScopedLeadIdsAsync(string userId, string userRole)
+        {
+            if (userRole == UserRoles.OrganizationAdmin)
+            {
+                return (await _context.Leads.Select(lead => lead.Id).ToListAsync()).ToHashSet();
+            }
+
+            var query = _context.Leads.AsQueryable();
+            var user = await _context.Users.FindAsync(userId);
+
+            if (userRole == UserRoles.GroupAdmin)
+            {
+                if (user?.SalesGroupId == null)
+                {
+                    return new HashSet<string>();
+                }
+
+                query = query.Where(lead => lead.SalesGroupId == user.SalesGroupId);
+            }
+            else if (userRole == UserRoles.SalesOrgAdmin)
+            {
+                if (user?.SalesOrgId == null)
+                {
+                    return new HashSet<string>();
+                }
+
+                query = query.Where(lead => lead.AssignedTo != null && lead.AssignedTo.SalesOrgId == user.SalesOrgId);
+            }
+            else if (userRole == UserRoles.SalesRep)
+            {
+                query = query.Where(lead => lead.AssignedToId == userId);
+            }
+            else
+            {
+                return new HashSet<string>();
+            }
+
+            return (await query.Select(lead => lead.Id).ToListAsync()).ToHashSet();
+        }
+
+        private async Task<bool> CanUserAccessLeadAsync(string leadId, string userId, string userRole)
+        {
+            var scopedLeadIds = await GetScopedLeadIdsAsync(userId, userRole);
+            return scopedLeadIds.Contains(leadId);
+        }
     }
 }
