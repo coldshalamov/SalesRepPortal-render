@@ -1,0 +1,318 @@
+/* ============================================================
+   Notification Bell — DiRx SalesRepPortal
+   Ported from TheRxSpot.com notifications-ui.css
+   ============================================================ */
+
+/* --- Bell wrapper positioning --- */
+#notifBellContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* --- Bell button --- */
+#notifBellBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 8px;
+    color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: background 0.15s ease, color 0.15s ease;
+    position: relative;
+}
+
+#notifBellBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+}
+
+#notifBellBtn svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+/* --- Unread badge --- */
+#notifBadge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    min-width: 16px;
+    height: 16px;
+    padding: 2px 4px;
+    border-radius: 999px;
+    display: none;        /* shown by JS when count > 0 */
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    box-shadow: 0 0 0 2px #0d6efd; /* matches navbar --bs-primary */
+}
+
+/* --- Dropdown panel --- */
+#notifDropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 360px;
+    max-width: calc(100vw - 16px);
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+    z-index: 1050;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+#notifDropdown.active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: all;
+}
+
+/* --- Dropdown header --- */
+.notif-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.notif-header-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111;
+}
+
+.notif-header-mark-all {
+    font-size: 12px;
+    color: #0d6efd;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.notif-header-mark-all:hover {
+    background: #e9f0ff;
+}
+
+/* --- Bulk action bar --- */
+.notif-bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+}
+
+.notif-bulk-select-all {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #555;
+    user-select: none;
+}
+
+.notif-bulk-btn {
+    margin-left: auto;
+    background: none;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #333;
+    transition: background 0.15s;
+}
+
+.notif-bulk-btn:hover {
+    background: #e9ecef;
+}
+
+/* --- Scrollable list --- */
+#notifList {
+    max-height: 380px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#notifList::-webkit-scrollbar {
+    width: 4px;
+}
+
+#notifList::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 4px;
+}
+
+/* --- Individual notification item --- */
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 11px 14px;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.notif-item:last-of-type {
+    border-bottom: none;
+}
+
+.notif-item:hover {
+    background: #f8f9fa;
+}
+
+.notif-item.unread {
+    background: #eff6ff;
+}
+
+.notif-item.unread:hover {
+    background: #dbeafe;
+}
+
+/* --- Checkbox column --- */
+.notif-checkbox {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-top: 2px;
+}
+
+.notif-checkbox input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #0d6efd;
+}
+
+/* --- Content column --- */
+.notif-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.notif-message {
+    font-size: 12px;
+    color: #555;
+    line-height: 1.4;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.notif-time {
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 4px;
+}
+
+/* --- Read/unread toggle button --- */
+.notif-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding-top: 3px;
+}
+
+.notif-read-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.notif-read-toggle:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.notif-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: block;
+    flex-shrink: 0;
+}
+
+.notif-dot.unread {
+    background: #3b82f6;
+}
+
+.notif-dot.read {
+    background: #d1d5db;
+}
+
+/* --- Empty state --- */
+.notif-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 36px 20px;
+    color: #bbb;
+    font-size: 13px;
+    text-align: center;
+}
+
+.notif-empty svg {
+    opacity: 0.4;
+}
+
+/* --- Footer link --- */
+.notif-footer {
+    border-top: 1px solid #f0f0f0;
+    padding: 10px 16px;
+    text-align: center;
+}
+
+.notif-view-all {
+    font-size: 13px;
+    color: #0d6efd;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: opacity 0.15s;
+}
+
+.notif-view-all:hover {
+    opacity: 0.75;
+    text-decoration: underline;
+}

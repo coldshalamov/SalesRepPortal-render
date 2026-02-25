@@ -74,6 +74,7 @@ builder.Services.AddScoped<IFileStorageService>(sp =>
         : ActivatorUtilities.CreateInstance<LocalFileStorageService>(sp));
 builder.Services.AddScoped<ILeadDocumentService, LeadDocumentService>();
 builder.Services.AddScoped<ILeadAuditService, LeadAuditService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Options
 builder.Services.Configure<SmartyStreetsOptions>(builder.Configuration.GetSection("SmartyStreets"));

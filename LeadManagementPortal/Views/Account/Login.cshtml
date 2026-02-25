@@ -1,6 +1,7 @@
 @model LeadManagementPortal.Controllers.LoginViewModel
 @{
     Layout = null;
+    var returnUrl = ViewData["ReturnUrl"] as string;
 }
 
 <!DOCTYPE html>
@@ -46,6 +47,7 @@
         </div>
 
         <form asp-action="Login" method="post">
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
             <div asp-validation-summary="All" class="text-danger"></div>
 
             <div class="mb-3">

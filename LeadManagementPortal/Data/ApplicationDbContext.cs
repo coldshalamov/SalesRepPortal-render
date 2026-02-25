@@ -21,6 +21,7 @@ namespace LeadManagementPortal.Data
         public DbSet<CustomerAudit> CustomerAudits { get; set; }
         public DbSet<LeadAudit> LeadAudits { get; set; }
         public DbSet<LeadDocument> LeadDocuments { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -225,6 +226,25 @@ namespace LeadManagementPortal.Data
                     .WithMany(g => g.SalesOrgs)
                     .HasForeignKey(s => s.SalesGroupId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Notification configuration
+            builder.Entity<Notification>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => e.Role);
+                entity.HasIndex(e => e.CreatedAt);
+                entity.HasIndex(e => e.IsRead);
+                entity.Property(e => e.Type).HasMaxLength(64);
+                entity.Property(e => e.Title).HasMaxLength(256);
+                entity.Property(e => e.Message).HasMaxLength(1024);
+                entity.Property(e => e.Link).HasMaxLength(512);
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
             });
         }
     }

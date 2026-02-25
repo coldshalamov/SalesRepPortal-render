@@ -1,0 +1,859 @@
+@using System.Text.Json
+@{
+    Layout = null;
+    var nextUrl = ViewData["NextUrl"] as string ?? Url.Action("Index", "Dashboard") ?? "/Dashboard";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome - DiRX</title>
+    <style>
+        :root {
+            --accent-primary: #0ea5e9;
+            --accent-cyan: #22d3ee;
+            --particle-color: rgba(79, 195, 247, 0.6);
+            --particle-glow: rgba(56, 189, 248, 0.35);
+            --bg-gradient-start: rgba(56, 189, 248, 0.14);
+            --bg-gradient-mid: rgba(14, 165, 233, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(ellipse at center, #0d1a2d 0%, #050810 100%);
+        }
+
+        #transition-container {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            visibility: hidden;
+        }
+
+        #particle-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .logo-ring {
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            background: linear-gradient(135deg, var(--bg-gradient-mid), var(--bg-gradient-start)) padding-box,
+                linear-gradient(135deg, var(--accent-primary), var(--accent-cyan), var(--accent-primary)) border-box;
+            background-size: 300% 300%;
+            animation: ringGlow 2s ease-in-out infinite, ringSpin 8s linear infinite;
+            box-shadow: 0 0 60px var(--particle-glow), 0 0 120px var(--particle-glow), inset 0 0 60px var(--particle-glow);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            opacity: 0;
+            transform: scale(0.5);
+            will-change: transform, opacity;
+        }
+
+        .logo-ring::before {
+            content: "";
+            position: absolute;
+            inset: -10px;
+            border-radius: 50%;
+            border: 1px solid var(--particle-color);
+            animation: pulseRing 2s ease-out infinite;
+        }
+
+        .logo-ring::after {
+            content: "";
+            position: absolute;
+            inset: -20px;
+            border-radius: 50%;
+            border: 1px solid var(--particle-color);
+            opacity: 0.5;
+            animation: pulseRing 2s ease-out infinite 0.5s;
+        }
+
+        .inner-ring {
+            position: absolute;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            border: 2px solid var(--particle-color);
+            animation: counterSpin 12s linear infinite;
+        }
+
+        .inner-ring::before {
+            content: "";
+            position: absolute;
+            inset: 15px;
+            border-radius: 50%;
+            border: 1px dashed var(--particle-color);
+            opacity: 0.5;
+        }
+
+        .rx-container {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.3) rotateY(180deg);
+            will-change: transform, opacity;
+            filter: drop-shadow(0 0 30px var(--particle-glow));
+        }
+
+        .rx-symbol {
+            font-size: 120px;
+            font-weight: 700;
+            background: linear-gradient(180deg, var(--accent-cyan) 0%, var(--accent-primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px var(--particle-glow);
+            font-family: "Times New Roman", serif;
+            letter-spacing: -8px;
+        }
+
+        .brand-text {
+            position: absolute;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(30px);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 20px;
+            border-radius: 12px;
+            will-change: transform, opacity;
+        }
+
+        .brand-text .dirx-text {
+            font-size: 42px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-primary), var(--accent-cyan));
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            animation: shimmer 3s linear infinite;
+        }
+
+        .success-container {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        .checkmark-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00c853, #00e676);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 40px rgba(0, 200, 83, 0.5), 0 0 80px rgba(0, 200, 83, 0.3);
+            position: relative;
+        }
+
+        .checkmark-circle::before {
+            content: "";
+            position: absolute;
+            inset: -5px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 230, 118, 0.5);
+            animation: successPulse 1s ease-out infinite;
+        }
+
+        .checkmark {
+            width: 45px;
+            height: 25px;
+            border: 4px solid white;
+            border-top: none;
+            border-right: none;
+            transform: rotate(-45deg) translate(3px, -3px);
+            animation: checkmarkDraw 0.4s ease-out forwards;
+            animation-play-state: paused;
+        }
+
+        .welcome-text {
+            font-size: 28px;
+            font-weight: 600;
+            color: #00e676;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(0, 230, 118, 0.5);
+        }
+
+        .progress-ring {
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            transform: rotate(-90deg);
+            opacity: 0;
+        }
+
+        .progress-ring circle {
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .progress-ring .bg {
+            stroke: var(--particle-color);
+            opacity: 0.2;
+        }
+
+        .progress-ring .progress {
+            stroke: url(#progressGradient);
+            stroke-linecap: round;
+            stroke-dasharray: 1005;
+            stroke-dashoffset: 1005;
+            filter: drop-shadow(0 0 4px var(--particle-glow));
+        }
+
+        .data-streams {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            opacity: 0;
+        }
+
+        .data-line {
+            position: absolute;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--particle-color), transparent);
+            animation: dataStream 2s linear infinite;
+        }
+
+        .loading-dots {
+            position: absolute;
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+        }
+
+        .loading-dots .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            animation: dotBounce 0.6s ease-in-out infinite;
+        }
+
+        .loading-dots .dot:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .loading-dots .dot:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .warmup-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 10000;
+            opacity: 1;
+            background: radial-gradient(ellipse at center, #0d1a2d 0%, #050810 100%);
+            transition: opacity 0.3s ease-out;
+        }
+
+        .warmup-text {
+            color: #a7dff4;
+            font-size: 14px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .warmup-bar-container {
+            width: 200px;
+            height: 3px;
+            background: rgba(14, 165, 233, 0.2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .warmup-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-cyan));
+            border-radius: 3px;
+            transition: width 0.1s ease-out;
+        }
+
+        .warmup-overlay.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .animate-ring {
+            animation: ringExpand 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+        }
+
+        .animate-logo {
+            animation: logoReveal 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+        }
+
+        .animate-text {
+            animation: textSlideUp 0.6s ease-out forwards !important;
+        }
+
+        .animate-success {
+            animation: successReveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+        }
+
+        .animate-exit {
+            animation: containerExit 0.4s ease-out forwards !important;
+        }
+
+        .animate-progress {
+            animation: progressFill 2.5s ease-out forwards !important;
+        }
+
+        .play-checkmark {
+            animation-play-state: running !important;
+        }
+
+        .animate-loading {
+            animation: fadeIn 0.3s ease-out forwards !important;
+        }
+
+        @@keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        @@keyframes ringGlow {
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        @@keyframes ringSpin {
+            to {
+                transform: scale(1) rotate(360deg);
+            }
+        }
+
+        @@keyframes counterSpin {
+            to {
+                transform: rotate(-360deg);
+            }
+        }
+
+        @@keyframes pulseRing {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1.3);
+                opacity: 0;
+            }
+        }
+
+        @@keyframes shimmer {
+            to {
+                background-position: 200% center;
+            }
+        }
+
+        @@keyframes checkmarkDraw {
+            0% {
+                width: 0;
+                height: 0;
+            }
+
+            50% {
+                width: 45px;
+                height: 0;
+            }
+
+            100% {
+                width: 45px;
+                height: 25px;
+            }
+        }
+
+        @@keyframes successPulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1.4);
+                opacity: 0;
+            }
+        }
+
+        @@keyframes dataStream {
+            0% {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateX(100vw);
+                opacity: 0;
+            }
+        }
+
+        @@keyframes dotBounce {
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-15px);
+            }
+        }
+
+        @@keyframes logoReveal {
+            0% {
+                opacity: 0;
+                transform: scale(0.3) rotateY(180deg);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.1) rotateY(0deg);
+            }
+
+            70% {
+                transform: scale(0.95) rotateY(0deg);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) rotateY(0deg);
+            }
+        }
+
+        @@keyframes ringExpand {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @@keyframes textSlideUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @@keyframes successReveal {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.05);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @@keyframes containerExit {
+            0% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        @@keyframes progressFill {
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        @@media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <svg width="0" height="0" aria-hidden="true">
+        <defs>
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#0ea5e9" />
+                <stop offset="50%" style="stop-color:#06b6d4" />
+                <stop offset="100%" style="stop-color:#0ea5e9" />
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <div id="transition-container" aria-label="Login transition">
+        <canvas id="particle-canvas"></canvas>
+        <div class="data-streams" id="data-streams"></div>
+
+        <svg class="progress-ring" id="progress-ring" viewBox="0 0 320 320">
+            <circle class="bg" cx="160" cy="160" r="160" />
+            <circle class="progress" id="progress-circle" cx="160" cy="160" r="160" />
+        </svg>
+
+        <div class="logo-ring" id="logo-ring">
+            <div class="inner-ring"></div>
+        </div>
+
+        <div class="rx-container" id="rx-container">
+            <span class="rx-symbol">Rx</span>
+        </div>
+
+        <div class="brand-text" id="brand-text">
+            <div class="dirx-text">DiRX</div>
+        </div>
+
+        <div class="loading-dots" id="loading-dots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
+
+        <div class="success-container" id="success-container">
+            <div class="checkmark-circle">
+                <div class="checkmark" id="checkmark"></div>
+            </div>
+            <div class="welcome-text">Welcome</div>
+        </div>
+    </div>
+
+    <noscript>
+        <meta http-equiv="refresh" content="0;url=@nextUrl" />
+    </noscript>
+
+    <script>
+        const redirectUrl = @Html.Raw(JsonSerializer.Serialize(nextUrl));
+        const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        class ParticleSystem {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext("2d");
+                this.particles = [];
+                this.running = false;
+                this.resize();
+                this.init();
+                window.addEventListener("resize", () => this.resize());
+            }
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                this.centerX = this.canvas.width / 2;
+                this.centerY = this.canvas.height / 2;
+            }
+
+            init() {
+                const particleCount = 80;
+                for (let i = 0; i < particleCount; i++) {
+                    this.particles.push(this.createParticle());
+                }
+            }
+
+            createParticle() {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 150 + Math.random() * 300;
+                return {
+                    x: this.centerX + Math.cos(angle) * distance,
+                    y: this.centerY + Math.sin(angle) * distance,
+                    radius: Math.random() * 2 + 1,
+                    opacity: Math.random() * 0.5 + 0.2,
+                    pulse: Math.random() * Math.PI * 2,
+                    pulseSpeed: 0.02 + Math.random() * 0.03
+                };
+            }
+
+            getParticleColor() {
+                return "rgba(79, 195, 247, {opacity})";
+            }
+
+            start() {
+                if (!this.running) {
+                    this.running = true;
+                    this.animate();
+                }
+            }
+
+            stop() {
+                this.running = false;
+            }
+
+            animate() {
+                if (!this.running) {
+                    return;
+                }
+
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                this.particles.forEach((particle, index) => {
+                    particle.pulse += particle.pulseSpeed;
+                    const pulseFactor = Math.sin(particle.pulse) * 0.3 + 0.7;
+
+                    this.ctx.beginPath();
+                    this.ctx.arc(particle.x, particle.y, particle.radius * pulseFactor, 0, Math.PI * 2);
+                    this.ctx.fillStyle = this.getParticleColor().replace("{opacity}", (particle.opacity * pulseFactor).toString());
+                    this.ctx.fill();
+
+                    this.particles.slice(index + 1).forEach((otherParticle) => {
+                        const dx = particle.x - otherParticle.x;
+                        const dy = particle.y - otherParticle.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < 120) {
+                            this.ctx.beginPath();
+                            this.ctx.moveTo(particle.x, particle.y);
+                            this.ctx.lineTo(otherParticle.x, otherParticle.y);
+                            this.ctx.strokeStyle = this.getParticleColor().replace("{opacity}", (0.1 * (1 - distance / 120)).toString());
+                            this.ctx.stroke();
+                        }
+                    });
+
+                    const dx = particle.x - this.centerX;
+                    const dy = particle.y - this.centerY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const orbitSpeed = 0.0003 * (200 / distance);
+                    const angle = Math.atan2(dy, dx) + orbitSpeed;
+                    particle.x = this.centerX + Math.cos(angle) * distance;
+                    particle.y = this.centerY + Math.sin(angle) * distance;
+                });
+
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        function createDataStreams() {
+            const container = document.getElementById("data-streams");
+            container.innerHTML = "";
+            for (let i = 0; i < 8; i++) {
+                const line = document.createElement("div");
+                line.className = "data-line";
+                line.style.top = `${10 + i * 12}%`;
+                line.style.width = `${100 + Math.random() * 200}px`;
+                line.style.animationDelay = `${Math.random() * 2}s`;
+                line.style.animationDuration = `${1.5 + Math.random() * 1}s`;
+                container.appendChild(line);
+            }
+        }
+
+        let particleSystem = null;
+
+        function initVisualizer() {
+            const canvas = document.getElementById("particle-canvas");
+            particleSystem = new ParticleSystem(canvas);
+            createDataStreams();
+        }
+
+        function startTransition() {
+            if (reducedMotion) {
+                window.setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 220);
+                return;
+            }
+
+            const warmupOverlay = document.createElement("div");
+            warmupOverlay.className = "warmup-overlay";
+            warmupOverlay.innerHTML = `
+                <div class="warmup-text">Initializing Portal</div>
+                <div class="warmup-bar-container">
+                    <div class="warmup-bar" id="warmup-bar"></div>
+                </div>
+            `;
+            document.body.appendChild(warmupOverlay);
+
+            const container = document.getElementById("transition-container");
+            if (!particleSystem) {
+                initVisualizer();
+            }
+
+            const warmupBar = document.getElementById("warmup-bar");
+            let progress = 0;
+            container.style.display = "flex";
+            container.style.visibility = "hidden";
+            particleSystem.start();
+
+            const progressInterval = window.setInterval(() => {
+                progress += 8;
+                warmupBar.style.width = Math.min(progress, 100) + "%";
+            }, 30);
+
+            window.setTimeout(() => {
+                window.clearInterval(progressInterval);
+                warmupBar.style.width = "100%";
+                warmupOverlay.classList.add("fade-out");
+                container.style.visibility = "visible";
+
+                window.setTimeout(() => warmupOverlay.remove(), 300);
+                runTransitionSequence(container);
+            }, 400);
+        }
+
+        function runTransitionSequence(container) {
+            const elements = {
+                container,
+                ring: document.getElementById("logo-ring"),
+                rx: document.getElementById("rx-container"),
+                brand: document.getElementById("brand-text"),
+                progress: document.getElementById("progress-ring"),
+                progressCircle: document.getElementById("progress-circle"),
+                streams: document.getElementById("data-streams"),
+                loading: document.getElementById("loading-dots"),
+                success: document.getElementById("success-container"),
+                checkmark: document.getElementById("checkmark")
+            };
+
+            Object.values(elements).forEach((element) => {
+                if (element && element.classList) {
+                    element.classList.remove(
+                        "animate-ring",
+                        "animate-logo",
+                        "animate-text",
+                        "animate-success",
+                        "animate-exit",
+                        "animate-progress",
+                        "animate-loading"
+                    );
+                }
+            });
+
+            elements.ring.style.opacity = "0";
+            elements.rx.style.opacity = "0";
+            elements.brand.style.opacity = "0";
+            elements.progress.style.opacity = "0";
+            elements.streams.style.opacity = "0";
+            elements.loading.style.opacity = "0";
+            elements.success.style.opacity = "0";
+
+            const sequence = [
+                {
+                    delay: 50,
+                    action: () => {
+                        elements.streams.style.opacity = "1";
+                        elements.progress.style.opacity = "1";
+                        elements.progressCircle.classList.add("animate-progress");
+                    }
+                },
+                { delay: 300, action: () => elements.ring.classList.add("animate-ring") },
+                { delay: 750, action: () => elements.rx.classList.add("animate-logo") },
+                { delay: 1200, action: () => elements.brand.classList.add("animate-text") },
+                { delay: 1700, action: () => elements.loading.classList.add("animate-loading") },
+                {
+                    delay: 2400,
+                    action: () => {
+                        elements.loading.style.opacity = "0";
+                        elements.ring.style.opacity = "0";
+                        elements.rx.style.opacity = "0";
+                        elements.brand.style.opacity = "0";
+                        elements.progress.style.opacity = "0";
+                        elements.success.classList.add("animate-success");
+                        window.setTimeout(() => elements.checkmark.classList.add("play-checkmark"), 100);
+                    }
+                },
+                {
+                    delay: 3000,
+                    action: () => {
+                        particleSystem.stop();
+                        elements.streams.style.transition = "opacity 0.3s ease-out";
+                        elements.streams.style.opacity = "0";
+                        elements.success.style.transition = "opacity 0.3s ease-out";
+                        elements.success.style.opacity = "0";
+                    }
+                },
+                {
+                    delay: 3200,
+                    action: () => {
+                        elements.container.classList.add("animate-exit");
+                    }
+                },
+                {
+                    delay: 3650,
+                    action: () => {
+                        window.location.href = redirectUrl;
+                    }
+                }
+            ];
+
+            sequence.forEach(({ delay, action }) => window.setTimeout(action, delay));
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            try {
+                startTransition();
+            } catch (error) {
+                console.error("Transition failed, redirecting:", error);
+                window.location.href = redirectUrl;
+            }
+        });
+    </script>
+</body>
+</html>

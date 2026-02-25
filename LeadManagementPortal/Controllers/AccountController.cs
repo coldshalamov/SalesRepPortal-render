@@ -1,4 +1,5 @@
 using LeadManagementPortal.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -41,7 +42,8 @@ namespace LeadManagementPortal.Controllers
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in.");
-                    return RedirectToLocal(returnUrl);
+                    var nextUrl = GetLocalRedirectUrl(returnUrl);
+                    return RedirectToAction(nameof(LoginTransition), new { next = nextUrl });
                 }
                 if (result.IsLockedOut)
                 {
@@ -70,6 +72,14 @@ namespace LeadManagementPortal.Controllers
 
         public IActionResult AccessDenied()
         {
+            return View();
+        }
+
+        [HttpGet]
+        [Authorize]
+        public IActionResult LoginTransition(string? next = null)
+        {
+            ViewData["NextUrl"] = GetLocalRedirectUrl(next);
             return View();
         }
 
@@ -110,16 +120,14 @@ namespace LeadManagementPortal.Controllers
             return View(model);
         }
 
-        private IActionResult RedirectToLocal(string? returnUrl)
+        private string GetLocalRedirectUrl(string? returnUrl)
         {
             if (Url.IsLocalUrl(returnUrl))
             {
-                return Redirect(returnUrl);
+                return returnUrl!;
             }
-            else
-            {
-                return RedirectToAction("Index", "Dashboard");
-            }
+
+            return Url.Action("Index", "Dashboard") ?? "/Dashboard";
         }
     }
 

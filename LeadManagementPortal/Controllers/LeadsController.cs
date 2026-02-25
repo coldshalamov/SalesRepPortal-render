@@ -20,6 +20,7 @@ namespace LeadManagementPortal.Controllers
         private readonly IAddressService _addressService;
         private readonly ILeadAuditService _leadAuditService;
         private readonly ISalesOrgService _salesOrgService;
+        private readonly INotificationService _notificationService;
 
         public LeadsController(
             ILeadService leadService,
@@ -28,7 +29,8 @@ namespace LeadManagementPortal.Controllers
             UserManager<ApplicationUser> userManager,
             IAddressService addressService,
             ILeadAuditService leadAuditService,
-            ISalesOrgService salesOrgService)
+            ISalesOrgService salesOrgService,
+            INotificationService notificationService)
         {
             _leadService = leadService;
             _salesGroupService = salesGroupService;
@@ -37,6 +39,7 @@ namespace LeadManagementPortal.Controllers
             _addressService = addressService;
             _leadAuditService = leadAuditService;
             _salesOrgService = salesOrgService;
+            _notificationService = notificationService;
         }
 
         public async Task<IActionResult> Index(string? searchTerm, string? status, List<LeadStatus>? statuses, string? salesGroupId, int? salesOrgId, string? salesRepId)
@@ -280,6 +283,19 @@ namespace LeadManagementPortal.Controllers
             if (ok)
             {
                 await _leadAuditService.LogAsync(lead, adminUser.Id, "Reassign", $"from={model.CurrentAssigneeId} to={model.NewAssigneeId}");
+
+                // Notify newly assigned rep
+                if (!string.IsNullOrEmpty(model.NewAssigneeId) && model.NewAssigneeId != adminUser.Id)
+                {
+                    await _notificationService.NotifyUserAsync(
+                        model.NewAssigneeId,
+                        "lead_assigned",
+                        "Lead Reassigned to You",
+                        $"The lead for {lead.Company} has been reassigned to you.",
+                        $"/Leads/Details/{lead.Id}"
+                    );
+                }
+
                 TempData["SuccessMessage"] = "Lead reassigned successfully.";
                 return RedirectToAction(nameof(Details), new { id = lead.Id });
             }
@@ -398,6 +414,28 @@ namespace LeadManagementPortal.Controllers
                 if (await _leadService.CreateAsync(lead))
                 {
                     await _leadAuditService.LogAsync(lead, userId, "Create", $"AssignedTo={lead.AssignedToId};Group={lead.SalesGroupId}");
+
+                    // Notify the assigned rep if it's someone else
+                    if (!string.IsNullOrEmpty(lead.AssignedToId) && lead.AssignedToId != userId)
+                    {
+                        await _notificationService.NotifyUserAsync(
+                            lead.AssignedToId,
+                            "lead_assigned",
+                            "New Lead Assigned to You",
+                            $"You have been assigned a new lead: {lead.Company} ({lead.FirstName} {lead.LastName})",
+                            $"/Leads/Details/{lead.Id}"
+                        );
+                    }
+
+                    // Notify org admins of any new lead
+                    await _notificationService.NotifyRoleAsync(
+                        UserRoles.OrganizationAdmin,
+                        "lead_created",
+                        "New Lead Created",
+                        $"A new lead was created: {lead.Company} ({lead.FirstName} {lead.LastName})",
+                        $"/Leads/Details/{lead.Id}"
+                    );
+
                     TempData["SuccessMessage"] = "Lead created successfully!";
                     return RedirectToAction(nameof(Index));
                 }
@@ -704,10 +742,24 @@ namespace LeadManagementPortal.Controllers
         public async Task<IActionResult> GrantExtension(string id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
-            
+            var extLead = await _leadService.GetByIdAsync(id);
+
             if (await _leadService.GrantExtensionAsync(id, userId))
             {
                 await _leadAuditService.LogAsync(id, userId, "GrantExtension", "Extension granted");
+
+                // Notify the assigned rep
+                if (extLead != null && !string.IsNullOrEmpty(extLead.AssignedToId) && extLead.AssignedToId != userId)
+                {
+                    await _notificationService.NotifyUserAsync(
+                        extLead.AssignedToId,
+                        "lead_extended",
+                        "Lead Extension Granted",
+                        $"An extension was granted for your lead: {extLead.Company}.",
+                        $"/Leads/Details/{id}"
+                    );
+                }
+
                 TempData["SuccessMessage"] = "Extension granted successfully!";
             }
             else
@@ -724,10 +776,24 @@ namespace LeadManagementPortal.Controllers
         public async Task<IActionResult> Convert(string id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var convLead = await _leadService.GetByIdAsync(id);
 
             if (await _leadService.ConvertToCustomerAsync(id, userId))
             {
                 await _leadAuditService.LogAsync(id, userId, "Convert", "Converted to customer");
+
+                // Notify the assigned rep
+                if (convLead != null && !string.IsNullOrEmpty(convLead.AssignedToId) && convLead.AssignedToId != userId)
+                {
+                    await _notificationService.NotifyUserAsync(
+                        convLead.AssignedToId,
+                        "lead_converted",
+                        "Lead Converted to Customer!",
+                        $"Your lead {convLead.Company} has been converted to a customer.",
+                        "/Customers"
+                    );
+                }
+
                 TempData["SuccessMessage"] = "Lead converted to customer successfully!";
                 return RedirectToAction("Index", "Customers");
             }
