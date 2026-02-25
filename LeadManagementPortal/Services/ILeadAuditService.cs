@@ -7,5 +7,6 @@ namespace LeadManagementPortal.Services
         Task LogAsync(string leadId, string? userId, string action, string? details = null);
         Task LogAsync(Lead lead, string? userId, string action, string? details = null)
             => LogAsync(lead.Id, userId, action, details);
+        Task<List<LeadAudit>> GetForLeadAsync(string leadId);
     }
 }

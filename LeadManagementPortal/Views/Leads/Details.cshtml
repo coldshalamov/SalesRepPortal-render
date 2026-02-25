@@ -245,6 +245,62 @@ else if (Model.UrgencyLevel == "Medium" && !Model.IsExpired && Model.Status != L
     </div>
 </div>
 
+<!-- Activity Timeline -->
+@{
+    var auditTrail = ViewBag.AuditTrail as List<LeadAudit> ?? new List<LeadAudit>();
+}
+<div class="card mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Activity Timeline</h5>
+        <small class="text-muted">@auditTrail.Count event(s)</small>
+    </div>
+    <div class="card-body p-0">
+        @if (auditTrail.Any())
+        {
+            <div class="lead-timeline px-3 py-2">
+                @foreach (var entry in auditTrail)
+                {
+                    var (icon, colorClass) = entry.Action switch
+                    {
+                        "Create"         => ("bi-plus-circle-fill", "text-success"),
+                        "Convert"        => ("bi-check-circle-fill", "text-success"),
+                        "Reassign"       => ("bi-arrow-left-right", "text-warning"),
+                        "GrantExtension" => ("bi-calendar-plus-fill", "text-info"),
+                        "Expire"         => ("bi-hourglass-split", "text-danger"),
+                        "AddFollowUp"    => ("bi-calendar-event-fill", "text-primary"),
+                        "CompleteFollowUp" => ("bi-check2-square", "text-success"),
+                        "DeleteFollowUps"  => ("bi-trash-fill", "text-danger"),
+                        _                => ("bi-pencil-fill", "text-secondary")
+                    };
+                    <div class="timeline-item d-flex gap-3 py-2">
+                        <div class="timeline-icon flex-shrink-0 pt-1">
+                            <i class="bi @icon @colorClass fs-5"></i>
+                        </div>
+                        <div class="flex-grow-1 border-bottom pb-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong>@entry.Action</strong>
+                                <small class="text-muted text-nowrap ms-3">@entry.OccurredAtUtc.ToString("MMM dd, yyyy HH:mm") UTC</small>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(entry.Details))
+                            {
+                                <div class="text-muted small mt-1">@entry.Details</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(entry.UserEmail))
+                            {
+                                <div class="small"><i class="bi bi-person"></i> @entry.UserEmail</div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="text-muted text-center py-3 mb-0">No activity recorded yet.</p>
+        }
+    </div>
+</div>
+
 <div id="lead-documents" data-lead-id="@Model.Id"></div>
 
 @section Scripts {

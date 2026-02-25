@@ -25,6 +25,7 @@
         lastName = lead.LastName,
         email = lead.Email,
         phone = lead.Phone,
+        notes = lead.Notes,
         assignedRep = lead.AssignedTo?.FullName ?? lead.AssignedTo?.Email ?? "-",
         salesOrg = lead.AssignedTo?.SalesOrg?.Name ?? "-",
         status = lead.Status.ToString(),
@@ -73,7 +74,10 @@
     <div class="col">
         <h2><i class="bi bi-people"></i> Leads</h2>
     </div>
-    <div class="col-auto">
+    <div class="col-auto d-flex gap-2">
+        <a asp-action="Export" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Export to CSV
+        </a>
         <a asp-action="Create" class="btn btn-primary">
             <i class="bi bi-plus-circle"></i> New Lead
         </a>
@@ -332,6 +336,10 @@
                     <div class="col-md-6">
                         <div class="pipeline-detail-label">Sales Org</div>
                         <div id="pipelineDetailOrg" class="pipeline-detail-value"></div>
+                    </div>
+                    <div class="col-12">
+                        <div class="pipeline-detail-label">Notes</div>
+                        <div id="pipelineDetailNotes" class="pipeline-detail-value text-muted">-</div>
                     </div>
                 </div>
 

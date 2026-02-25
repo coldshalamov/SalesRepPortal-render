@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  SOLUTION_PATH: "LeadManagementPortal.sln"
+  TEST_PROJECT: "LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj"
+  # Safety: exclude the local dev DB seeding helper from automated runs.
+  TEST_FILTER: "FullyQualifiedName!~LeadManagementPortal.Tests.LocalSeeder"
+
+jobs:
+  build-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore / Build / Test
+        uses: ./.github/actions/dotnet-ci
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          solution-path: ${{ env.SOLUTION_PATH }}
+          test-project-path: ${{ env.TEST_PROJECT }}
+          configuration: Release
+          test-filter: ${{ env.TEST_FILTER }}
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults
+          if-no-files-found: ignore
+
+  dependency-vuln-scan:
+    name: Dependency Vulnerability Scan (Advisory)
+    runs-on: ubuntu-latest
+    # This job is best-effort because vulnerability feeds can change rapidly; it is still useful signal on PRs.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Scan
+        run: dotnet list ${{ env.SOLUTION_PATH }} package --vulnerable --include-transitive
+
+  publish-check:
+    name: Publish Check
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Publish
+        run: dotnet publish LeadManagementPortal/LeadManagementPortal.csproj -c Release --no-restore -o out

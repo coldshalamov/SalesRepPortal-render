@@ -34,7 +34,7 @@
     return;
   }
 
-  const columnStatuses = ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Lost"];
+  const columnStatuses = ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Converted", "Lost"];
   const activeStatuses = ["New", "Contacted", "Qualified", "Proposal", "Negotiation"];
   const stageLabels = {
     New: "New Lead",
@@ -58,6 +58,7 @@
     selectedLeadId: null,
     dragLeadId: null
   };
+  const viewStorageKey = "leadsPipelinePreferredView";
 
   function normalizeLead(lead) {
     const tasks = Array.isArray(lead.tasks) ? lead.tasks.map(normalizeTask) : [];
@@ -165,13 +166,22 @@
       const leads = state.leads.filter((lead) => normalizeStatus(lead.status) === status);
       const cards = leads.map((lead) => {
         const fullName = [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() || "No contact";
-        const daysLabel = lead.isExpired ? "Expired" : `${Math.max(0, Number(lead.daysRemaining || 0))} days`;
+        const normalizedStatus = normalizeStatus(lead.status);
+        const daysLabel = lead.isExpired
+          ? "Expired"
+          : normalizedStatus === "Converted"
+            ? "Converted"
+            : `${Math.max(0, Number(lead.daysRemaining || 0))} days`;
         const pendingTasks = getPendingTasks(lead);
         const overdueCount = getOverdueCount(lead);
         const nextTask = pendingTasks[0];
         const taskSummary = nextTask
           ? `${nextTask.type.toUpperCase()}: ${nextTask.description.substring(0, 35)}${nextTask.description.length > 35 ? "..." : ""}`
           : "No open tasks";
+        const notes = String(lead.notes || "").trim();
+        const notesPreview = notes
+          ? `${notes.substring(0, 60)}${notes.length > 60 ? "..." : ""}`
+          : "";
 
         return `
           <article class="pipeline-card" draggable="true" data-lead-id="${escapeHtml(lead.id)}">
@@ -200,6 +210,7 @@
                 <span class="pipeline-meta-value">${escapeHtml(taskSummary)}</span>
               </div>
             </div>
+            ${notesPreview ? `<div class="pipeline-card-notes">${escapeHtml(notesPreview)}</div>` : ""}
           </article>
         `;
       }).join("");
@@ -303,18 +314,24 @@
       tableBtn.classList.toggle("btn-primary", !isPipeline);
       tableBtn.classList.toggle("btn-outline-primary", isPipeline);
     }
+
+    try {
+      localStorage.setItem(viewStorageKey, isPipeline ? "pipeline" : "table");
+    } catch {
+      // Ignore storage issues (privacy mode / blocked storage).
+    }
   }
 
   function renderModalStageButtons(lead) {
     const container = document.getElementById("pipelineStageButtons");
     if (!container || !lead) return;
-    const statuses = columnStatuses.slice();
-    if (config.canConvert) statuses.push("Converted");
+    const statuses = ["New", "Contacted", "Qualified", "Proposal", "Negotiation", "Lost", "Converted"];
 
     container.innerHTML = statuses.map((status) => {
       const isCurrent = normalizeStatus(lead.status) === status;
+      const isConvertBlocked = status === "Converted" && !config.canConvert;
       const buttonClass = isCurrent ? "btn btn-primary btn-sm" : "btn btn-outline-secondary btn-sm";
-      return `<button type="button" class="${buttonClass}" data-target-status="${status}" data-pipeline-stage-btn="1">${escapeHtml(stageLabels[status])}</button>`;
+      return `<button type="button" class="${buttonClass}" data-target-status="${status}" data-pipeline-stage-btn="1" ${isConvertBlocked ? "disabled" : ""}>${escapeHtml(stageLabels[status])}</button>`;
     }).join("");
   }
 
@@ -497,6 +514,7 @@
     setText("pipelineDetailPhone", lead.phone || "-");
     setText("pipelineDetailRep", lead.assignedRep || "-");
     setText("pipelineDetailOrg", lead.salesOrg || "-");
+    setText("pipelineDetailNotes", String(lead.notes || "").trim() || "-");
 
     renderModalStageButtons(lead);
     renderTasksList(lead);
@@ -569,6 +587,10 @@
       const targetStatus = column.getAttribute("data-status");
       const leadId = event.dataTransfer?.getData("text/plain") || state.dragLeadId;
       if (!targetStatus || !leadId) return;
+      if (targetStatus === "Converted" && !config.canConvert) {
+        showToast("Only organization admins can convert leads.", "danger");
+        return;
+      }
       await updateLeadStatus(leadId, targetStatus, false);
     });
 
@@ -632,5 +654,11 @@
   renderBoard();
   updateStats();
   bindEvents();
-  setView("pipeline");
+  let preferredView = "pipeline";
+  try {
+    preferredView = localStorage.getItem(viewStorageKey) === "table" ? "table" : "pipeline";
+  } catch {
+    preferredView = "pipeline";
+  }
+  setView(preferredView);
 })();

@@ -39,6 +39,9 @@ For every new commit in this sandbox repo, append an entry with:
     - Status update endpoint
     - Follow-up task add/complete/delete workflow
     - Overdue follow-up visibility in pipeline stats
+    - Converted-stage visibility in board columns
+    - Notes preview in pipeline cards and detail modal
+    - User-friendly board/table view preference persistence
     - Explicit sandbox-to-prod portability guardrails in docs/instructions
 - Classification: **Portable with edits**
 - Exact port action:

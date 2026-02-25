@@ -32,5 +32,13 @@ namespace LeadManagementPortal.Services
             _context.LeadAudits.Add(audit);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<List<LeadAudit>> GetForLeadAsync(string leadId)
+        {
+            return await _context.LeadAudits
+                .Where(a => a.LeadId == leadId)
+                .OrderByDescending(a => a.OccurredAtUtc)
+                .ToListAsync();
+        }
     }
 }

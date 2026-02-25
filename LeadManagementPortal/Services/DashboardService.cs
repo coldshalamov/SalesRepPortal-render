@@ -78,10 +78,20 @@ namespace LeadManagementPortal.Services
 
             var criticalLeads = leads.Count(l => l.UrgencyLevel == "Critical" && l.Status != LeadStatus.Converted && !l.IsExpired);
             var highPriorityLeads = leads.Count(l => l.UrgencyLevel == "High" && l.Status != LeadStatus.Converted && !l.IsExpired);
+            var lowPriorityLeads = leads.Count(l => l.UrgencyLevel == "Low" && l.Status != LeadStatus.Converted && !l.IsExpired);
 
             var totalCustomers = customers.Count;
             var conversionRate = totalLeads > 0 ? (decimal)convertedLeads / totalLeads * 100 : 0;
             var averageDaysToConvert = customers.Any() ? customers.Average(c => c.DaysToConvert) : 0;
+
+            // Build last-30-day conversion trend
+            var cutoff = DateTime.UtcNow.AddDays(-30);
+            var trend = customers
+                .Where(c => c.ConversionDate >= cutoff)
+                .GroupBy(c => c.ConversionDate.Date)
+                .OrderBy(g => g.Key)
+                .Select(g => new ConversionDataPoint(g.Key.ToString("MMM dd"), g.Count()))
+                .ToList();
 
             return new DashboardStats
             {
@@ -91,9 +101,11 @@ namespace LeadManagementPortal.Services
                 ExpiredLeads = expiredLeads,
                 CriticalLeads = criticalLeads,
                 HighPriorityLeads = highPriorityLeads,
+                LowPriorityLeads = lowPriorityLeads,
                 TotalCustomers = totalCustomers,
                 ConversionRate = Math.Round(conversionRate, 2),
-                AverageDaysToConvert = Math.Round(averageDaysToConvert, 1)
+                AverageDaysToConvert = Math.Round(averageDaysToConvert, 1),
+                ConversionTrend = trend
             };
         }
     }

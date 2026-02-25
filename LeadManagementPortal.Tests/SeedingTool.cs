@@ -14,7 +14,9 @@ namespace LeadManagementPortal.Tests
 {
     public class LocalSeeder
     {
-        [Fact]
+        // Local-only helper that can point at a real SQL Server connection string.
+        // It is intentionally excluded from automated CI runs.
+        [Fact(Skip = "Manual local database seeding helper; not part of automated test suite.")]
         public async Task SeedDatabase()
         {
             var config = new ConfigurationBuilder()

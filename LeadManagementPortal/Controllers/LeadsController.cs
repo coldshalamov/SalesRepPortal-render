@@ -417,6 +417,8 @@ namespace LeadManagementPortal.Controllers
                 return Forbid();
             }
 
+            ViewBag.AuditTrail = await _leadAuditService.GetForLeadAsync(id);
+
             return View(lead);
         }
 
@@ -1195,6 +1197,49 @@ namespace LeadManagementPortal.Controllers
             return Json(reps.Select(u => new { id = u.Id, fullName = u.FullName }));
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Export()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+            var leads = await _leadService.GetByUserAsync(userId, userRole);
+
+            var stream = new System.IO.MemoryStream();
+            using (var writer = new System.IO.StreamWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+            using (var csv = new CsvHelper.CsvWriter(writer, System.Globalization.CultureInfo.InvariantCulture))
+            {
+                csv.WriteHeader<LeadExportRow>();
+                csv.NextRecord();
+                foreach (var lead in leads)
+                {
+                    csv.WriteRecord(new LeadExportRow
+                    {
+                        FirstName       = lead.FirstName,
+                        LastName        = lead.LastName,
+                        Email           = lead.Email,
+                        Phone           = lead.Phone,
+                        Company         = lead.Company,
+                        Address         = lead.Address ?? string.Empty,
+                        City            = lead.City ?? string.Empty,
+                        State           = lead.State ?? string.Empty,
+                        ZipCode         = lead.ZipCode ?? string.Empty,
+                        Status          = lead.Status.ToString(),
+                        UrgencyLevel    = lead.UrgencyLevel,
+                        DaysRemaining   = lead.DaysRemaining,
+                        CreatedDate     = lead.CreatedDate.ToString("yyyy-MM-dd"),
+                        ExpiryDate      = lead.ExpiryDate.ToString("yyyy-MM-dd"),
+                        AssignedTo      = lead.AssignedTo?.Email ?? string.Empty,
+                        Notes           = lead.Notes ?? string.Empty
+                    });
+                    csv.NextRecord();
+                }
+            }
+
+            stream.Position = 0;
+            var fileName = $"Leads_Export_{DateTime.UtcNow:yyyyMMdd}.csv";
+            return File(stream, "text/csv", fileName);
+        }
+
         private static object MapTask(LeadFollowUpTask task)
         {
             return new
@@ -1264,5 +1309,25 @@ namespace LeadManagementPortal.Controllers
 
         [Required]
         public List<int> FollowUpIds { get; set; } = new();
+    }
+
+    public class LeadExportRow
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string Company { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
+        public string ZipCode { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string UrgencyLevel { get; set; } = string.Empty;
+        public int DaysRemaining { get; set; }
+        public string CreatedDate { get; set; } = string.Empty;
+        public string ExpiryDate { get; set; } = string.Empty;
+        public string AssignedTo { get; set; } = string.Empty;
+        public string Notes { get; set; } = string.Empty;
     }
 }
