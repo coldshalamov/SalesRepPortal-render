@@ -8,5 +8,6 @@ namespace LeadManagementPortal.Services
         Task<IReadOnlyList<LeadDocument>> ListAsync(string leadId, CancellationToken ct = default);
         Task<LeadDocument?> GetAsync(int id, CancellationToken ct = default);
         Task<string?> GetDownloadUrlAsync(int id, TimeSpan? expires = null, CancellationToken ct = default);
+        Task<int> DeleteForLeadAsync(string leadId, CancellationToken ct = default);
     }
 }

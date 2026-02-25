@@ -61,5 +61,26 @@ namespace LeadManagementPortal.Services
             var url = await _storage.GetPreSignedDownloadUrlAsync(doc.StorageKey, expires ?? TimeSpan.FromMinutes(10), ct);
             return url;
         }
+
+        public async Task<int> DeleteForLeadAsync(string leadId, CancellationToken ct = default)
+        {
+            var docs = await _db.LeadDocuments
+                .Where(d => d.LeadId == leadId)
+                .ToListAsync(ct);
+
+            if (docs.Count == 0)
+            {
+                return 0;
+            }
+
+            foreach (var doc in docs)
+            {
+                await _storage.DeleteAsync(doc.StorageKey, ct);
+            }
+
+            _db.LeadDocuments.RemoveRange(docs);
+            await _db.SaveChangesAsync(ct);
+            return docs.Count;
+        }
     }
 }
