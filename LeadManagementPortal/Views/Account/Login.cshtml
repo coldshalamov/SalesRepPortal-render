@@ -55,7 +55,7 @@
 
         .corner-stripes {
             position: absolute;
-            top: calc(15% + 80px);
+            top: calc(15% + 120px);
             right: calc(-18% + 35px);
             width: min(76vw, 920px);
             height: min(70vh, 560px);
@@ -142,8 +142,8 @@
             inset: 0;
             pointer-events: none;
             z-index: 0;
-            -webkit-mask-image: linear-gradient(to bottom, transparent, transparent calc(15% + 80px - 180px), black calc(15% + 80px), black 100%);
-            mask-image: linear-gradient(to bottom, transparent, transparent calc(15% + 80px - 180px), black calc(15% + 80px), black 100%);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
+            mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
         }
 
         @@keyframes stripeDrift {
@@ -360,12 +360,12 @@
 
         @@media (max-width: 768px) {
             .stripes-wrapper {
-                -webkit-mask-image: linear-gradient(to bottom, transparent, transparent calc(10% + 20px - 100px), black calc(10% + 20px), black 100%);
-                mask-image: linear-gradient(to bottom, transparent, transparent calc(10% + 20px - 100px), black calc(10% + 20px), black 100%);
+                -webkit-mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
+                mask-image: linear-gradient(to bottom, transparent 0px, black 30px);
             }
 
             .corner-stripes {
-                top: calc(10% + 20px);
+                top: calc(10% + 60px);
                 right: -22%;
                 width: 120vw;
                 height: 50vh;
