@@ -82,13 +82,13 @@ body {
 
 /* ─── Navbar bottom-line tab pattern (GitHub / Vercel style) ───────────────
    The navbar's OWN border-bottom is the persistent full-width line.
-   Nav links use margin-bottom: -3px to reach down and overlap that border.
+   Nav links use margin-bottom: -2px to reach down and overlap that border.
    The active tab's border-bottom sits right on top of it, "lighting" it.
    overflow: visible is required so the negative-margin border isn't clipped.
    ──────────────────────────────────────────────────────────────────────── */
 .navbar {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
-  border-bottom: 3px solid rgba(255, 255, 255, 0.22) !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.35) !important;
   padding-bottom: 0;
   position: relative;
   overflow: visible !important;
@@ -115,18 +115,18 @@ body {
   overflow: visible !important;
 }
 
-/* All nav links: reserve space for the 3px indicator,
+/* All nav links: reserve space for the 2px indicator,
    extend down via negative margin so it overlaps the navbar border-bottom */
 .navbar-dark .navbar-nav .nav-link {
   display: flex;
   align-items: center;
   align-self: stretch;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: -3px;
+  padding: 0.65rem 0.75rem 0.7rem;
+  margin-bottom: -2px;
   /* reach down exactly onto the navbar border */
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.84);
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   transition: color 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
   position: relative;
@@ -135,7 +135,7 @@ body {
 
 .navbar-dark .navbar-nav .nav-link:hover {
   color: #fff;
-  border-bottom-color: rgba(255, 255, 255, 0.65);
+  border-bottom-color: rgba(255, 255, 255, 0.5);
 }
 
 /* Active tab: solid white border paints over its slice of the navbar border */
