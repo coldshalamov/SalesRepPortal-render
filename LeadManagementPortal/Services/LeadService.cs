@@ -506,6 +506,88 @@ namespace LeadManagementPortal.Services
             return await query.OrderByDescending(l => l.CreatedDate).ToListAsync();
         }
 
+        public async Task<IEnumerable<Lead>> SearchTopAsync(string searchTerm, string userId, string userRole, int maxResults)
+        {
+            if (maxResults <= 0)
+            {
+                return new List<Lead>();
+            }
+
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return new List<Lead>();
+            }
+
+            var query = _context.Leads
+                .AsNoTracking()
+                .AsQueryable();
+
+            // Apply role-based filtering
+            if (userRole == UserRoles.OrganizationAdmin)
+            {
+                // No filtering needed
+            }
+            else if (userRole == UserRoles.GroupAdmin)
+            {
+                var salesGroupId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesGroupId)
+                    .FirstOrDefaultAsync();
+
+                if (string.IsNullOrWhiteSpace(salesGroupId))
+                {
+                    return new List<Lead>();
+                }
+
+                query = query.Where(l => l.SalesGroupId == salesGroupId);
+            }
+            else if (userRole == UserRoles.SalesOrgAdmin)
+            {
+                var salesOrgId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesOrgId)
+                    .FirstOrDefaultAsync();
+
+                if (!salesOrgId.HasValue)
+                {
+                    return new List<Lead>();
+                }
+
+                query = query.Where(l => l.AssignedTo != null && l.AssignedTo.SalesOrgId == salesOrgId.Value);
+            }
+            else if (userRole == UserRoles.SalesRep)
+            {
+                query = query.Where(l => l.AssignedToId == userId);
+            }
+            else
+            {
+                return new List<Lead>();
+            }
+
+            // Apply search filter (company + contact info + address + rep email + notes)
+            var term = searchTerm.Trim().ToLowerInvariant();
+            query = query.Where(l =>
+                l.FirstName.ToLower().Contains(term) ||
+                l.LastName.ToLower().Contains(term) ||
+                l.Email.ToLower().Contains(term) ||
+                l.Phone.ToLower().Contains(term) ||
+                (l.Company != null && l.Company.ToLower().Contains(term)) ||
+                (l.Address != null && l.Address.ToLower().Contains(term)) ||
+                (l.City != null && l.City.ToLower().Contains(term)) ||
+                (l.State != null && l.State.ToLower().Contains(term)) ||
+                (l.ZipCode != null && l.ZipCode.ToLower().Contains(term)) ||
+                (l.Notes != null && l.Notes.ToLower().Contains(term)) ||
+                (l.AssignedTo != null && l.AssignedTo.Email != null && l.AssignedTo.Email.ToLower().Contains(term))
+            );
+
+            return await query
+                .OrderByDescending(l => l.CreatedDate)
+                .Take(maxResults)
+                .ToListAsync();
+        }
+
         public async Task<Dictionary<string, List<LeadFollowUpTask>>> GetFollowUpsForLeadsAsync(IEnumerable<string> leadIds, string userId, string userRole)
         {
             var result = new Dictionary<string, List<LeadFollowUpTask>>();

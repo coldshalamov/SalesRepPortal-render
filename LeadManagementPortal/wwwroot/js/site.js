@@ -10,6 +10,15 @@ document.addEventListener("DOMContentLoaded", function () {
     }, 5000);
   });
 
+  // Enable Bootstrap tooltips/popovers globally when present
+  document
+    .querySelectorAll('[data-bs-toggle="tooltip"]')
+    .forEach((el) => new bootstrap.Tooltip(el));
+
+  document
+    .querySelectorAll('[data-bs-toggle="popover"]')
+    .forEach((el) => new bootstrap.Popover(el));
+
   // Dependent dropdown: Sales Orgs by Sales Group - REMOVED (Handled in specific views to avoid conflicts)
 });
 

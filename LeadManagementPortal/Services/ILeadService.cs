@@ -18,6 +18,7 @@ namespace LeadManagementPortal.Services
         Task<bool> GrantExtensionAsync(string leadId, string grantedBy);
         Task ExpireOldLeadsAsync();
         Task<IEnumerable<Lead>> SearchAsync(string searchTerm, string userId, string userRole);
+        Task<IEnumerable<Lead>> SearchTopAsync(string searchTerm, string userId, string userRole, int maxResults);
         Task<Dictionary<string, List<LeadFollowUpTask>>> GetFollowUpsForLeadsAsync(IEnumerable<string> leadIds, string userId, string userRole);
         Task<List<LeadFollowUpTask>> GetFollowUpsForLeadAsync(string leadId, string userId, string userRole);
         Task<LeadFollowUpTask?> AddFollowUpAsync(string leadId, string userId, string userRole, string type, string description, DateTime? dueDate);

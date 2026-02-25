@@ -59,58 +59,110 @@
                     {
                         var navController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
                         var navAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
-                        <ul class="navbar-nav flex-grow-1">
+                        <ul class="navbar-nav me-auto">
                             <li class="nav-item">
-                                <a class="nav-link @(navController == "Dashboard" ? "active" : "")" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                                <a class="nav-link @(navController == "Dashboard" ? "active" : "")" asp-controller="Dashboard" asp-action="Index"
+                                   data-bs-toggle="tooltip" data-bs-placement="bottom" title="View your dashboard and daily stats">
+                                    <i class="bi bi-speedometer2 me-1 nav-icon" aria-hidden="true"></i>Dashboard
+                                </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(navController == "Leads" ? "active" : "")" asp-controller="Leads" asp-action="Index">Leads</a>
+                                <a class="nav-link @(navController == "Leads" ? "active" : "")" asp-controller="Leads" asp-action="Index"
+                                   data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage active leads and prospects">
+                                    <i class="bi bi-person-lines-fill me-1 nav-icon" aria-hidden="true"></i>Leads
+                                </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(navController == "Customers" ? "active" : "")" asp-controller="Customers" asp-action="Index">Customers</a>
+                                <a class="nav-link @(navController == "Customers" ? "active" : "")" asp-controller="Customers" asp-action="Index"
+                                   data-bs-toggle="tooltip" data-bs-placement="bottom" title="View customers and converted leads">
+                                    <i class="bi bi-building me-1 nav-icon" aria-hidden="true"></i>Customers
+                                </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(navController == "Commissions" ? "active" : "")" asp-controller="Commissions" asp-action="Index">Commissions <span class="badge bg-warning text-dark ms-1">New</span></a>
+                                <a class="nav-link @(navController == "Commissions" ? "active" : "")" asp-controller="Commissions" asp-action="Index"
+                                   data-bs-toggle="tooltip" data-bs-placement="bottom" title="Track commissions and payouts">
+                                    <i class="bi bi-cash-coin me-1 nav-icon" aria-hidden="true"></i>Commissions <span class="badge bg-warning text-dark ms-1">New</span>
+                                </a>
                             </li>
                             @if (User.IsInRole("OrganizationAdmin"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="Index">Sales Groups</a>
+                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="Index"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage sales groups">
+                                        <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>Sales Groups
+                                    </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index">Sales Orgs</a>
+                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage sales organizations">
+                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Sales Orgs
+                                    </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index">Users</a>
+                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage users and access">
+                                        <i class="bi bi-person-gear me-1 nav-icon" aria-hidden="true"></i>Users
+                                    </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "Settings" ? "active" : "")" asp-controller="Settings" asp-action="Index">Settings</a>
+                                    <a class="nav-link @(navController == "Settings" ? "active" : "")" asp-controller="Settings" asp-action="Index"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Configure portal settings">
+                                        <i class="bi bi-sliders me-1 nav-icon" aria-hidden="true"></i>Settings
+                                    </a>
                                 </li>
                             }
                             else if (User.IsInRole("GroupAdmin"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="MyGroup">My Group</a>
+                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="MyGroup"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="View your sales group">
+                                        <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>My Group
+                                    </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index">Sales Orgs</a>
+                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="View sales orgs in your group">
+                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Sales Orgs
+                                    </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyGroup">My Group Users</a>
+                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyGroup"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage users in your group">
+                                        <i class="bi bi-person-gear me-1 nav-icon" aria-hidden="true"></i>My Group Users
+                                    </a>
                                 </li>
                             }
                             else if (User.IsInRole("SalesOrgAdmin"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyOrg">My Org Users</a>
+                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyOrg"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage users in your org">
+                                        <i class="bi bi-person-gear me-1 nav-icon" aria-hidden="true"></i>My Org Users
+                                    </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="MyOrgDetails">My Org</a>
+                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="MyOrgDetails"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="View your sales org details">
+                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>My Org
+                                    </a>
                                 </li>
                             }
                         </ul>
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
+
+                        <!-- Command center search -->
+                        <div id="navbarSearch" class="px-sm-3 my-2 my-sm-0">
+                            <div class="position-relative">
+                                <i class="bi bi-search navbar-search-icon" aria-hidden="true"></i>
+                                <span id="navbarSearchStatus" class="navbar-search-status"></span>
+                                <input id="navbarSearchInput" type="search" class="form-control navbar-search-input"
+                                       placeholder="Search leads & customers…"
+                                       autocomplete="off"
+                                       aria-label="Global search" />
+                                <div id="navbarSearchMenu" class="dropdown-menu" aria-hidden="true"></div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center">
                             <!-- Notification Bell -->
                             <div id="notifBellContainer">
                                 <button id="notifBellBtn" type="button" aria-label="Notifications">
@@ -133,8 +185,14 @@
                                     </div>
                                 </div>
                             </div>
-                        }
-                        <ul class="navbar-nav">
+
+                            <a class="btn btn-sm btn-outline-light ms-2"
+                               asp-controller="Leads" asp-action="Create"
+                               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Create a new lead">
+                                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New Lead
+                            </a>
+
+                            <ul class="navbar-nav ms-2">
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-person-circle"></i> @((await UserManager.GetUserAsync(User)) is ApplicationUser u ? (string.IsNullOrWhiteSpace(u.FullName) ? User.Identity.Name : u.FullName) : User.Identity.Name)
@@ -155,6 +213,7 @@
                                 </ul>
                             </li>
                         </ul>
+                        </div>
                     }
                 </div>
             </div>
@@ -193,6 +252,7 @@
     @if (User.Identity?.IsAuthenticated == true)
     {
         <script src="~/js/notifications.js" asp-append-version="true"></script>
+        <script src="~/js/navbar-search.js" asp-append-version="true"></script>
     }
     @await RenderSectionAsync("Scripts", required: false)
 </body>

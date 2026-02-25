@@ -12,6 +12,7 @@ namespace LeadManagementPortal.Services
         Task<bool> CreateAsync(Customer customer);
         Task<bool> UpdateAsync(Customer customer);
         Task<IEnumerable<Customer>> SearchAsync(string searchTerm, string userId, string userRole);
+        Task<IEnumerable<Customer>> SearchTopAsync(string searchTerm, string userId, string userRole, int maxResults);
         Task<bool> SoftDeleteAsync(string id, string deletedByUserId);
         Task<bool> IsDuplicateAsync(Customer customer);
     }

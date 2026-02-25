@@ -89,28 +89,41 @@ namespace LeadManagementPortal.Services
                 // Organization admin sees all customers
                 return await query.OrderByDescending(c => c.ConversionDate).ToListAsync();
             }
-            else if (userRole == UserRoles.GroupAdmin)
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return new List<Customer>();
+            }
+
+            if (userRole == UserRoles.GroupAdmin)
             {
                 // Group admin sees all customers in their group
-                var user = await _context.Users.FindAsync(userId);
-                if (user?.SalesGroupId != null)
+                if (string.IsNullOrWhiteSpace(user.SalesGroupId))
                 {
-                    query = query.Where(c => c.SalesGroupId == user.SalesGroupId);
+                    return new List<Customer>();
                 }
+
+                query = query.Where(c => c.SalesGroupId == user.SalesGroupId);
             }
             else if (userRole == UserRoles.SalesOrgAdmin)
             {
                 // Sales Org Admin sees customers assigned to reps in their org
-                var user = await _context.Users.FindAsync(userId);
-                if (user?.SalesOrgId != null)
+                if (!user.SalesOrgId.HasValue)
                 {
-                    query = query.Where(c => c.SalesRep != null && c.SalesRep.SalesOrgId == user.SalesOrgId);
+                    return new List<Customer>();
                 }
+
+                query = query.Where(c => c.SalesRep != null && c.SalesRep.SalesOrgId == user.SalesOrgId.Value);
             }
             else if (userRole == UserRoles.SalesRep)
             {
                 // Sales rep sees customers they converted OR customers belonging to them
                 query = query.Where(c => c.ConvertedById == userId || c.SalesRepId == userId);
+            }
+            else
+            {
+                return new List<Customer>();
             }
 
             return await query.OrderByDescending(c => c.ConversionDate).ToListAsync();
@@ -203,25 +216,51 @@ namespace LeadManagementPortal.Services
                 .AsQueryable();
 
             // Apply role-based filtering
-            if (userRole == UserRoles.GroupAdmin)
+            if (userRole == UserRoles.OrganizationAdmin)
             {
-                var user = await _context.Users.FindAsync(userId);
-                if (user?.SalesGroupId != null)
+                // No filtering needed
+            }
+            else if (userRole == UserRoles.GroupAdmin)
+            {
+                var salesGroupId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesGroupId)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrWhiteSpace(salesGroupId))
                 {
-                    query = query.Where(c => c.SalesGroupId == user.SalesGroupId);
+                    query = query.Where(c => c.SalesGroupId == salesGroupId);
+                }
+                else
+                {
+                    return new List<Customer>();
                 }
             }
             else if (userRole == UserRoles.SalesOrgAdmin)
             {
-                var user = await _context.Users.FindAsync(userId);
-                if (user?.SalesOrgId != null)
+                var salesOrgId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesOrgId)
+                    .FirstOrDefaultAsync();
+
+                if (salesOrgId.HasValue)
                 {
-                    query = query.Where(c => c.SalesRep != null && c.SalesRep.SalesOrgId == user.SalesOrgId);
+                    query = query.Where(c => c.SalesRep != null && c.SalesRep.SalesOrgId == salesOrgId.Value);
+                }
+                else
+                {
+                    return new List<Customer>();
                 }
             }
             else if (userRole == UserRoles.SalesRep)
             {
                 query = query.Where(c => c.ConvertedById == userId || c.SalesRepId == userId);
+            }
+            else
+            {
+                return new List<Customer>();
             }
 
             // Apply search filter
@@ -250,6 +289,82 @@ namespace LeadManagementPortal.Services
             }
 
             return await query.OrderByDescending(c => c.ConversionDate).ToListAsync();
+        }
+
+        public async Task<IEnumerable<Customer>> SearchTopAsync(string searchTerm, string userId, string userRole, int maxResults)
+        {
+            if (maxResults <= 0)
+            {
+                return new List<Customer>();
+            }
+
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return new List<Customer>();
+            }
+
+            var query = _context.Customers
+                .AsNoTracking()
+                .Where(c => !c.IsDeleted)
+                .AsQueryable();
+
+            // Apply role-based filtering
+            if (userRole == UserRoles.OrganizationAdmin)
+            {
+                // No filtering needed
+            }
+            else if (userRole == UserRoles.GroupAdmin)
+            {
+                var salesGroupId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesGroupId)
+                    .FirstOrDefaultAsync();
+
+                if (string.IsNullOrWhiteSpace(salesGroupId))
+                {
+                    return new List<Customer>();
+                }
+
+                query = query.Where(c => c.SalesGroupId == salesGroupId);
+            }
+            else if (userRole == UserRoles.SalesOrgAdmin)
+            {
+                var salesOrgId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesOrgId)
+                    .FirstOrDefaultAsync();
+
+                if (!salesOrgId.HasValue)
+                {
+                    return new List<Customer>();
+                }
+
+                query = query.Where(c => c.SalesRep != null && c.SalesRep.SalesOrgId == salesOrgId.Value);
+            }
+            else if (userRole == UserRoles.SalesRep)
+            {
+                query = query.Where(c => c.ConvertedById == userId || c.SalesRepId == userId);
+            }
+            else
+            {
+                return new List<Customer>();
+            }
+
+            var term = searchTerm.Trim().ToLowerInvariant();
+            query = query.Where(c =>
+                c.FirstName.ToLower().Contains(term) ||
+                c.LastName.ToLower().Contains(term) ||
+                c.Email.ToLower().Contains(term) ||
+                c.Phone.ToLower().Contains(term) ||
+                (c.Company != null && c.Company.ToLower().Contains(term))
+            );
+
+            return await query
+                .OrderByDescending(c => c.ConversionDate)
+                .Take(maxResults)
+                .ToListAsync();
         }
 
         public async Task<bool> SoftDeleteAsync(string id, string deletedByUserId)
