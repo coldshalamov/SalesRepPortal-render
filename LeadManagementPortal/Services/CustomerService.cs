@@ -17,9 +17,51 @@ namespace LeadManagementPortal.Services
         {
             return await _context.Customers
                 .Include(c => c.ConvertedBy)
-                .Include(c => c.SalesRep)
+                .Include(c => c.SalesRep).ThenInclude(u => u!.SalesOrg)
                 .Include(c => c.SalesGroup)
                 .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+        }
+
+        public async Task<Customer?> GetAccessibleByIdAsync(string id, string userId, string userRole)
+        {
+            var query = _context.Customers
+                .Include(c => c.ConvertedBy)
+                .Include(c => c.SalesRep).ThenInclude(u => u!.SalesOrg)
+                .Include(c => c.SalesGroup)
+                .Where(c => c.Id == id && !c.IsDeleted)
+                .AsQueryable();
+
+            if (userRole == UserRoles.OrganizationAdmin)
+            {
+                return await query.FirstOrDefaultAsync();
+            }
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return null;
+            }
+
+            if (userRole == UserRoles.GroupAdmin)
+            {
+                if (user.SalesGroupId == null) return null;
+                query = query.Where(c => c.SalesGroupId == user.SalesGroupId);
+            }
+            else if (userRole == UserRoles.SalesOrgAdmin)
+            {
+                if (user.SalesOrgId == null) return null;
+                query = query.Where(c => c.SalesRep != null && c.SalesRep.SalesOrgId == user.SalesOrgId);
+            }
+            else if (userRole == UserRoles.SalesRep)
+            {
+                query = query.Where(c => c.ConvertedById == userId || c.SalesRepId == userId);
+            }
+            else
+            {
+                return null;
+            }
+
+            return await query.FirstOrDefaultAsync();
         }
 
         public async Task<IEnumerable<Customer>> GetAllAsync()
@@ -112,6 +154,36 @@ namespace LeadManagementPortal.Services
                     });
                 }
                 _context.Customers.Add(customer);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateAsync(Customer customer)
+        {
+            try
+            {
+                var existing = await _context.Customers.FirstOrDefaultAsync(c => c.Id == customer.Id && !c.IsDeleted);
+                if (existing == null) return false;
+
+                // Only update editable fields. Keep conversion/system fields unchanged.
+                existing.FirstName = customer.FirstName;
+                existing.LastName = customer.LastName;
+                existing.Email = customer.Email;
+                existing.Phone = customer.Phone;
+                existing.Company = customer.Company;
+                existing.Address = customer.Address;
+                existing.City = customer.City;
+                existing.State = customer.State;
+                existing.ZipCode = customer.ZipCode;
+                existing.Notes = customer.Notes;
+                existing.SalesRepId = customer.SalesRepId;
+                existing.SalesGroupId = customer.SalesGroupId;
+
                 await _context.SaveChangesAsync();
                 return true;
             }

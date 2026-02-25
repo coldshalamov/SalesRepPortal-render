@@ -57,53 +57,57 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     @if (User.Identity?.IsAuthenticated == true)
                     {
+                        @{
+                            var navController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+                            var navAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+                        }
                         <ul class="navbar-nav flex-grow-1">
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                                <a class="nav-link @(navController == "Dashboard" ? "active" : "")" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="Leads" asp-action="Index">Leads</a>
+                                <a class="nav-link @(navController == "Leads" ? "active" : "")" asp-controller="Leads" asp-action="Index">Leads</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="Customers" asp-action="Index">Customers</a>
+                                <a class="nav-link @(navController == "Customers" ? "active" : "")" asp-controller="Customers" asp-action="Index">Customers</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="Commissions" asp-action="Index">Commissions <span class="badge bg-warning text-dark ms-1">New</span></a>
+                                <a class="nav-link @(navController == "Commissions" ? "active" : "")" asp-controller="Commissions" asp-action="Index">Commissions <span class="badge bg-warning text-dark ms-1">New</span></a>
                             </li>
                             @if (User.IsInRole("OrganizationAdmin"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="SalesGroups" asp-action="Index">Sales Groups</a>
-                                </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link" asp-controller="SalesOrgs" asp-action="Index">Sales Orgs</a>
-                                    </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Users" asp-action="Index">Users</a>
+                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="Index">Sales Groups</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Settings" asp-action="Index">Settings</a>
+                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index">Sales Orgs</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="Index">Users</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link @(navController == "Settings" ? "active" : "")" asp-controller="Settings" asp-action="Index">Settings</a>
                                 </li>
                             }
                             else if (User.IsInRole("GroupAdmin"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="SalesGroups" asp-action="MyGroup">My Group</a>
+                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="MyGroup">My Group</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="SalesOrgs" asp-action="Index">Sales Orgs</a>
+                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index">Sales Orgs</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Users" asp-action="MyGroup">My Group Users</a>
+                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyGroup">My Group Users</a>
                                 </li>
                             }
                             else if (User.IsInRole("SalesOrgAdmin"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="Users" asp-action="MyOrg">My Org Users</a>
+                                    <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyOrg">My Org Users</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" asp-controller="SalesOrgs" asp-action="MyOrgDetails">My Org</a>
+                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="MyOrgDetails">My Org</a>
                                 </li>
                             }
                         </ul>

@@ -119,6 +119,9 @@
                                         <a asp-action="Details" asp-route-id="@customer.Id" class="btn btn-outline-primary btn-sm">
                                             <i class="bi bi-eye"></i> View
                                         </a>
+                                        <a asp-action="Edit" asp-route-id="@customer.Id" class="btn btn-outline-secondary btn-sm">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </a>
                                         @if (User.IsInRole("OrganizationAdmin"))
                                         {
                                             <form asp-action="Delete" method="post" onsubmit="return confirm('Delete this customer? The original lead will be marked Lost.');" class="d-inline">

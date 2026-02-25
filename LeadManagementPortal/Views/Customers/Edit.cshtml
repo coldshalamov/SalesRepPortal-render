@@ -1,0 +1,120 @@
+@model LeadManagementPortal.Models.ViewModels.CustomerEditViewModel
+@{
+    ViewData["Title"] = "Edit Customer";
+    var canChangeOwner = ViewBag.CanChangeOwner != null && (bool)ViewBag.CanChangeOwner;
+}
+
+<div class="row mb-3">
+    <div class="col">
+        <h2><i class="bi bi-pencil"></i> Edit Customer</h2>
+    </div>
+    <div class="col-auto">
+        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Details
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="Edit" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <h5 class="mb-3"><i class="bi bi-person"></i> Contact</h5>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="FirstName" class="form-label">First Name *</label>
+                    <input asp-for="FirstName" class="form-control" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="LastName" class="form-label">Last Name *</label>
+                    <input asp-for="LastName" class="form-control" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="Email" class="form-label">Email *</label>
+                    <input asp-for="Email" type="email" class="form-control" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Phone" class="form-label">Phone *</label>
+                    <input asp-for="Phone" class="form-control" />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label asp-for="Company" class="form-label">Company</label>
+                    <input asp-for="Company" class="form-control" />
+                    <span asp-validation-for="Company" class="text-danger"></span>
+                </div>
+            </div>
+
+            <h5 class="mb-3 mt-4"><i class="bi bi-geo-alt"></i> Address</h5>
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label asp-for="Address" class="form-label">Address</label>
+                    <input asp-for="Address" class="form-control" />
+                    <span asp-validation-for="Address" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label asp-for="City" class="form-label">City</label>
+                    <input asp-for="City" class="form-control" />
+                    <span asp-validation-for="City" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="State" class="form-label">State</label>
+                    <input asp-for="State" class="form-control" />
+                    <span asp-validation-for="State" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ZipCode" class="form-label">Zip Code</label>
+                    <input asp-for="ZipCode" class="form-control" />
+                    <span asp-validation-for="ZipCode" class="text-danger"></span>
+                </div>
+            </div>
+
+            <h5 class="mb-3 mt-4"><i class="bi bi-chat-left-text"></i> Notes</h5>
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <label asp-for="Notes" class="form-label">Notes</label>
+                    <textarea asp-for="Notes" class="form-control" rows="4"></textarea>
+                    <span asp-validation-for="Notes" class="text-danger"></span>
+                </div>
+            </div>
+
+            @if (canChangeOwner)
+            {
+                <h5 class="mb-3 mt-4"><i class="bi bi-people"></i> Assignment</h5>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label asp-for="SalesRepId" class="form-label">Sales Rep</label>
+                        <select asp-for="SalesRepId" class="form-select" asp-items="ViewBag.SalesReps"></select>
+                        <span asp-validation-for="SalesRepId" class="text-danger"></span>
+                        <small class="text-muted">Owner changes must stay within the same sales organization.</small>
+                    </div>
+                </div>
+            }
+
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

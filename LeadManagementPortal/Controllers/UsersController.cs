@@ -739,6 +739,153 @@ namespace LeadManagementPortal.Controllers
             return View(users);
         }
 
+        private IActionResult RedirectToUserList()
+        {
+            if (User.IsInRole(UserRoles.SalesOrgAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                return RedirectToAction(nameof(MyOrg));
+            }
+            if (User.IsInRole(UserRoles.GroupAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                return RedirectToAction(nameof(MyGroup));
+            }
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = LeadManagementPortal.Models.UserRoles.OrganizationAdmin + "," + LeadManagementPortal.Models.UserRoles.GroupAdmin + "," + LeadManagementPortal.Models.UserRoles.SalesOrgAdmin)]
+        public async Task<IActionResult> PromoteToSalesOrgAdmin(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId)) return NotFound();
+
+            var actor = await _userManager.GetUserAsync(User);
+            if (actor == null) return Challenge();
+
+            var target = await _userManager.FindByIdAsync(userId);
+            if (target == null) return NotFound();
+
+            // Scope checks
+            if (User.IsInRole(UserRoles.GroupAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                if (actor.SalesGroupId == null || target.SalesGroupId != actor.SalesGroupId)
+                {
+                    return Forbid();
+                }
+            }
+            if (User.IsInRole(UserRoles.SalesOrgAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                if (actor.SalesOrgId == null || target.SalesOrgId != actor.SalesOrgId)
+                {
+                    return Forbid();
+                }
+            }
+
+            var targetRoles = await _userManager.GetRolesAsync(target);
+            if (targetRoles.Contains(UserRoles.OrganizationAdmin) || targetRoles.Contains(UserRoles.GroupAdmin))
+            {
+                TempData["ErrorMessage"] = "You cannot change roles for this user.";
+                return RedirectToUserList();
+            }
+
+            if (targetRoles.Contains(UserRoles.SalesOrgAdmin))
+            {
+                TempData["SuccessMessage"] = "User is already a Sales Org Admin.";
+                return RedirectToUserList();
+            }
+
+            if (!targetRoles.Contains(UserRoles.SalesRep))
+            {
+                TempData["ErrorMessage"] = "Only Sales Reps can be promoted to Sales Org Admin.";
+                return RedirectToUserList();
+            }
+
+            if (target.SalesOrgId == null)
+            {
+                TempData["ErrorMessage"] = "User must be assigned to a Sales Org before promotion.";
+                return RedirectToUserList();
+            }
+
+            if (targetRoles.Any())
+            {
+                await _userManager.RemoveFromRolesAsync(target, targetRoles);
+            }
+
+            var addResult = await _userManager.AddToRoleAsync(target, UserRoles.SalesOrgAdmin);
+            if (!addResult.Succeeded)
+            {
+                TempData["ErrorMessage"] = "Failed to promote user.";
+                return RedirectToUserList();
+            }
+
+            TempData["SuccessMessage"] = "User promoted to Sales Org Admin.";
+            return RedirectToUserList();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = LeadManagementPortal.Models.UserRoles.OrganizationAdmin + "," + LeadManagementPortal.Models.UserRoles.GroupAdmin + "," + LeadManagementPortal.Models.UserRoles.SalesOrgAdmin)]
+        public async Task<IActionResult> DemoteToSalesRep(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId)) return NotFound();
+
+            var actor = await _userManager.GetUserAsync(User);
+            if (actor == null) return Challenge();
+
+            var target = await _userManager.FindByIdAsync(userId);
+            if (target == null) return NotFound();
+
+            if (!User.IsInRole(UserRoles.OrganizationAdmin) && actor.Id == target.Id)
+            {
+                TempData["ErrorMessage"] = "You cannot demote yourself.";
+                return RedirectToUserList();
+            }
+
+            // Scope checks
+            if (User.IsInRole(UserRoles.GroupAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                if (actor.SalesGroupId == null || target.SalesGroupId != actor.SalesGroupId)
+                {
+                    return Forbid();
+                }
+            }
+            if (User.IsInRole(UserRoles.SalesOrgAdmin) && !User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                if (actor.SalesOrgId == null || target.SalesOrgId != actor.SalesOrgId)
+                {
+                    return Forbid();
+                }
+            }
+
+            var targetRoles = await _userManager.GetRolesAsync(target);
+            if (targetRoles.Contains(UserRoles.OrganizationAdmin) || targetRoles.Contains(UserRoles.GroupAdmin))
+            {
+                TempData["ErrorMessage"] = "You cannot change roles for this user.";
+                return RedirectToUserList();
+            }
+
+            if (!targetRoles.Contains(UserRoles.SalesOrgAdmin))
+            {
+                TempData["SuccessMessage"] = "User is already a Sales Rep.";
+                return RedirectToUserList();
+            }
+
+            if (targetRoles.Any())
+            {
+                await _userManager.RemoveFromRolesAsync(target, targetRoles);
+            }
+
+            var addResult = await _userManager.AddToRoleAsync(target, UserRoles.SalesRep);
+            if (!addResult.Succeeded)
+            {
+                TempData["ErrorMessage"] = "Failed to demote user.";
+                return RedirectToUserList();
+            }
+
+            TempData["SuccessMessage"] = "User demoted to Sales Rep.";
+            return RedirectToUserList();
+        }
+
         [HttpGet]
         [Authorize(Roles = LeadManagementPortal.Models.UserRoles.SalesOrgAdmin)]
         public async Task<IActionResult> Deactivate(string id)

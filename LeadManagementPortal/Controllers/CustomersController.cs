@@ -1,4 +1,5 @@
 using LeadManagementPortal.Models;
+using LeadManagementPortal.Models.ViewModels;
 using LeadManagementPortal.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -121,13 +122,190 @@ namespace LeadManagementPortal.Controllers
 
         public async Task<IActionResult> Details(string id)
         {
-            var customer = await _customerService.GetByIdAsync(id);
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+
+            var customer = await _customerService.GetAccessibleByIdAsync(id, userId, userRole);
             if (customer == null)
             {
                 return NotFound();
             }
 
             return View(customer);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Edit(string id)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+
+            var customer = await _customerService.GetAccessibleByIdAsync(id, userId, userRole);
+            if (customer == null)
+            {
+                return NotFound();
+            }
+
+            bool canChangeOwner = User.IsInRole(UserRoles.OrganizationAdmin)
+                || User.IsInRole(UserRoles.GroupAdmin)
+                || User.IsInRole(UserRoles.SalesOrgAdmin)
+                || (User.IsInRole(UserRoles.SalesRep) && customer.SalesRepId == userId);
+
+            ViewBag.CanChangeOwner = canChangeOwner;
+            ViewBag.SalesReps = new SelectList(Enumerable.Empty<ApplicationUser>(), "Id", "FullName");
+
+            if (canChangeOwner)
+            {
+                int? orgId = customer.SalesRep?.SalesOrgId;
+                if (!orgId.HasValue)
+                {
+                    var currentUser = await _userManager.FindByIdAsync(userId);
+                    orgId = currentUser?.SalesOrgId;
+                }
+
+                if (orgId.HasValue)
+                {
+                    var reps = await _userManager.Users
+                        .Where(u => u.IsActive && u.SalesOrgId == orgId.Value)
+                        .OrderBy(u => u.FirstName).ThenBy(u => u.LastName)
+                        .ToListAsync();
+
+                    ViewBag.SalesReps = new SelectList(reps, "Id", "FullName", customer.SalesRepId);
+                }
+            }
+
+            var vm = new CustomerEditViewModel
+            {
+                Id = customer.Id,
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Email = customer.Email,
+                Phone = customer.Phone,
+                Company = customer.Company,
+                Address = customer.Address,
+                City = customer.City,
+                State = customer.State,
+                ZipCode = customer.ZipCode,
+                Notes = customer.Notes,
+                SalesRepId = customer.SalesRepId
+            };
+
+            return View(vm);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(CustomerEditViewModel model)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+
+            var existing = await _customerService.GetAccessibleByIdAsync(model.Id, userId, userRole);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
+            bool canChangeOwner = User.IsInRole(UserRoles.OrganizationAdmin)
+                || User.IsInRole(UserRoles.GroupAdmin)
+                || User.IsInRole(UserRoles.SalesOrgAdmin)
+                || (User.IsInRole(UserRoles.SalesRep) && existing.SalesRepId == userId);
+
+            ViewBag.CanChangeOwner = canChangeOwner;
+
+            string? newSalesRepId = existing.SalesRepId;
+            string? newSalesGroupId = existing.SalesGroupId;
+
+            if (canChangeOwner && !string.IsNullOrWhiteSpace(model.SalesRepId) && model.SalesRepId != existing.SalesRepId)
+            {
+                int? existingOrgId = existing.SalesRep?.SalesOrgId;
+                if (!existingOrgId.HasValue && !string.IsNullOrWhiteSpace(existing.SalesRepId))
+                {
+                    var existingOwner = await _userManager.FindByIdAsync(existing.SalesRepId);
+                    existingOrgId = existingOwner?.SalesOrgId;
+                }
+
+                if (!existingOrgId.HasValue)
+                {
+                    ModelState.AddModelError(nameof(CustomerEditViewModel.SalesRepId), "Cannot change Sales Rep because the current sales organization is unknown.");
+                }
+                else
+                {
+                    var newOwner = await _userManager.FindByIdAsync(model.SalesRepId);
+                    if (newOwner == null || !newOwner.IsActive)
+                    {
+                        ModelState.AddModelError(nameof(CustomerEditViewModel.SalesRepId), "Select a valid active sales rep.");
+                    }
+                    else if (newOwner.SalesOrgId != existingOrgId.Value)
+                    {
+                        ModelState.AddModelError(nameof(CustomerEditViewModel.SalesRepId), "Sales Rep must be in the same sales organization.");
+                    }
+                    else
+                    {
+                        newSalesRepId = newOwner.Id;
+                        newSalesGroupId = newOwner.SalesGroupId;
+                    }
+                }
+            }
+            else if (!canChangeOwner)
+            {
+                // Ignore any posted value if user cannot change owner.
+                ModelState.Remove(nameof(CustomerEditViewModel.SalesRepId));
+            }
+
+            // Repopulate dropdown on validation errors
+            ViewBag.SalesReps = new SelectList(Enumerable.Empty<ApplicationUser>(), "Id", "FullName");
+            if (canChangeOwner)
+            {
+                int? orgId = existing.SalesRep?.SalesOrgId;
+                if (!orgId.HasValue)
+                {
+                    var currentUser = await _userManager.FindByIdAsync(userId);
+                    orgId = currentUser?.SalesOrgId;
+                }
+
+                if (orgId.HasValue)
+                {
+                    var reps = await _userManager.Users
+                        .Where(u => u.IsActive && u.SalesOrgId == orgId.Value)
+                        .OrderBy(u => u.FirstName).ThenBy(u => u.LastName)
+                        .ToListAsync();
+
+                    ViewBag.SalesReps = new SelectList(reps, "Id", "FullName", newSalesRepId);
+                }
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var updated = new Customer
+            {
+                Id = model.Id,
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                Email = model.Email,
+                Phone = model.Phone,
+                Company = model.Company,
+                Address = model.Address,
+                City = model.City,
+                State = model.State,
+                ZipCode = model.ZipCode,
+                Notes = model.Notes,
+                SalesRepId = newSalesRepId,
+                SalesGroupId = newSalesGroupId
+            };
+
+            var ok = await _customerService.UpdateAsync(updated);
+            if (ok)
+            {
+                TempData["SuccessMessage"] = "Customer updated successfully!";
+                return RedirectToAction(nameof(Details), new { id = model.Id });
+            }
+
+            ModelState.AddModelError(string.Empty, "Failed to update customer.");
+            return View(model);
         }
 
         [HttpPost]

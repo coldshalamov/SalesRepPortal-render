@@ -46,7 +46,30 @@ body {
 }
 
 .navbar {
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* Active nav tab indicator — white underline matching GitHub/Vercel pattern */
+.navbar-dark .navbar-nav .nav-link {
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+.navbar-dark .navbar-nav .nav-link.active {
+  color: #fff !important;
+  font-weight: 500;
+}
+
+.navbar-dark .navbar-nav .nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0.25rem;
+  right: 0.25rem;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 2px 2px 0 0;
 }
 
 .badge {

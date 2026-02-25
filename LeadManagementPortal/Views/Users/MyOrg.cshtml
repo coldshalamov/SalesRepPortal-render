@@ -3,6 +3,7 @@
 @inject UserManager<ApplicationUser> UserManager
 @{
     ViewData["Title"] = "My Org Users";
+    var currentUserId = UserManager.GetUserId(User);
 }
 
 <div class="row mb-4">
@@ -80,6 +81,24 @@
                                     }
                                 </td>
                                 <td>
+                                    @if (roles.Contains("SalesRep"))
+                                    {
+                                        <form asp-action="PromoteToSalesOrgAdmin" method="post" class="d-inline" onsubmit="return confirm('Promote this user to Sales Org Admin?');">
+                                            <input type="hidden" name="userId" value="@user.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-success" title="Promote to Sales Org Admin">
+                                                <i class="bi bi-shield-plus"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                    else if (roles.Contains("SalesOrgAdmin") && user.Id != currentUserId)
+                                    {
+                                        <form asp-action="DemoteToSalesRep" method="post" class="d-inline" onsubmit="return confirm('Demote this user to Sales Rep?');">
+                                            <input type="hidden" name="userId" value="@user.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Demote to Sales Rep">
+                                                <i class="bi bi-shield-minus"></i>
+                                            </button>
+                                        </form>
+                                    }
                                     <a asp-action="Edit" asp-route-id="@user.Id" class="btn btn-sm btn-outline-primary" title="Edit">
                                         <i class="bi bi-pencil"></i>
                                     </a>
