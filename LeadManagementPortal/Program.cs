@@ -3,6 +3,7 @@ using LeadManagementPortal.Models;
 using LeadManagementPortal.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +30,28 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(defaultConnection);
     }
 });
+
+static void EnsureSqliteDataSourceDirectoryExists(string connectionString)
+{
+    var sqliteConnectionStringBuilder = new SqliteConnectionStringBuilder(connectionString);
+    var dataSource = sqliteConnectionStringBuilder.DataSource?.Trim();
+    if (string.IsNullOrWhiteSpace(dataSource) || string.Equals(dataSource, ":memory:", StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
+    if (dataSource.Contains("://", StringComparison.Ordinal))
+    {
+        return;
+    }
+
+    var fullPath = Path.GetFullPath(dataSource);
+    var directory = Path.GetDirectoryName(fullPath);
+    if (!string.IsNullOrWhiteSpace(directory))
+    {
+        Directory.CreateDirectory(directory);
+    }
+}
 
 // Configure Identity
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -104,6 +127,7 @@ using (var scope = app.Services.CreateScope())
         var db = services.GetRequiredService<ApplicationDbContext>();
         if (db.Database.IsSqlite())
         {
+            EnsureSqliteDataSourceDirectoryExists(db.Database.GetDbConnection().ConnectionString);
             await db.Database.EnsureCreatedAsync();
         }
         else
