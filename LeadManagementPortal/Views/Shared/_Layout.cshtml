@@ -81,7 +81,7 @@
                             <li class="nav-item">
                                 <a class="nav-link @(navController == "Commissions" ? "active" : "")" asp-controller="Commissions" asp-action="Index"
                                    data-bs-toggle="tooltip" data-bs-placement="bottom" title="Track commissions and payouts">
-                                    <i class="bi bi-cash-coin me-1 nav-icon" aria-hidden="true"></i>Commissions <span class="badge bg-warning text-dark ms-1">New</span>
+                                    <i class="bi bi-cash-coin me-1 nav-icon" aria-hidden="true"></i>Commissions
                                 </a>
                             </li>
                             @if (User.IsInRole("OrganizationAdmin"))
@@ -89,13 +89,13 @@
                                 <li class="nav-item">
                                     <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="Index"
                                        data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage sales groups">
-                                        <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>Sales Groups
+                                        <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>Groups
                                     </a>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index"
                                        data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage sales organizations">
-                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Sales Orgs
+                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Orgs
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -122,7 +122,7 @@
                                 <li class="nav-item">
                                     <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index"
                                        data-bs-toggle="tooltip" data-bs-placement="bottom" title="View sales orgs in your group">
-                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Sales Orgs
+                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Orgs
                                     </a>
                                 </li>
                                 <li class="nav-item">
