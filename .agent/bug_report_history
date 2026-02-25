@@ -1,2 +1,5 @@
 LeadManagementPortal/wwwroot/js/notifications.js
 LeadManagementPortal/wwwroot/js/multiselect.js
+LeadManagementPortal/wwwroot/js/leads-pipeline.js
+LeadManagementPortal/Controllers/CommissionsController.cs
+LeadManagementPortal/Services/LeadDocumentService.cs

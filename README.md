@@ -341,6 +341,7 @@ This repository includes a dedicated browser compatibility suite under `tests/br
 
 - Blocking parity workflow: `.github/workflows/browser-parity.yml`
 - Advisory quality workflow (a11y + lighthouse): `.github/workflows/browser-quality-advisory.yml`
+- Optional deployed smoke probes (same advisory workflow) when `SALESREPPORTAL_BASE_URL` is set in repo variables
 
 Local execution from repo root:
 

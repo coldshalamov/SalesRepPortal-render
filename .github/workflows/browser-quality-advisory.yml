@@ -135,3 +135,79 @@ jobs:
             tests/browser/lighthouse/
           if-no-files-found: ignore
           retention-days: 14
+
+  deployed-surface-smoke:
+    name: Deployed Surface Smoke (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve deploy URL
+        id: target
+        env:
+          SALESREPPORTAL_BASE_URL: ${{ vars.SALESREPPORTAL_BASE_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SALESREPPORTAL_BASE_URL:-}" ]; then
+            echo "should_probe=false" >> "$GITHUB_OUTPUT"
+            echo "url=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "should_probe=true" >> "$GITHUB_OUTPUT"
+          echo "url=${SALESREPPORTAL_BASE_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip summary when deploy URL missing
+        if: steps.target.outputs.should_probe != 'true'
+        shell: bash
+        run: |
+          {
+            echo "### Deployed surface smoke skipped"
+            echo "- Missing repo variable: SALESREPPORTAL_BASE_URL"
+            echo "- Configure it with your canonical deployed portal URL to enable this advisory lane."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        if: steps.target.outputs.should_probe == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+
+      - name: Install dependencies
+        if: steps.target.outputs.should_probe == 'true'
+        run: npm --prefix tests/browser ci
+
+      - name: Install Playwright browser runtime
+        if: steps.target.outputs.should_probe == 'true'
+        run: npx --prefix tests/browser playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Probe deployed login surface
+        if: steps.target.outputs.should_probe == 'true'
+        env:
+          BROWSER: ${{ matrix.browser }}
+          SURFACE_NAME: deployed-login
+          SURFACE_URL: ${{ steps.target.outputs.url }}/Account/Login
+          REQUIRED_SELECTORS: body||form
+          MIN_BODY_TEXT_LENGTH: "80"
+          SCREENSHOT_DIR: tests/browser/playwright-report/surfaces
+        run: node scripts/ci/browser-surface-smoke.mjs
+
+      - name: Upload deployed surface artifacts
+        if: always() && steps.target.outputs.should_probe == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-surface-smoke-${{ matrix.browser }}
+          path: |
+            tests/browser/playwright-report/surfaces/
+          if-no-files-found: ignore
+          retention-days: 14

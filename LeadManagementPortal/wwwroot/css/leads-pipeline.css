@@ -1,7 +1,7 @@
 .pipeline-stat-row .pipeline-stat-card {
   background: #ffffff;
   border: 1px solid #e9ecef;
-  border-radius: 0.75rem;
+  border-radius: 0;
   padding: 0.85rem 0.95rem;
   height: 100%;
 }
@@ -45,10 +45,10 @@
   min-height: 270px;
   background: #ffffff;
   border: 1px solid #dee2e6;
-  border-radius: 0.8rem;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -64,8 +64,8 @@
   justify-content: space-between;
   align-items: center;
   background: #f8f9fa;
-  border-top-left-radius: 0.8rem;
-  border-top-right-radius: 0.8rem;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .pipeline-column-title {
@@ -97,7 +97,7 @@
 .pipeline-card {
   border: 1px solid #e9ecef;
   background: #ffffff;
-  border-radius: 0.7rem;
+  border-radius: 0;
   padding: 0.62rem 0.65rem;
   cursor: move;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
@@ -198,7 +198,7 @@
 .pipeline-empty-column {
   border: 1px dashed #dee2e6;
   color: #6c757d;
-  border-radius: 0.7rem;
+  border-radius: 0;
   text-align: center;
   padding: 1rem 0.5rem;
   font-size: 0.82rem;

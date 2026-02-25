@@ -22,6 +22,16 @@ This file defines the exact process for moving selected feature changes from `Sa
 - Scoped feature PRs with prechecks in this playbook: **4/10 (Manageable)**
   - Risk becomes acceptable only when schema + role + provider checks are explicitly completed.
 
+## Full-Feature Port Is Feasible
+
+Porting all product features to the work repo is achievable. The unsafe part is "bulk copy without structure," not the features themselves.
+
+- Expected risk with the guided integration path below: **3-4/10**
+- Expected risk with one-shot unmanaged copy: **9/10**
+- Translation:
+  - Yes, you can deliver a single clean PR to the work repo.
+  - You should build that PR through a controlled integration branch with hard gates.
+
 ## Current High-Risk Items Found
 
 1. **EF schema mismatch for follow-up tasks**
@@ -109,6 +119,63 @@ Include two sections in each PR:
    - Keep this PR free from unrelated startup/provider/storage edits.
 4. `PR-3 (role/rule changes)`:
    - Any access-control or business-rule adjustments (reassign/edit/extension) isolated for focused review.
+
+## Single-PR Integration Route (All Features, Clean Merge)
+
+Use this when leadership wants one PR in the work repo, but you still need safety.
+
+1. In the work repo, create a dedicated integration branch:
+   - `git checkout -b integration/feature-parity-20260225`
+2. Port in this exact sequence (commit each step on the integration branch):
+   - `Step A`: Schema prerequisites (`AddNotifications`, `AddLeadFollowUpTasks`) + model snapshot parity
+   - `Step B`: Service/model contracts (interfaces, service implementations, model updates)
+   - `Step C`: Controller/API behavior (lead pipeline actions, follow-up actions, notifications API)
+   - `Step D`: Views/assets (pipeline JS/CSS, dashboard/login/layout UI refreshes)
+   - `Step E`: Tests + CI guardrails for portability
+3. After each step, run verification:
+   - `dotnet restore`
+   - `dotnet build`
+   - `dotnet test LeadManagementPortal.Tests/LeadManagementPortal.Tests.csproj`
+   - `pwsh ./scripts/ci/check-portability-guardrails.ps1` (or `./scripts/ci/check-portability-guardrails.ps1` in PowerShell)
+4. When branch is fully green, open **one PR** from `integration/feature-parity-20260225` to work repo `main`.
+5. In the PR body, include:
+   - "Port order used" (A-E above)
+   - migration apply/rollback evidence
+   - explicit excluded Render-only files list
+   - smoke-test checklist results
+
+This produces a single PR artifact while still getting the safety of staged integration internally.
+
+## Recommended Commit Layout Inside The Single Integration PR
+
+Keep commits grouped so reviewers can reason about risk:
+
+1. `feat(db): add notifications and follow-up-task schema`
+2. `feat(services): add notification/follow-up service contracts`
+3. `feat(leads): add pipeline status/follow-up endpoints`
+4. `feat(ui): add leads pipeline board assets and view wiring`
+5. `feat(ui): dashboard/login/layout refresh`
+6. `test(ci): add portability guardrails and contract tests`
+
+If you need to rollback before merge, you can revert only the high-risk commit groups (schema/role changes) without losing all UI work.
+
+## Hard Gates Before Opening The Single PR
+
+All must pass:
+
+1. SQL Server migration validation on staging clone:
+   - apply up
+   - execute smoke queries
+   - verify down/rollback path
+2. App + tests green on work repo branch.
+3. No mixed Render-only files in the PR.
+4. Role/permission regression check completed for:
+   - `GrantExtension`
+   - lead reassignment
+   - lead status movement/convert flow
+5. Documentation updated:
+   - `MIGRATION_PLAYBOOK.md`
+   - `PORTING_LOG.md`
 
 ## Must-Exclude From Product PRs Unless Explicitly Approved
 

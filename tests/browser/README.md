@@ -45,3 +45,13 @@ You can override via environment variables:
 - `E2E_ADMIN_PASSWORD`
 - `BASE_URL` (to target an existing running environment)
 - `SKIP_WEBSERVER=1` (if app is already running)
+
+## Deployed surface advisory lane
+
+`browser-quality-advisory.yml` can also smoke-test the deployed login page across
+Chromium/Firefox/WebKit if this repo variable is configured:
+
+- `SALESREPPORTAL_BASE_URL` (example: `https://your-portal.example.com`)
+
+The workflow uses `scripts/ci/browser-surface-smoke.mjs` and uploads screenshots
+plus runtime diagnostics as artifacts.

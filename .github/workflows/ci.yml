@@ -121,7 +121,7 @@ jobs:
     name: Target Port Dry Run (Optional)
     runs-on: windows-latest
     needs: portability-guardrails
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.target_zip_url != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target_zip_url != '' }}
 
     steps:
       - name: Checkout
@@ -135,4 +135,4 @@ jobs:
       - name: Run Target Portability Dry Run
         shell: pwsh
         run: |
-          ./scripts/ci/portability-target-dry-run.ps1 -TargetRepoZipUrl "${{ inputs.target_zip_url }}"
+          ./scripts/ci/portability-target-dry-run.ps1 -TargetRepoZipUrl "${{ github.event.inputs.target_zip_url }}"
