@@ -12,7 +12,12 @@
     </div>
     <div class="form-group">
         <label>Sales Group</label>
-        <select asp-for="SalesGroupId" class="form-control" asp-items="new SelectList((IEnumerable<LeadManagementPortal.Models.SalesGroup>)ViewBag.SalesGroups, nameof(LeadManagementPortal.Models.SalesGroup.Id), nameof(LeadManagementPortal.Models.SalesGroup.Name))"></select>
+        <select asp-for="SalesGroupId" class="form-control" asp-items="new SelectList((IEnumerable<LeadManagementPortal.Models.SalesGroup>)ViewBag.SalesGroups, nameof(LeadManagementPortal.Models.SalesGroup.Id), nameof(LeadManagementPortal.Models.SalesGroup.Name))" disabled="@( !User.IsInRole("OrganizationAdmin") )"></select>
+        @if (!User.IsInRole("OrganizationAdmin"))
+        {
+            <input type="hidden" asp-for="SalesGroupId" />
+            <small class="text-muted">Only Organization Admin can change the Sales Group.</small>
+        }
         <span asp-validation-for="SalesGroupId" class="text-danger"></span>
     </div>
     <button type="submit" class="btn btn-primary">Save</button>

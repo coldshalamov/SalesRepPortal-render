@@ -1,7 +1,6 @@
 @model Lead
 @{
     ViewData["Title"] = "Edit Lead";
-    bool isRestricted = User.IsInRole("SalesOrgAdmin") || User.IsInRole("GroupAdmin");
 }
 
 <div class="row mb-3">
@@ -25,12 +24,12 @@
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label asp-for="FirstName" class="form-label">First Name *</label>
-                    <input asp-for="FirstName" class="form-control" readonly="@isRestricted" />
+                    <input asp-for="FirstName" class="form-control" />
                     <span asp-validation-for="FirstName" class="text-danger"></span>
                 </div>
                 <div class="col-md-6">
                     <label asp-for="LastName" class="form-label">Last Name *</label>
-                    <input asp-for="LastName" class="form-control" readonly="@isRestricted" />
+                    <input asp-for="LastName" class="form-control" />
                     <span asp-validation-for="LastName" class="text-danger"></span>
                 </div>
             </div>
@@ -38,12 +37,12 @@
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label asp-for="Email" class="form-label">Email *</label>
-                    <input asp-for="Email" type="email" class="form-control" readonly="@isRestricted" />
+                    <input asp-for="Email" type="email" class="form-control" />
                     <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
                 <div class="col-md-6">
                     <label asp-for="Phone" class="form-label">Phone *</label>
-                    <input asp-for="Phone" class="form-control" readonly="@isRestricted" />
+                    <input asp-for="Phone" class="form-control" />
                     <span asp-validation-for="Phone" class="text-danger"></span>
                 </div>
             </div>
@@ -51,16 +50,7 @@
             <div class="row mb-3">
                 <div class="col-md-12">
                     <label asp-for="Company" class="form-label">Company</label>
-                    @if (User.IsInRole("OrganizationAdmin"))
-                    {
-                        <input asp-for="Company" class="form-control" />
-                    }
-                    else
-                    {
-                        <input asp-for="Company" class="form-control" readonly />
-                        <input type="hidden" asp-for="Company" />
-                        <small class="text-muted">Only Organization Admin can change the company name.</small>
-                    }
+                    <input asp-for="Company" class="form-control" />
                     <span asp-validation-for="Company" class="text-danger"></span>
                 </div>
             </div>
@@ -68,7 +58,7 @@
             <div class="row mb-3">
                 <div class="col-md-12">
                     <label class="form-label">Products</label>
-                    <select name="productIds" class="form-select" multiple asp-items="ViewBag.Products" data-enhance="multiselect" disabled="@isRestricted"></select>
+                    <select name="productIds" class="form-select" multiple asp-items="ViewBag.Products" data-enhance="multiselect"></select>
                     <small class="text-muted">Click to select/unselect products. Click outside to close.</small>
                 </div>
             </div>
@@ -78,7 +68,7 @@
                 <div class="col-md-12">
                     <label asp-for="Address" class="form-label">Address</label>
                     <div class="position-relative">
-                        <input asp-for="Address" class="form-control" autocomplete="off" readonly="@isRestricted" />
+                        <input asp-for="Address" class="form-control" autocomplete="off" />
                         <ul id="address-suggestions" class="dropdown-menu w-100" style="max-height: 200px; overflow-y: auto;"></ul>
                     </div>
                     <small class="text-muted">Start typing to search addresses (powered by SmartyStreets).</small>
@@ -89,73 +79,43 @@
             <div class="row mb-3">
                 <div class="col-md-4">
                     <label asp-for="City" class="form-label">City</label>
-                    <input asp-for="City" class="form-control" readonly="@isRestricted" />
+                    <input asp-for="City" class="form-control" />
                     <span asp-validation-for="City" class="text-danger"></span>
                 </div>
                 <div class="col-md-4">
                     <label asp-for="State" class="form-label">State</label>
-                    <input asp-for="State" class="form-control" readonly="@isRestricted" />
+                    <input asp-for="State" class="form-control" />
                     <span asp-validation-for="State" class="text-danger"></span>
                 </div>
                 <div class="col-md-4">
                     <label asp-for="ZipCode" class="form-label">Zip Code</label>
-                    <input asp-for="ZipCode" class="form-control" readonly="@isRestricted" />
+                    <input asp-for="ZipCode" class="form-control" />
                     <span asp-validation-for="ZipCode" class="text-danger"></span>
                 </div>
             </div>
 
-            @if (User.IsInRole("OrganizationAdmin"))
-            {
-                <h5 class="mb-3 mt-4"><i class="bi bi-shield-check"></i> Admin Only Fields</h5>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label asp-for="Status" class="form-label">Status</label>
-                        <select asp-for="Status" class="form-select" asp-items="ViewBag.Statuses"></select>
-                        <span asp-validation-for="Status" class="text-danger"></span>
-                    </div>
+            <h5 class="mb-3 mt-4"><i class="bi bi-shield-check"></i> Lead Status</h5>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="Status" class="form-label">Status</label>
+                    <select asp-for="Status" class="form-select" asp-items="ViewBag.Statuses"></select>
+                    <span asp-validation-for="Status" class="text-danger"></span>
+                    <small class="text-muted">Converted and Expired are managed via separate actions.</small>
                 </div>
-            }
+            </div>
 
             <h5 class="mb-3 mt-4"><i class="bi bi-chat-left-text"></i> Additional Information</h5>
             <div class="row mb-3">
                 <div class="col-md-12">
                     <label asp-for="Notes" class="form-label">Notes</label>
-                    <textarea asp-for="Notes" class="form-control" rows="4" readonly="@isRestricted"></textarea>
+                    <textarea asp-for="Notes" class="form-control" rows="4"></textarea>
                     <span asp-validation-for="Notes" class="text-danger"></span>
                 </div>
             </div>
 
-            @if (User.IsInRole("OrganizationAdmin") || User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))
-            {
-                <h5 class="mb-3 mt-4"><i class="bi bi-person-badge"></i> Assignment</h5>
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Sales Group</label>
-                        <select id="salesGroupId" name="SalesGroupId" class="form-select" asp-items="ViewBag.SalesGroups" 
-                            disabled="@(User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))">
-                            <option value="">-- Select Group --</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Sales Org</label>
-                        <select id="salesOrgId" asp-for="SalesOrgId" class="form-select" asp-items="ViewBag.SalesOrgs"
-                            disabled="@(User.IsInRole("SalesOrgAdmin"))">
-                            <option value="">-- Select Org --</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Sales Rep</label>
-                        <select id="assignedToId" name="AssignedToId" class="form-select" asp-items="ViewBag.SalesReps">
-                            <option value="">-- Select Rep --</option>
-                        </select>
-                    </div>
-                </div>
-            }
-            else
-            {
-                <input type="hidden" asp-for="AssignedToId" />
-                <input type="hidden" asp-for="SalesGroupId" />
-            }
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Need to move this lead to another rep? Use <strong>Reassign Lead</strong> from the Lead Details page.
+            </div>
 
             <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                 <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>

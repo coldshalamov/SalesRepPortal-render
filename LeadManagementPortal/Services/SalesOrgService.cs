@@ -27,7 +27,10 @@ namespace LeadManagementPortal.Services
 
         public async Task<IEnumerable<SalesOrg>> GetByGroupIdAsync(string salesGroupId)
         {
-            return await _db.SalesOrgs.Where(o => o.SalesGroupId == salesGroupId).ToListAsync();
+            return await _db.SalesOrgs
+                .Include(o => o.SalesGroup)
+                .Where(o => o.SalesGroupId == salesGroupId)
+                .ToListAsync();
         }
 
         public async Task<SalesOrg> CreateAsync(SalesOrg org)

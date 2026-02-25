@@ -377,6 +377,12 @@ namespace LeadManagementPortal.Services
                 if (lead == null || lead.Status == LeadStatus.Converted || lead.Status == LeadStatus.Lost)
                     return false;
 
+                // One-time extension: treat either flag as authoritative for legacy compatibility.
+                if (lead.IsExtended || lead.ExtensionGrantedDate != null)
+                {
+                    return false;
+                }
+
                 var s = await _settingsService.GetAsync();
                 var previousExpiry = lead.ExpiryDate;
                 
@@ -395,6 +401,7 @@ namespace LeadManagementPortal.Services
 
                 lead.ExtensionGrantedDate = DateTime.UtcNow;
                 lead.ExtensionGrantedBy = grantedBy;
+                lead.IsExtended = true;
 
                 _context.LeadExtensionAudits.Add(new LeadExtensionAudit
                 {

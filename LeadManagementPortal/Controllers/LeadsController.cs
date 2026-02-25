@@ -110,6 +110,113 @@ namespace LeadManagementPortal.Controllers
             return View(leads);
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateStatus([FromBody] LeadPipelineStatusUpdateRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { success = false, message = "Invalid request." });
+            }
+
+            if (!Enum.TryParse<LeadStatus>(request.Status, true, out var targetStatus))
+            {
+                return BadRequest(new { success = false, message = "Unknown status." });
+            }
+
+            var pipelineStatuses = new HashSet<LeadStatus>
+            {
+                LeadStatus.New,
+                LeadStatus.Contacted,
+                LeadStatus.Qualified,
+                LeadStatus.Proposal,
+                LeadStatus.Negotiation,
+                LeadStatus.Lost,
+                LeadStatus.Converted
+            };
+
+            if (!pipelineStatuses.Contains(targetStatus))
+            {
+                return BadRequest(new { success = false, message = "Status is not supported in pipeline." });
+            }
+
+            var lead = await _leadService.GetByIdAsync(request.LeadId);
+            if (lead == null)
+            {
+                return NotFound(new { success = false, message = "Lead not found." });
+            }
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
+
+            if (!await CanEditLead(lead, userId, userRole))
+            {
+                return Forbid();
+            }
+
+            if (lead.IsExpired || lead.Status == LeadStatus.Expired)
+            {
+                return BadRequest(new { success = false, message = "Expired leads cannot be moved in pipeline." });
+            }
+
+            if (lead.Status == LeadStatus.Converted)
+            {
+                return BadRequest(new { success = false, message = "Converted leads cannot be moved in pipeline." });
+            }
+
+            if (lead.Status == LeadStatus.Lost && targetStatus != LeadStatus.Lost)
+            {
+                return BadRequest(new { success = false, message = "Lost leads cannot be reopened in pipeline." });
+            }
+
+            if (targetStatus == LeadStatus.Expired)
+            {
+                return BadRequest(new { success = false, message = "Expired status is system-managed." });
+            }
+
+            if (targetStatus == lead.Status)
+            {
+                return Json(new { success = true, status = lead.Status.ToString(), message = "Status unchanged." });
+            }
+
+            if (targetStatus == LeadStatus.Converted)
+            {
+                if (userRole != UserRoles.OrganizationAdmin)
+                {
+                    return Forbid();
+                }
+
+                var converted = await _leadService.ConvertToCustomerAsync(lead.Id, userId);
+                if (!converted)
+                {
+                    return BadRequest(new { success = false, message = "Unable to convert this lead." });
+                }
+
+                await _leadAuditService.LogAsync(lead, userId, "Convert", "Converted to customer from pipeline board");
+
+                return Json(new { success = true, status = LeadStatus.Converted.ToString(), message = "Lead converted successfully." });
+            }
+
+            lead.Status = targetStatus;
+            if (targetStatus == LeadStatus.Contacted ||
+                targetStatus == LeadStatus.Qualified ||
+                targetStatus == LeadStatus.Proposal ||
+                targetStatus == LeadStatus.Negotiation)
+            {
+                lead.LastContactDate = DateTime.UtcNow;
+            }
+
+            var updated = await _leadService.UpdateAsync(lead);
+            if (!updated)
+            {
+                return StatusCode(500, new { success = false, message = "Unable to update lead status right now." });
+            }
+
+            await _leadAuditService.LogAsync(lead, userId, "Update", $"Status changed to {targetStatus} from pipeline board");
+
+            return Json(new { success = true, status = targetStatus.ToString(), message = "Status updated." });
+        }
+
         private async Task PopulateIndexFilters(string userRole, string userId)
         {
             if (userRole == UserRoles.OrganizationAdmin)
@@ -181,35 +288,37 @@ namespace LeadManagementPortal.Controllers
         }
 
         [HttpGet]
-        [Authorize(Roles = LeadManagementPortal.Models.UserRoles.SalesOrgAdmin + "," + LeadManagementPortal.Models.UserRoles.OrganizationAdmin + "," + LeadManagementPortal.Models.UserRoles.GroupAdmin)]
+        [Authorize(Roles = UserRoles.SalesOrgAdmin + "," + UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin + "," + UserRoles.SalesRep)]
         public async Task<IActionResult> Reassign(string id)
         {
             var lead = await _leadService.GetByIdAsync(id);
             if (lead == null) return NotFound();
 
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
             var admin = await _userManager.GetUserAsync(User);
+            if (admin == null) return Challenge();
 
-            if (userRole == UserRoles.GroupAdmin)
-            {
-                if (admin?.SalesGroupId == null || lead.SalesGroupId != admin.SalesGroupId) return Forbid();
-            }
-            else if (userRole == UserRoles.SalesOrgAdmin)
-            {
-                if (admin?.SalesOrgId == null || lead.AssignedTo == null || lead.AssignedTo.SalesOrgId != admin.SalesOrgId) return Forbid();
-            }
-            else if (userRole != UserRoles.OrganizationAdmin)
+            if (!await CanAccessLead(lead, userId, userRole))
             {
                 return Forbid();
             }
 
-            var repsQuery = _userManager.Users
-                .Where(u => u.IsActive && u.SalesGroupId == lead.SalesGroupId);
-
-            if (userRole == UserRoles.SalesOrgAdmin)
+            var leadOrgId = lead.AssignedTo?.SalesOrgId;
+            if (!leadOrgId.HasValue && !string.IsNullOrWhiteSpace(lead.AssignedToId))
             {
-                 repsQuery = repsQuery.Where(u => u.SalesOrgId == admin.SalesOrgId);
+                var assignedUser = await _userManager.FindByIdAsync(lead.AssignedToId);
+                leadOrgId = assignedUser?.SalesOrgId;
             }
+            if (!leadOrgId.HasValue)
+            {
+                TempData["ErrorMessage"] = "This lead is not assigned to a sales organization.";
+                return RedirectToAction(nameof(Details), new { id = lead.Id });
+            }
+
+            // Reassignment is restricted to the same Sales Org.
+            var repsQuery = _userManager.Users
+                .Where(u => u.IsActive && u.SalesOrgId == leadOrgId.Value);
 
             var reps = await repsQuery
                 .OrderBy(u => u.FirstName).ThenBy(u => u.LastName)
@@ -222,36 +331,38 @@ namespace LeadManagementPortal.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [Authorize(Roles = LeadManagementPortal.Models.UserRoles.SalesOrgAdmin + "," + LeadManagementPortal.Models.UserRoles.OrganizationAdmin + "," + LeadManagementPortal.Models.UserRoles.GroupAdmin)]
+        [Authorize(Roles = UserRoles.SalesOrgAdmin + "," + UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin + "," + UserRoles.SalesRep)]
         public async Task<IActionResult> Reassign(LeadReassignViewModel model)
         {
             var lead = await _leadService.GetByIdAsync(model.LeadId);
             if (lead == null) return NotFound();
 
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
             var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
             var adminUser = await _userManager.GetUserAsync(User);
+            if (adminUser == null) return Challenge();
 
-            if (userRole == UserRoles.GroupAdmin)
-            {
-                if (adminUser?.SalesGroupId == null || lead.SalesGroupId != adminUser.SalesGroupId) return Forbid();
-            }
-            else if (userRole == UserRoles.SalesOrgAdmin)
-            {
-                if (adminUser?.SalesOrgId == null || lead.AssignedTo == null || lead.AssignedTo.SalesOrgId != adminUser.SalesOrgId) return Forbid();
-            }
-            else if (userRole != UserRoles.OrganizationAdmin)
+            if (!await CanAccessLead(lead, userId, userRole))
             {
                 return Forbid();
             }
 
-            // Helper query for reps
+            var leadOrgId = lead.AssignedTo?.SalesOrgId;
+            if (!leadOrgId.HasValue && !string.IsNullOrWhiteSpace(lead.AssignedToId))
+            {
+                var assignedUser = await _userManager.FindByIdAsync(lead.AssignedToId);
+                leadOrgId = assignedUser?.SalesOrgId;
+            }
+            if (!leadOrgId.HasValue)
+            {
+                TempData["ErrorMessage"] = "This lead is not assigned to a sales organization.";
+                return RedirectToAction(nameof(Details), new { id = lead.Id });
+            }
+
+            // Helper query for reps in the same org
             IQueryable<ApplicationUser> GetRepsQuery()
             {
-                var q = _userManager.Users.Where(u => u.IsActive && u.SalesGroupId == lead.SalesGroupId);
-                if (userRole == UserRoles.SalesOrgAdmin)
-                {
-                    q = q.Where(u => u.SalesOrgId == adminUser.SalesOrgId);
-                }
+                var q = _userManager.Users.Where(u => u.IsActive && u.SalesOrgId == leadOrgId.Value);
                 return q.OrderBy(u => u.FirstName).ThenBy(u => u.LastName);
             }
 
@@ -262,23 +373,20 @@ namespace LeadManagementPortal.Controllers
             }
 
             var newAssignee = await _userManager.FindByIdAsync(model.NewAssigneeId);
-            bool isValidAssignee = newAssignee != null && newAssignee.IsActive && newAssignee.SalesGroupId == lead.SalesGroupId;
-            
-            if (isValidAssignee && userRole == UserRoles.SalesOrgAdmin)
-            {
-                if (newAssignee.SalesOrgId != adminUser.SalesOrgId) isValidAssignee = false;
-            }
+            bool isValidAssignee = newAssignee != null
+                && newAssignee.IsActive
+                && newAssignee.SalesOrgId == leadOrgId.Value;
 
             if (!isValidAssignee)
             {
-                ModelState.AddModelError(string.Empty, "Select a valid active sales rep in the lead's group/org.");
+                ModelState.AddModelError(string.Empty, "Select a valid active sales rep in the same sales organization.");
                 ViewBag.SalesReps = new SelectList(await GetRepsQuery().ToListAsync(), "Id", "FullName", model.NewAssigneeId);
                 return View(model);
             }
 
             // Apply reassignment
             lead.AssignedToId = newAssignee.Id;
-            // Keep SalesGroupId unchanged (same group enforced above)
+            // Keep SalesGroupId and SalesOrgId unchanged (same org enforced above)
             var ok = await _leadService.UpdateAsync(lead);
             if (ok)
             {
@@ -590,46 +698,23 @@ namespace LeadManagementPortal.Controllers
                 return RedirectToAction(nameof(Details), new { id = existingLead.Id });
             }
 
-            // Business rule: Lost leads cannot be reassigned within same sales group
-            if (existingLead.Status == LeadStatus.Lost && existingLead.SalesGroupId == lead.SalesGroupId && existingLead.AssignedToId != lead.AssignedToId)
+            // Status rule: Converted and Expired are not settable via Edit.
+            // Converted must go through the Convert action (creates customer record).
+            if (lead.Status == LeadStatus.Converted)
             {
-                ModelState.AddModelError("", "Lost leads cannot be reassigned within the same sales group.");
+                ModelState.AddModelError(nameof(Lead.Status), "Converted status cannot be set here. Use Convert to Customer.");
+                lead.Status = existingLead.Status;
+            }
+            if (lead.Status == LeadStatus.Expired)
+            {
+                ModelState.AddModelError(nameof(Lead.Status), "Expired status is system-managed.");
+                lead.Status = existingLead.Status;
             }
 
-            // Business rule: Only Organization Admin can change company name
-            if (userRole != UserRoles.OrganizationAdmin &&
-                !string.Equals(existingLead.Company ?? string.Empty, lead.Company ?? string.Empty, StringComparison.OrdinalIgnoreCase))
-            {
-                ModelState.AddModelError("", "Only Organization Admin can change the company name.");
-            }
-
-            // Business rule: Sales Org Admin and Group Admin can only edit assignment details
-            if (userRole == UserRoles.SalesOrgAdmin || userRole == UserRoles.GroupAdmin)
-            {
-                // Revert restricted fields
-                lead.FirstName = existingLead.FirstName;
-                lead.LastName = existingLead.LastName;
-                lead.Email = existingLead.Email;
-                lead.Phone = existingLead.Phone;
-                lead.Company = existingLead.Company;
-                lead.Address = existingLead.Address;
-                lead.City = existingLead.City;
-                lead.State = existingLead.State;
-                lead.ZipCode = existingLead.ZipCode;
-                lead.Notes = existingLead.Notes;
-                
-                // Keep existing products
-                productIds = existingLead.Products?.Select(p => p.Id).ToList();
-
-                // Group Admin and Sales Org Admin cannot change Sales Group (disabled in UI)
-                lead.SalesGroupId = existingLead.SalesGroupId;
-
-                // Sales Org Admin cannot change Sales Org
-                if (userRole == UserRoles.SalesOrgAdmin)
-                {
-                    lead.SalesOrgId = existingLead.SalesOrgId;
-                }
-            }
+            // Assignment changes are handled via the dedicated Reassign flow (same-org enforced there).
+            lead.AssignedToId = existingLead.AssignedToId;
+            lead.SalesGroupId = existingLead.SalesGroupId;
+            lead.SalesOrgId = existingLead.SalesOrgId;
 
             if (ModelState.IsValid)
             {
@@ -667,41 +752,12 @@ namespace LeadManagementPortal.Controllers
                 lead.CreatedById = existingLead.CreatedById;
                 lead.CreatedDate = existingLead.CreatedDate;
                 lead.ExpiryDate = existingLead.ExpiryDate;
+                lead.IsExpired = existingLead.IsExpired;
                 lead.IsExtended = existingLead.IsExtended;
                 lead.ExtensionGrantedDate = existingLead.ExtensionGrantedDate;
                 lead.ExtensionGrantedBy = existingLead.ExtensionGrantedBy;
-
-                // Only Organization Admin can change status
-                if (userRole != UserRoles.OrganizationAdmin)
-                {
-                    lead.Status = existingLead.Status;
-                }
-
-                // If Org Admin sets status to Converted during edit, run full conversion flow
-                var isOrgAdmin = userRole == UserRoles.OrganizationAdmin;
-                var wantsConversion = isOrgAdmin && lead.Status == LeadStatus.Converted && existingLead.Status != LeadStatus.Converted;
-
-                if (wantsConversion)
-                {
-                    // First persist other field changes without changing status
-                    lead.Status = existingLead.Status;
-                    var updated = await _leadService.UpdateAsync(lead);
-                    if (!updated)
-                    {
-                        ModelState.AddModelError("", "Failed to update lead before conversion.");
-                    }
-                    else
-                    {
-                        var converted = await _leadService.ConvertToCustomerAsync(id, userId);
-                        if (converted)
-                        {
-                            await _leadAuditService.LogAsync(existingLead, userId, "Convert", "Converted to customer");
-                            TempData["SuccessMessage"] = "Lead converted to customer successfully!";
-                            return RedirectToAction("Index", "Customers");
-                        }
-                        ModelState.AddModelError("", "Failed to convert lead. It may be Lost, Expired, or already Converted.");
-                    }
-                }
+                lead.ConvertedDate = existingLead.ConvertedDate;
+                lead.LastContactDate = existingLead.LastContactDate;
 
                 if (await _leadService.UpdateAsync(lead))
                 {
@@ -738,11 +794,19 @@ namespace LeadManagementPortal.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "OrganizationAdmin")]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin + "," + UserRoles.SalesOrgAdmin)]
         public async Task<IActionResult> GrantExtension(string id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "";
             var extLead = await _leadService.GetByIdAsync(id);
+            if (extLead == null) return NotFound();
+
+            if (!await CanAccessLead(extLead, userId, userRole))
+            {
+                return Forbid();
+            }
 
             if (await _leadService.GrantExtensionAsync(id, userId))
             {
@@ -874,7 +938,7 @@ namespace LeadManagementPortal.Controllers
             }
 
             var statuses = Enum.GetValues(typeof(LeadStatus)).Cast<LeadStatus>()
-                .Where(s => s != LeadStatus.Converted);
+                .Where(s => s != LeadStatus.Converted && s != LeadStatus.Expired);
             ViewBag.Statuses = new SelectList(statuses);
         }
 
@@ -1009,5 +1073,14 @@ namespace LeadManagementPortal.Controllers
         [Required]
         [Display(Name = "Assign to")]
         public string NewAssigneeId { get; set; } = string.Empty;
+    }
+
+    public class LeadPipelineStatusUpdateRequest
+    {
+        [Required]
+        public string LeadId { get; set; } = string.Empty;
+
+        [Required]
+        public string Status { get; set; } = string.Empty;
     }
 }

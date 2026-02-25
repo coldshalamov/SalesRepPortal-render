@@ -10,7 +10,7 @@ using System;
 
 namespace LeadManagementPortal.Controllers
 {
-    [Authorize(Roles = LeadManagementPortal.Models.UserRoles.OrganizationAdmin + "," + LeadManagementPortal.Models.UserRoles.SalesOrgAdmin)]
+    [Authorize(Roles = UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin + "," + UserRoles.SalesOrgAdmin)]
     public class SalesOrgsController : Controller
     {
         private readonly ISalesOrgService _service;
@@ -28,7 +28,26 @@ namespace LeadManagementPortal.Controllers
 
         public async Task<IActionResult> Index()
         {
-            var orgs = await _service.GetAllAsync();
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                return RedirectToAction(nameof(MyOrgDetails));
+            }
+
+            if (User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                var allOrgs = await _service.GetAllAsync();
+                return View(allOrgs);
+            }
+
+            // GroupAdmin: only orgs in their group
+            var user = await _userManager.GetUserAsync(User);
+            if (user?.SalesGroupId == null)
+            {
+                TempData["ErrorMessage"] = "You are not assigned to a sales group.";
+                return View(Enumerable.Empty<SalesOrg>());
+            }
+
+            var orgs = await _service.GetByGroupIdAsync(user.SalesGroupId);
             return View(orgs);
         }
 
@@ -36,6 +55,16 @@ namespace LeadManagementPortal.Controllers
         {
             var org = await _service.GetByIdAsync(id);
             if (org == null) return NotFound();
+
+            var user = await _userManager.GetUserAsync(User);
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                if (user?.SalesOrgId != id) return Forbid();
+            }
+            else if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                if (user?.SalesGroupId == null || org.SalesGroupId != user.SalesGroupId) return Forbid();
+            }
 
             var allOrgAdmins = await _userManager.GetUsersInRoleAsync(UserRoles.SalesOrgAdmin);
             var admins = allOrgAdmins.Where(u => u.SalesOrgId == id).ToList();
@@ -46,6 +75,25 @@ namespace LeadManagementPortal.Controllers
 
         public async Task<IActionResult> Create()
         {
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                return Forbid();
+            }
+
+            if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user?.SalesGroupId == null)
+                {
+                    TempData["ErrorMessage"] = "You are not assigned to a sales group.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                var group = await _groupService.GetByIdAsync(user.SalesGroupId);
+                ViewBag.SalesGroups = group == null ? Enumerable.Empty<SalesGroup>() : new[] { group };
+                return View(new SalesOrg { SalesGroupId = user.SalesGroupId });
+            }
+
             var groups = await _groupService.GetAllAsync();
             if (groups == null)
             {
@@ -66,8 +114,22 @@ namespace LeadManagementPortal.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin)]
         public async Task<IActionResult> Create([Bind("Name,SalesGroupId")] SalesOrg model)
         {
+            if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user?.SalesGroupId == null)
+                {
+                    return Forbid();
+                }
+
+                // Group Admin can only create orgs in their own group
+                model.SalesGroupId = user.SalesGroupId;
+                ModelState.Remove(nameof(SalesOrg.SalesGroupId));
+            }
+
             // Server-side validation guardrails
             if (string.IsNullOrWhiteSpace(model.Name))
             {
@@ -78,8 +140,31 @@ namespace LeadManagementPortal.Controllers
                 ModelState.AddModelError(nameof(model.SalesGroupId), "Sales Group selection is required.");
             }
 
+            if (!ModelState.IsValid)
+            {
+                if (User.IsInRole(UserRoles.GroupAdmin))
+                {
+                    var user = await _userManager.GetUserAsync(User);
+                    if (user?.SalesGroupId != null)
+                    {
+                        var group = await _groupService.GetByIdAsync(user.SalesGroupId);
+                        ViewBag.SalesGroups = group == null ? Enumerable.Empty<SalesGroup>() : new[] { group };
+                    }
+                    else
+                    {
+                        ViewBag.SalesGroups = Enumerable.Empty<SalesGroup>();
+                    }
+                }
+                else
+                {
+                    ViewBag.SalesGroups = await _groupService.GetAllAsync();
+                }
+
+                return View(model);
+            }
+
             await _service.CreateAsync(model);
-            TempData["Success"] = "Sales Organization created successfully.";
+            TempData["SuccessMessage"] = "Sales Organization created successfully.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -87,7 +172,32 @@ namespace LeadManagementPortal.Controllers
         {
             var org = await _service.GetByIdAsync(id);
             if (org == null) return NotFound();
-            ViewBag.SalesGroups = await _groupService.GetAllAsync();
+
+            var user = await _userManager.GetUserAsync(User);
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                if (user?.SalesOrgId != id) return Forbid();
+            }
+            else if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                if (user?.SalesGroupId == null || org.SalesGroupId != user.SalesGroupId) return Forbid();
+            }
+
+            if (User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                ViewBag.SalesGroups = await _groupService.GetAllAsync();
+            }
+            else if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                var group = user?.SalesGroupId == null ? null : await _groupService.GetByIdAsync(user.SalesGroupId);
+                ViewBag.SalesGroups = group == null ? Enumerable.Empty<SalesGroup>() : new[] { group };
+            }
+            else
+            {
+                var group = await _groupService.GetByIdAsync(org.SalesGroupId);
+                ViewBag.SalesGroups = group == null ? Enumerable.Empty<SalesGroup>() : new[] { group };
+            }
+
             return View(org);
         }
 
@@ -96,14 +206,45 @@ namespace LeadManagementPortal.Controllers
         public async Task<IActionResult> Edit(int id, SalesOrg model)
         {
             if (id != model.Id) return BadRequest();
-            if (!ModelState.IsValid)
-            {
-                ViewBag.SalesGroups = await _groupService.GetAllAsync();
-                return View(model);
-            }
-
             var existing = await _service.GetByIdAsync(id);
             if (existing == null) return NotFound();
+
+            var user = await _userManager.GetUserAsync(User);
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                if (user?.SalesOrgId != id) return Forbid();
+            }
+            else if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                if (user?.SalesGroupId == null || existing.SalesGroupId != user.SalesGroupId) return Forbid();
+            }
+
+            // Only OrganizationAdmin can move an org to a different group.
+            if (!User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                model.SalesGroupId = existing.SalesGroupId;
+                ModelState.Remove(nameof(SalesOrg.SalesGroupId));
+            }
+
+            if (!ModelState.IsValid)
+            {
+                if (User.IsInRole(UserRoles.OrganizationAdmin))
+                {
+                    ViewBag.SalesGroups = await _groupService.GetAllAsync();
+                }
+                else if (User.IsInRole(UserRoles.GroupAdmin))
+                {
+                    var group = user?.SalesGroupId == null ? null : await _groupService.GetByIdAsync(user.SalesGroupId);
+                    ViewBag.SalesGroups = group == null ? Enumerable.Empty<SalesGroup>() : new[] { group };
+                }
+                else
+                {
+                    var group = await _groupService.GetByIdAsync(existing.SalesGroupId);
+                    ViewBag.SalesGroups = group == null ? Enumerable.Empty<SalesGroup>() : new[] { group };
+                }
+
+                return View(model);
+            }
 
             existing.Name = model.Name;
             existing.SalesGroupId = model.SalesGroupId;
@@ -116,17 +257,38 @@ namespace LeadManagementPortal.Controllers
 
         public async Task<IActionResult> Delete(int id)
         {
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                return Forbid();
+            }
+
             var org = await _service.GetByIdAsync(id);
             if (org == null) return NotFound();
+
+            if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                var user = await _userManager.GetUserAsync(User);
+                if (user?.SalesGroupId == null || org.SalesGroupId != user.SalesGroupId) return Forbid();
+            }
+
             return View(org);
         }
 
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
+        [Authorize(Roles = UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin)]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             try
             {
+                if (User.IsInRole(UserRoles.GroupAdmin))
+                {
+                    var user = await _userManager.GetUserAsync(User);
+                    var org = await _service.GetByIdAsync(id);
+                    if (org == null) return NotFound();
+                    if (user?.SalesGroupId == null || org.SalesGroupId != user.SalesGroupId) return Forbid();
+                }
+
                 await _service.DeleteAsync(id);
                 TempData["SuccessMessage"] = "Sales Organization deleted successfully.";
                 return RedirectToAction(nameof(Index));
@@ -156,7 +318,7 @@ namespace LeadManagementPortal.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = UserRoles.OrganizationAdmin + "," + UserRoles.SalesOrgAdmin)]
+        [Authorize(Roles = UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin + "," + UserRoles.SalesOrgAdmin)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UploadLogo(int id, IFormFile logo, string? source = null)
         {
@@ -164,6 +326,7 @@ namespace LeadManagementPortal.Controllers
             
             // Check permissions
             bool isOrgAdmin = User.IsInRole(UserRoles.OrganizationAdmin);
+            bool isGroupAdmin = User.IsInRole(UserRoles.GroupAdmin);
             bool isSalesOrgAdmin = User.IsInRole(UserRoles.SalesOrgAdmin);
 
             if (!isOrgAdmin && isSalesOrgAdmin && user?.SalesOrgId != id)
@@ -173,6 +336,14 @@ namespace LeadManagementPortal.Controllers
 
             var org = await _service.GetByIdAsync(id);
             if (org == null) return NotFound();
+
+            if (!isOrgAdmin && isGroupAdmin)
+            {
+                if (user?.SalesGroupId == null || org.SalesGroupId != user.SalesGroupId)
+                {
+                    return Forbid();
+                }
+            }
 
             if (logo != null && logo.Length > 0)
             {

@@ -4,7 +4,10 @@
 }
 <h2>Sales Orgs</h2>
 <p>
-    <a class="btn btn-primary" asp-action="Create">Create New</a>
+    @if (User.IsInRole("OrganizationAdmin") || User.IsInRole("GroupAdmin"))
+    {
+        <a class="btn btn-primary" asp-action="Create">Create New</a>
+    }
 </p>
 <table class="table">
     <thead>

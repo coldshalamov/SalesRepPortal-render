@@ -1,0 +1,236 @@
+.pipeline-stat-row .pipeline-stat-card {
+  background: #ffffff;
+  border: 1px solid #e9ecef;
+  border-radius: 0.75rem;
+  padding: 0.85rem 0.95rem;
+  height: 100%;
+}
+
+.pipeline-stat-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6c757d;
+}
+
+.pipeline-stat-value {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #212529;
+  line-height: 1.1;
+}
+
+.pipeline-stat-sub {
+  font-size: 0.78rem;
+  color: #6c757d;
+}
+
+.pipeline-board-view {
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  padding: 0.85rem 0;
+  overflow-x: auto;
+}
+
+.pipeline-columns {
+  display: flex;
+  gap: 0.9rem;
+  min-width: max-content;
+  padding: 0 1rem 0.45rem;
+}
+
+.pipeline-column {
+  width: 280px;
+  min-height: 270px;
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pipeline-column.is-drop-target {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.12);
+}
+
+.pipeline-column-header {
+  border-bottom: 1px solid #e9ecef;
+  padding: 0.65rem 0.8rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+  border-top-left-radius: 0.8rem;
+  border-top-right-radius: 0.8rem;
+}
+
+.pipeline-column-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #495057;
+}
+
+.pipeline-column-count {
+  background: #0d6efd;
+  color: #ffffff;
+  min-width: 1.35rem;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.74rem;
+  padding: 0.08rem 0.42rem;
+  font-weight: 600;
+}
+
+.pipeline-column-body {
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 210px;
+}
+
+.pipeline-card {
+  border: 1px solid #e9ecef;
+  background: #ffffff;
+  border-radius: 0.7rem;
+  padding: 0.62rem 0.65rem;
+  cursor: move;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.pipeline-card:hover {
+  border-color: #b6d4fe;
+  box-shadow: 0 0.3rem 0.8rem rgba(13, 110, 253, 0.12);
+  transform: translateY(-1px);
+}
+
+.pipeline-card.is-dragging {
+  opacity: 0.55;
+}
+
+.pipeline-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.pipeline-card-company {
+  font-size: 0.87rem;
+  font-weight: 700;
+  color: #212529;
+  margin-bottom: 0.05rem;
+}
+
+.pipeline-card-name {
+  font-size: 0.76rem;
+  color: #6c757d;
+}
+
+.pipeline-card-days {
+  font-size: 0.72rem;
+  color: #6c757d;
+  white-space: nowrap;
+}
+
+.pipeline-card-meta {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed #e9ecef;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.pipeline-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+}
+
+.pipeline-meta-label {
+  color: #6c757d;
+}
+
+.pipeline-meta-value {
+  color: #343a40;
+  font-weight: 500;
+  text-align: right;
+}
+
+.pipeline-urgency-badge {
+  font-size: 0.68rem;
+  border-radius: 999px;
+  padding: 0.08rem 0.4rem;
+  font-weight: 600;
+}
+
+.pipeline-urgency-low {
+  background: #6c757d;
+  color: #ffffff;
+}
+
+.pipeline-urgency-medium {
+  background: #ffc107;
+  color: #212529;
+}
+
+.pipeline-urgency-high,
+.pipeline-urgency-critical {
+  background: #dc3545;
+  color: #ffffff;
+}
+
+.pipeline-empty-column {
+  border: 1px dashed #dee2e6;
+  color: #6c757d;
+  border-radius: 0.7rem;
+  text-align: center;
+  padding: 1rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+.pipeline-loading {
+  width: 100%;
+  color: #6c757d;
+  text-align: center;
+  font-size: 0.9rem;
+  padding: 2rem;
+}
+
+.pipeline-stage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.pipeline-stage-actions .btn {
+  min-width: 110px;
+}
+
+.pipeline-detail-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+  color: #6c757d;
+}
+
+.pipeline-detail-value {
+  color: #212529;
+  font-weight: 500;
+}
+
+@media (max-width: 991.98px) {
+  .pipeline-column {
+    width: 245px;
+  }
+
+  .pipeline-columns {
+    padding: 0 0.6rem 0.35rem;
+  }
+}
