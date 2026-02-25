@@ -18,17 +18,18 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" />
     <style>
         :root {
-            --page-base: #040b17;
-            --page-mid: #0b162b;
-            --page-top: #15223a;
-            --text-main: #f1f6ff;
-            --text-muted: rgba(226, 238, 255, 0.82);
-            --card-bg: rgba(10, 20, 37, 0.62);
-            --card-border: rgba(169, 194, 225, 0.24);
-            --field-bg: rgba(255, 255, 255, 0.08);
-            --field-border: rgba(178, 205, 237, 0.3);
-            --field-focus: rgba(182, 212, 247, 0.52);
-            --accent: #7dafff;
+            --page-base: #f8fafc;
+            --page-mid: #ffffff;
+            --page-top: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --card-border: rgba(226, 232, 240, 0.8);
+            --field-bg: #ffffff;
+            --field-border: #cbd5e1;
+            --field-focus: #3b82f6;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
         }
 
         body, html {
@@ -40,7 +41,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: radial-gradient(125% 95% at 102% -6%, var(--page-top) 0%, var(--page-mid) 34%, var(--page-base) 72%, #02050d 100%);
+            background: #ffffff; /* Match dashboard interior */
         }
 
         .login-bg {
@@ -49,17 +50,18 @@
             pointer-events: none;
             overflow: hidden;
             z-index: 0;
+            background: #ffffff;
         }
 
         .corner-stripes {
             position: absolute;
-            top: -22%;
-            right: -10%;
+            top: -10%;       /* Moved more into screen (was -22%) */
+            right: -2%;      /* Moved more into screen (was -10%) */
             width: min(76vw, 920px);
             height: min(70vh, 560px);
-            opacity: 0.62;
-            filter: saturate(0.86) contrast(0.95);
-            animation: stripeDrift 10s ease-in-out infinite;
+            opacity: 0.85;
+            filter: blur(28px); /* Stripe aesthetic */
+            animation: stripeDrift 7.5s ease-in-out infinite; /* 25% faster than 10s */
         }
 
         .stripe {
@@ -69,21 +71,21 @@
         }
 
         .stripe-1 {
-            stroke: url(#stripeWarm);
-            stroke-width: 66;
-            opacity: 0.38;
+            stroke: url(#stripeBlue);
+            stroke-width: 90;
+            opacity: 0.8;
         }
 
         .stripe-2 {
-            stroke: url(#stripeViolet);
-            stroke-width: 54;
-            opacity: 0.34;
+            stroke: url(#stripePurple);
+            stroke-width: 70;
+            opacity: 0.7;
         }
 
         .stripe-3 {
-            stroke: url(#stripeSoftBlue);
-            stroke-width: 36;
-            opacity: 0.3;
+            stroke: url(#stripeCyan);
+            stroke-width: 50;
+            opacity: 0.6;
         }
 
         .corner-glow {
@@ -93,20 +95,19 @@
             width: min(58vw, 760px);
             height: min(58vh, 520px);
             background:
-                radial-gradient(58% 60% at 66% 38%, rgba(245, 162, 71, 0.22) 0%, rgba(245, 162, 71, 0.06) 46%, transparent 76%),
-                radial-gradient(64% 66% at 54% 50%, rgba(151, 119, 255, 0.18) 0%, rgba(151, 119, 255, 0.05) 50%, transparent 80%);
-            filter: blur(2px);
+                radial-gradient(58% 60% at 66% 38%, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 46%, transparent 76%),
+                radial-gradient(64% 66% at 54% 50%, rgba(139, 92, 246, 0.12) 0%, rgba(139, 92, 246, 0.04) 50%, transparent 80%);
+            filter: blur(20px);
         }
 
         .subtle-grid {
             position: absolute;
             inset: 0;
             background-image:
-                linear-gradient(to right, rgba(176, 204, 241, 0.05) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(176, 204, 241, 0.04) 1px, transparent 1px);
+                linear-gradient(to right, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
             background-size: 160px 160px;
-            opacity: 0.1;
-            mask-image: radial-gradient(80% 70% at 35% 50%, black 35%, transparent 100%);
+            mask-image: radial-gradient(100% 100% at 50% 50%, black 10%, transparent 90%);
         }
 
         .top-right-line {
@@ -115,17 +116,16 @@
             right: 110px;
             width: min(16vw, 220px);
             height: 1px;
-            background: linear-gradient(90deg, rgba(168, 204, 244, 0) 0%, rgba(190, 218, 250, 0.72) 52%, rgba(168, 204, 244, 0) 100%);
-            opacity: 0.48;
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0) 0%, rgba(99, 102, 241, 0.4) 52%, rgba(99, 102, 241, 0) 100%);
         }
 
-        @@keyframes stripeDrift {
+        @keyframes stripeDrift {
             0%, 100% {
                 transform: translate3d(0, 0, 0) scale(1);
             }
 
             50% {
-                transform: translate3d(-8px, 6px, 0) scale(1.015);
+                transform: translate3d(-30px, 20px, 0) scale(1.05);
             }
         }
 
@@ -141,11 +141,11 @@
 
         .login-card {
             background: var(--card-bg);
-            backdrop-filter: blur(22px);
-            -webkit-backdrop-filter: blur(22px);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
             border: 1px solid var(--card-border);
             border-radius: 24px;
-            box-shadow: 0 34px 70px rgba(1, 6, 15, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
             padding: 48px;
             width: 100%;
             max-width: 440px;
@@ -155,7 +155,7 @@
             transform: translateY(20px);
         }
 
-        @@keyframes slideUp {
+        @keyframes slideUp {
             from {
                 opacity: 0;
                 transform: translateY(30px);
@@ -177,7 +177,6 @@
             letter-spacing: -0.03em;
             margin-bottom: 8px;
             color: var(--text-main);
-            text-shadow: 0 8px 30px rgba(10, 21, 42, 0.45);
         }
 
         .login-subtitle {
@@ -190,29 +189,28 @@
             font-weight: 500;
             font-size: 0.95rem;
             margin-bottom: 8px;
-            color: rgba(235, 244, 255, 0.95);
+            color: var(--text-main);
         }
 
         .input-group {
             margin-bottom: 24px;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 14px rgba(3, 10, 23, 0.22);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             background: var(--field-bg);
             border: 1px solid var(--field-border);
             transition: all 0.3s ease;
         }
 
         .input-group:focus-within {
-            background: rgba(255, 255, 255, 0.14);
             border-color: var(--field-focus);
-            box-shadow: 0 10px 24px rgba(7, 20, 39, 0.36);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
         }
 
         .input-group-text {
             background: transparent;
             border: none;
-            color: rgba(218, 233, 252, 0.9);
+            color: #94a3b8;
             padding-left: 16px;
         }
 
@@ -225,7 +223,7 @@
         }
 
         .form-control::placeholder {
-            color: rgba(214, 229, 249, 0.62);
+            color: #cbd5e1;
         }
 
         .form-control:focus {
@@ -235,9 +233,9 @@
         }
 
         .form-check-input {
-            background-color: rgba(255, 255, 255, 0.12);
-            border-color: rgba(186, 211, 241, 0.5);
             cursor: pointer;
+            border-color: #cbd5e1;
+            background-color: #ffffff;
         }
 
         .form-check-input:checked {
@@ -246,15 +244,15 @@
         }
 
         .form-check-label {
-            color: rgba(222, 235, 253, 0.9);
+            color: var(--text-muted);
             font-size: 0.95rem;
             cursor: pointer;
         }
 
         .btn-primary {
-            background: linear-gradient(180deg, rgba(145, 182, 247, 0.3) 0%, rgba(123, 166, 238, 0.32) 100%);
-            border: 1px solid rgba(185, 213, 250, 0.56);
-            color: var(--text-main);
+            background: var(--accent);
+            border: 1px solid var(--accent);
+            color: #ffffff;
             font-weight: 600;
             padding: 14px;
             border-radius: 12px;
@@ -264,11 +262,11 @@
         }
 
         .btn-primary:hover, .btn-primary:focus {
-            background: linear-gradient(180deg, rgba(167, 199, 255, 0.42) 0%, rgba(138, 182, 255, 0.45) 100%);
-            border-color: rgba(202, 224, 255, 0.72);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
             transform: translateY(-2px);
-            box-shadow: 0 12px 24px rgba(8, 19, 37, 0.36);
-            color: var(--text-main);
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+            color: #ffffff;
         }
 
         .btn-primary:active {
@@ -277,28 +275,26 @@
 
         .validation-errors {
             font-size: 0.9rem;
-            color: #ffe8e8;
-            background: rgba(212, 64, 64, 0.18);
+            color: #991b1b;
+            background: #fef2f2;
             padding: 12px;
             border-radius: 8px;
-            border: 1px solid rgba(255, 124, 124, 0.4);
+            border: 1px solid #fecaca;
             margin-bottom: 20px;
             display: none;
         }
 
-        @@media (max-width: 768px) {
+        @media (max-width: 768px) {
             .corner-stripes {
-                top: -12%;
-                right: -32%;
-                width: 132vw;
+                top: -5%;
+                right: -10%;
+                width: 120vw;
                 height: 50vh;
-                opacity: 0.45;
+                opacity: 0.6;
             }
 
             .top-right-line {
-                top: 66px;
-                right: 30px;
-                width: 32vw;
+                display: none;
             }
 
             .login-card {
@@ -315,20 +311,21 @@
         <div class="corner-glow"></div>
         <svg class="corner-stripes" viewBox="0 0 720 520" preserveAspectRatio="xMaxYMin slice" role="presentation">
             <defs>
-                <linearGradient id="stripeWarm" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="rgba(255, 255, 255, 0.15)" />
-                    <stop offset="46%" stop-color="rgba(252, 189, 95, 0.9)" />
-                    <stop offset="100%" stop-color="rgba(246, 135, 76, 0.85)" />
+                <linearGradient id="stripeBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="rgba(59, 130, 246, 0.9)" />
+                    <stop offset="50%" stop-color="rgba(37, 99, 235, 0.85)" />
+                    <stop offset="100%" stop-color="rgba(29, 78, 216, 0.8)" />
                 </linearGradient>
-                <linearGradient id="stripeViolet" x1="6%" y1="8%" x2="100%" y2="92%">
-                    <stop offset="0%" stop-color="rgba(208, 222, 255, 0.4)" />
-                    <stop offset="52%" stop-color="rgba(190, 125, 255, 0.9)" />
-                    <stop offset="100%" stop-color="rgba(129, 104, 246, 0.78)" />
+                <!-- Corrected below -->
+                <linearGradient id="stripePurple" x1="6%" y1="8%" x2="100%" y2="92%">
+                    <stop offset="0%" stop-color="rgba(167, 139, 250, 0.8)" />
+                    <stop offset="52%" stop-color="rgba(139, 92, 246, 0.85)" />
+                    <stop offset="100%" stop-color="rgba(109, 40, 217, 0.75)" />
                 </linearGradient>
-                <linearGradient id="stripeSoftBlue" x1="0%" y1="0%" x2="92%" y2="90%">
-                    <stop offset="0%" stop-color="rgba(223, 236, 255, 0.5)" />
-                    <stop offset="56%" stop-color="rgba(143, 189, 255, 0.72)" />
-                    <stop offset="100%" stop-color="rgba(140, 156, 255, 0.38)" />
+                <linearGradient id="stripeCyan" x1="0%" y1="0%" x2="92%" y2="90%">
+                    <stop offset="0%" stop-color="rgba(94, 234, 212, 0.8)" />
+                    <stop offset="56%" stop-color="rgba(45, 212, 191, 0.7)" />
+                    <stop offset="100%" stop-color="rgba(15, 118, 110, 0.6)" />
                 </linearGradient>
             </defs>
             <path class="stripe stripe-1" d="M 256 -90 C 390 72 470 204 740 510" />
@@ -346,7 +343,7 @@
 
             <form asp-action="Login" method="post">
                 <input type="hidden" name="returnUrl" value="@returnUrl" />
-                <div asp-validation-summary="All" class="text-white validation-errors"></div>
+                <div asp-validation-summary="All" class="text-danger validation-errors"></div>
 
                 <div>
                     <label asp-for="Email" class="form-label">Email</label>

@@ -300,3 +300,42 @@ body {
 #navbarSearchMenu .dropdown-item {
   white-space: normal;
 }
+
+/* User profile pill in the navbar */
+.user-pill {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  padding: 4px 14px 4px 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.user-pill:hover,
+.nav-link:hover .user-pill {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.user-pill-icon {
+  font-size: 2rem;
+  line-height: 1;
+  color: #fff;
+}
+
+.user-pill-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.user-pill-top {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.user-pill-bottom {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.8);
+}
