@@ -141,6 +141,99 @@ namespace LeadManagementPortal.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("LeadManagementPortal.Models.CommissionDeal", b =>
+                {
+                    b.Property<string>("ApplicationUserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("CalculationBasis")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("BaseCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("DealType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("ApplicationUserId");
+
+                    b.ToTable("CommissionDeals");
+                });
+
+            modelBuilder.Entity("LeadManagementPortal.Models.CommissionLedger", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("BeneficiaryId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("CalculationNotes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ChainDepth")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("CommissionAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("DealSnapshot")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("SaleRecordId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BeneficiaryId");
+
+                    b.HasIndex("SaleRecordId");
+
+                    b.HasIndex("SaleRecordId", "BeneficiaryId")
+                        .IsUnique();
+
+                    b.ToTable("CommissionLedgers");
+                });
+
+            modelBuilder.Entity("LeadManagementPortal.Models.CommissionLink", b =>
+                {
+                    b.Property<string>("DownlineId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SponsorId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("DownlineId");
+
+                    b.HasIndex("SponsorId");
+
+                    b.ToTable("CommissionLinks", t =>
+                        {
+                            t.HasCheckConstraint("CK_CommissionLinks_NoSelfSponsor", "[DownlineId] <> [SponsorId]");
+                        });
+                });
+
             modelBuilder.Entity("LeadManagementPortal.Models.Customer", b =>
                 {
                     b.Property<string>("Id")
@@ -588,6 +681,60 @@ namespace LeadManagementPortal.Migrations
                     b.ToTable("SalesOrgs");
                 });
 
+            modelBuilder.Entity("LeadManagementPortal.Models.SaleRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<decimal?>("CostAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ImportBatchId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SaleDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("ImportBatchId");
+
+                    b.HasIndex("SaleDate");
+
+                    b.ToTable("SaleRecords");
+                });
+
             modelBuilder.Entity("LeadManagementPortal.Models.SystemSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -812,6 +959,55 @@ namespace LeadManagementPortal.Migrations
                     b.Navigation("SalesOrg");
                 });
 
+            modelBuilder.Entity("LeadManagementPortal.Models.CommissionDeal", b =>
+                {
+                    b.HasOne("LeadManagementPortal.Models.ApplicationUser", "ApplicationUser")
+                        .WithOne("CommissionDeal")
+                        .HasForeignKey("LeadManagementPortal.Models.CommissionDeal", "ApplicationUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApplicationUser");
+                });
+
+            modelBuilder.Entity("LeadManagementPortal.Models.CommissionLedger", b =>
+                {
+                    b.HasOne("LeadManagementPortal.Models.ApplicationUser", "Beneficiary")
+                        .WithMany("CommissionLedgers")
+                        .HasForeignKey("BeneficiaryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("LeadManagementPortal.Models.SaleRecord", "SaleRecord")
+                        .WithMany("CommissionLedgers")
+                        .HasForeignKey("SaleRecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Beneficiary");
+
+                    b.Navigation("SaleRecord");
+                });
+
+            modelBuilder.Entity("LeadManagementPortal.Models.CommissionLink", b =>
+                {
+                    b.HasOne("LeadManagementPortal.Models.ApplicationUser", "Downline")
+                        .WithOne("SponsorLink")
+                        .HasForeignKey("LeadManagementPortal.Models.CommissionLink", "DownlineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LeadManagementPortal.Models.ApplicationUser", "Sponsor")
+                        .WithMany("SponsoredDownlines")
+                        .HasForeignKey("SponsorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Downline");
+
+                    b.Navigation("Sponsor");
+                });
+
             modelBuilder.Entity("LeadManagementPortal.Models.Customer", b =>
                 {
                     b.HasOne("LeadManagementPortal.Models.ApplicationUser", "ConvertedBy")
@@ -937,6 +1133,17 @@ namespace LeadManagementPortal.Migrations
                     b.Navigation("SalesGroup");
                 });
 
+            modelBuilder.Entity("LeadManagementPortal.Models.SaleRecord", b =>
+                {
+                    b.HasOne("LeadManagementPortal.Models.ApplicationUser", "Account")
+                        .WithMany("SaleRecords")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+                });
+
             modelBuilder.Entity("LeadProducts", b =>
                 {
                     b.HasOne("LeadManagementPortal.Models.Lead", null)
@@ -1005,7 +1212,17 @@ namespace LeadManagementPortal.Migrations
 
             modelBuilder.Entity("LeadManagementPortal.Models.ApplicationUser", b =>
                 {
+                    b.Navigation("CommissionDeal");
+
+                    b.Navigation("CommissionLedgers");
+
                     b.Navigation("Leads");
+
+                    b.Navigation("SaleRecords");
+
+                    b.Navigation("SponsoredDownlines");
+
+                    b.Navigation("SponsorLink");
                 });
 
             modelBuilder.Entity("LeadManagementPortal.Models.Lead", b =>
@@ -1025,6 +1242,10 @@ namespace LeadManagementPortal.Migrations
             modelBuilder.Entity("LeadManagementPortal.Models.SalesOrg", b =>
                 {
                     b.Navigation("SalesReps");
+                });
+            modelBuilder.Entity("LeadManagementPortal.Models.SaleRecord", b =>
+                {
+                    b.Navigation("CommissionLedgers");
                 });
             modelBuilder.Entity("LeadManagementPortal.Models.Notification", b =>
                 {

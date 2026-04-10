@@ -5,27 +5,21 @@
 }
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">My Earnings & Commissions</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary">Share</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary">Export</button>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle">
-            <span data-feather="calendar"></span>
-            This Month
-        </button>
+    <h1 class="h2">Commissions</h1>
+    <div class="btn-toolbar">
+        <a asp-action="Details" class="btn btn-outline-primary">
+            <i class="bi bi-table"></i> View All Ledger Rows
+        </a>
     </div>
 </div>
 
-<!-- Summary Cards -->
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card text-white bg-success mb-3">
-            <div class="card-header">Total Earned (YTD)</div>
+            <div class="card-header">Total Earned</div>
             <div class="card-body">
                 <h2 class="card-title">@Model.TotalCommissionEarned.ToString("C")</h2>
-                <p class="card-text">Great job! You are on track.</p>
+                <p class="card-text mb-0">@Model.TotalLedgerRows ledger rows</p>
             </div>
         </div>
     </div>
@@ -34,61 +28,106 @@
             <div class="card-header">This Month</div>
             <div class="card-body">
                 <h2 class="card-title">@Model.CurrentMonthCommission.ToString("C")</h2>
-                <p class="card-text">From 4 deals closed.</p>
+                <p class="card-text mb-0">Freshly queried from the commission ledger.</p>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-white bg-warning mb-3">
-            <div class="card-header">Pending Payouts</div>
+        <div class="card text-dark bg-info-subtle mb-3">
+            <div class="card-header">Deal Types</div>
             <div class="card-body">
-                <h2 class="card-title">@Model.PendingPayouts.ToString("C")</h2>
-                <p class="card-text">Expected by end of month.</p>
+                <h2 class="card-title">@Model.BreakdownByDealType.Count</h2>
+                <p class="card-text mb-0">Distinct deal types represented in visible rows.</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Deals Table -->
-<h3>Recent Deals</h3>
-<div class="table-responsive">
-    <table class="table table-striped table-sm">
-        <thead>
-            <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Customer</th>
-                <th scope="col">Product</th>
-                <th scope="col" class="text-end">Sale Amount</th>
-                <th scope="col" class="text-end">Commission (10%)</th>
-                <th scope="col">Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var deal in Model.RecentDeals)
-            {
-                <tr>
-                    <td>@deal.Date.ToShortDateString()</td>
-                    <td>@deal.CustomerName</td>
-                    <td>@deal.Product</td>
-                    <td class="text-end">@deal.SaleAmount.ToString("C")</td>
-                    <td class="text-end fw-bold text-success">@deal.CommissionAmount.ToString("C")</td>
-                    <td>
-                        @if(deal.Status == "Paid")
-                        {
-                            <span class="badge bg-success">Paid</span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-warning text-dark">Pending</span>
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                Earnings By Deal Type
+            </div>
+            <div class="card-body">
+                @if (Model.BreakdownByDealType.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Deal Type</th>
+                                    <th class="text-end">Rows</th>
+                                    <th class="text-end">Earned</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.BreakdownByDealType)
+                                {
+                                    <tr>
+                                        <td>@row.DealType</td>
+                                        <td class="text-end">@row.RowCount</td>
+                                        <td class="text-end fw-semibold">@row.TotalCommission.ToString("C")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No commission rows are visible yet.</p>
+                }
+            </div>
+        </div>
+    </div>
 
-<div class="alert alert-info mt-4">
-    <i class="bi bi-info-circle"></i> <strong>Note:</strong> Data is currently simulated for demonstration. 
-    Real-time integration with DispensePro/Finance is pending configuration.
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Recent Ledger Rows</span>
+                <span class="text-muted small">Newest 20 visible rows</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Product</th>
+                                <th>Beneficiary</th>
+                                <th>Deal Type</th>
+                                <th class="text-end">Gross</th>
+                                <th class="text-end">Net</th>
+                                <th class="text-end">Commission</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.DetailRows.Any())
+                            {
+                                @foreach (var row in Model.DetailRows)
+                                {
+                                    <tr>
+                                        <td>@row.SaleDate.ToString("MMM dd, yyyy")</td>
+                                        <td>@row.ProductName</td>
+                                        <td>@row.BeneficiaryName</td>
+                                        <td>@row.DealType</td>
+                                        <td class="text-end">@row.GrossAmount.ToString("C")</td>
+                                        <td class="text-end">@row.NetAmount.ToString("C")</td>
+                                        <td class="text-end fw-semibold text-success">@row.CommissionAmount.ToString("C")</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">No commission data is available yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

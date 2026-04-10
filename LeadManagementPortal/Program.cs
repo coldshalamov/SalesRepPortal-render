@@ -98,6 +98,7 @@ builder.Services.AddScoped<IFileStorageService>(sp =>
 builder.Services.AddScoped<ILeadDocumentService, LeadDocumentService>();
 builder.Services.AddScoped<ILeadAuditService, LeadAuditService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<ICommissionCalculationService, CommissionCalculationService>();
 
 // Options
 builder.Services.Configure<SmartyStreetsOptions>(builder.Configuration.GetSection("SmartyStreets"));

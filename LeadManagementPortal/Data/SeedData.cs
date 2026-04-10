@@ -18,7 +18,14 @@ namespace LeadManagementPortal.Data
             var db = serviceProvider.GetRequiredService<ApplicationDbContext>();
 
             // Create Roles
-            string[] roleNames = { UserRoles.OrganizationAdmin, UserRoles.GroupAdmin, UserRoles.SalesRep, UserRoles.SalesOrgAdmin };
+            string[] roleNames =
+            {
+                UserRoles.OrganizationAdmin,
+                UserRoles.GroupAdmin,
+                UserRoles.SalesRep,
+                UserRoles.SalesOrgAdmin,
+                UserRoles.Affiliate
+            };
             foreach (var roleName in roleNames)
             {
                 if (!await roleManager.RoleExistsAsync(roleName))

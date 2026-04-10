@@ -4,17 +4,32 @@ namespace LeadManagementPortal.Models.ViewModels
     {
         public decimal TotalCommissionEarned { get; set; }
         public decimal CurrentMonthCommission { get; set; }
-        public decimal PendingPayouts { get; set; }
-        public List<CommissionDealViewModel> RecentDeals { get; set; } = new List<CommissionDealViewModel>();
+        public int TotalLedgerRows { get; set; }
+        public List<CommissionDealBreakdownViewModel> BreakdownByDealType { get; set; } = new List<CommissionDealBreakdownViewModel>();
+        public List<CommissionLedgerRowViewModel> DetailRows { get; set; } = new List<CommissionLedgerRowViewModel>();
     }
 
-    public class CommissionDealViewModel
+    public class CommissionDealBreakdownViewModel
     {
-        public DateTime Date { get; set; }
-        public string CustomerName { get; set; } = string.Empty;
-        public string Product { get; set; } = string.Empty;
-        public decimal SaleAmount { get; set; }
+        public string DealType { get; set; } = string.Empty;
+        public decimal TotalCommission { get; set; }
+        public int RowCount { get; set; }
+    }
+
+    public class CommissionLedgerRowViewModel
+    {
+        public int Id { get; set; }
+        public int SaleRecordId { get; set; }
+        public string BeneficiaryId { get; set; } = string.Empty;
+        public string BeneficiaryName { get; set; } = string.Empty;
+        public DateTime SaleDate { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public decimal GrossAmount { get; set; }
+        public decimal NetAmount { get; set; }
         public decimal CommissionAmount { get; set; }
-        public string Status { get; set; } = "Paid"; // Paid, Pending
+        public int ChainDepth { get; set; }
+        public string DealType { get; set; } = string.Empty;
+        public string CalculationBasis { get; set; } = string.Empty;
+        public string CalculationNotes { get; set; } = string.Empty;
     }
 }

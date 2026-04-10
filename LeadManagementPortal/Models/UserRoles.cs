@@ -6,5 +6,6 @@ namespace LeadManagementPortal.Models
         public const string GroupAdmin = "GroupAdmin";
         public const string SalesRep = "SalesRep";
         public const string SalesOrgAdmin = "SalesOrgAdmin";
+        public const string Affiliate = "Affiliate";
     }
 }

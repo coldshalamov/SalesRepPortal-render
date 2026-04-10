@@ -340,7 +340,12 @@ namespace LeadManagementPortal.Controllers
                 return NotFound();
             }
 
-            var user = await _userManager.Users.Include(u => u.SalesGroup).Include(u => u.SalesOrg).FirstOrDefaultAsync(u => u.Id == id);
+            var user = await _userManager.Users
+                .Include(u => u.SalesGroup)
+                .Include(u => u.SalesOrg)
+                .Include(u => u.CommissionDeal)
+                .Include(u => u.SponsorLink)
+                .FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
             {
                 return NotFound();
@@ -393,7 +398,12 @@ namespace LeadManagementPortal.Controllers
                 Role = roles.FirstOrDefault() ?? string.Empty,
                 SalesGroupId = user.SalesGroupId,
                 SalesOrgId = user.SalesOrgId,
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                SponsorId = user.SponsorLink?.SponsorId,
+                CommissionDealType = user.CommissionDeal?.DealType,
+                CommissionRate = user.CommissionDeal?.Rate,
+                CommissionBaseCost = user.CommissionDeal?.BaseCost,
+                CommissionCalculationBasis = user.CommissionDeal?.CalculationBasis
             };
 
             if (User.IsInRole(UserRoles.GroupAdmin))
@@ -459,6 +469,8 @@ namespace LeadManagementPortal.Controllers
                 ViewBag.LockToGroup = false;
                 ViewBag.LockToOrg = false;
             }
+
+            await PopulateCommissionOptionsAsync(model);
             return View(model);
         }
 
@@ -469,16 +481,20 @@ namespace LeadManagementPortal.Controllers
         {
             if (ModelState.IsValid)
             {
-                var user = await _userManager.FindByIdAsync(model.Id);
+                var user = await _userManager.Users
+                    .Include(u => u.CommissionDeal)
+                    .Include(u => u.SponsorLink)
+                    .FirstOrDefaultAsync(u => u.Id == model.Id);
                 if (user == null)
                 {
                     return NotFound();
                 }
 
+                var currentUser = await _userManager.GetUserAsync(User);
+
                 if (User.IsInRole(UserRoles.GroupAdmin))
                 {
                     // Enforce constraints for Group Admin edits
-                    var currentUser = await _userManager.GetUserAsync(User);
                     if (currentUser?.SalesGroupId == null)
                     {
                         return Forbid();
@@ -489,14 +505,18 @@ namespace LeadManagementPortal.Controllers
                         return Forbid();
                     }
 
-                    // Lock role to SalesRep and group to current admin's group
-                    model.Role = UserRoles.SalesRep;
+                    var lockedRole = await GetLockedScopedRoleAsync(user);
+                    if (lockedRole == null)
+                    {
+                        return Forbid();
+                    }
+
+                    model.Role = lockedRole;
                     model.SalesGroupId = currentUser.SalesGroupId;
                 }
                 else if (User.IsInRole(UserRoles.SalesOrgAdmin))
                 {
                     // Enforce constraints for Sales Org Admin edits
-                    var currentUser = await _userManager.GetUserAsync(User);
                     if (currentUser?.SalesOrgId == null)
                     {
                         return Forbid();
@@ -507,8 +527,13 @@ namespace LeadManagementPortal.Controllers
                         return Forbid();
                     }
 
-                    // Lock to SalesRep and to current admin's org and its group
-                    model.Role = UserRoles.SalesRep;
+                    var lockedRole = await GetLockedScopedRoleAsync(user);
+                    if (lockedRole == null)
+                    {
+                        return Forbid();
+                    }
+
+                    model.Role = lockedRole;
                     var org = await _context.SalesOrgs.FirstOrDefaultAsync(o => o.Id == currentUser.SalesOrgId.Value);
                     if (org != null)
                     {
@@ -551,6 +576,32 @@ namespace LeadManagementPortal.Controllers
                     }
                 }
 
+                ValidateCommissionFields(model);
+
+                if (!string.IsNullOrWhiteSpace(model.SponsorId))
+                {
+                    if (model.SponsorId == model.Id)
+                    {
+                        ModelState.AddModelError(nameof(model.SponsorId), "A user cannot sponsor themselves.");
+                    }
+                    else
+                    {
+                        var sponsor = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == model.SponsorId);
+                        if (sponsor == null)
+                        {
+                            ModelState.AddModelError(nameof(model.SponsorId), "Selected sponsor does not exist.");
+                        }
+                        else if (!await CanAssignSponsorAsync(sponsor, currentUser))
+                        {
+                            ModelState.AddModelError(nameof(model.SponsorId), "Selected sponsor is outside your admin scope.");
+                        }
+                        else if (await WouldCreateCommissionCycleAsync(model.Id, model.SponsorId))
+                        {
+                            ModelState.AddModelError(nameof(model.SponsorId), "This sponsor selection would create a commission cycle.");
+                        }
+                    }
+                }
+
                 if (ModelState.IsValid)
                 {
                     user.FirstName = model.FirstName;
@@ -568,6 +619,8 @@ namespace LeadManagementPortal.Controllers
                         var currentRoles = await _userManager.GetRolesAsync(user);
                         await _userManager.RemoveFromRolesAsync(user, currentRoles);
                         await _userManager.AddToRoleAsync(user, model.Role);
+
+                        await UpsertCommissionConfigurationAsync(user, model);
 
                         TempData["SuccessMessage"] = "User updated successfully!";
                         if (User.IsInRole(UserRoles.GroupAdmin))
@@ -648,6 +701,8 @@ namespace LeadManagementPortal.Controllers
                 ViewBag.LockToGroup = false;
                 ViewBag.LockToOrg = false;
             }
+
+            await PopulateCommissionOptionsAsync(model);
             return View(model);
         }
 
@@ -967,6 +1022,168 @@ namespace LeadManagementPortal.Controllers
             return RedirectToAction(nameof(MyOrg));
         }
 
+        private void ValidateCommissionFields(EditUserViewModel model)
+        {
+            var hasCommissionInput = model.CommissionDealType.HasValue
+                || model.CommissionRate.HasValue
+                || model.CommissionBaseCost.HasValue
+                || model.CommissionCalculationBasis.HasValue;
+
+            if (!hasCommissionInput)
+            {
+                return;
+            }
+
+            if (!model.CommissionDealType.HasValue)
+            {
+                ModelState.AddModelError(nameof(model.CommissionDealType), "Select a deal type or clear the commission fields.");
+            }
+
+            if (!model.CommissionRate.HasValue)
+            {
+                ModelState.AddModelError(nameof(model.CommissionRate), "Rate / amount is required when a commission deal is configured.");
+            }
+
+            if (!model.CommissionCalculationBasis.HasValue)
+            {
+                ModelState.AddModelError(nameof(model.CommissionCalculationBasis), "Calculation basis is required when a commission deal is configured.");
+            }
+        }
+
+        private async Task PopulateCommissionOptionsAsync(EditUserViewModel model)
+        {
+            var currentUser = await _userManager.GetUserAsync(User);
+            var sponsorCandidates = await GetSponsorCandidatesAsync(currentUser, model.Id);
+
+            ViewBag.Sponsors = new SelectList(
+                sponsorCandidates.Select(candidate => new
+                {
+                    candidate.Id,
+                    Name = $"{candidate.FullName} ({candidate.Email})"
+                }),
+                "Id",
+                "Name",
+                model.SponsorId);
+        }
+
+        private async Task<List<ApplicationUser>> GetSponsorCandidatesAsync(ApplicationUser? currentUser, string editedUserId)
+        {
+            var query = _userManager.Users
+                .AsNoTracking()
+                .Where(u => u.IsActive && u.Id != editedUserId);
+
+            if (User.IsInRole(UserRoles.GroupAdmin) && currentUser?.SalesGroupId != null)
+            {
+                query = query.Where(u => u.SalesGroupId == currentUser.SalesGroupId);
+            }
+            else if (User.IsInRole(UserRoles.SalesOrgAdmin) && currentUser?.SalesOrgId != null)
+            {
+                query = query.Where(u => u.SalesOrgId == currentUser.SalesOrgId);
+            }
+
+            return await query
+                .OrderBy(u => u.FirstName)
+                .ThenBy(u => u.LastName)
+                .ToListAsync();
+        }
+
+        private Task<bool> CanAssignSponsorAsync(ApplicationUser sponsor, ApplicationUser? currentUser)
+        {
+            if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                return Task.FromResult(currentUser?.SalesGroupId != null && sponsor.SalesGroupId == currentUser.SalesGroupId);
+            }
+
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                return Task.FromResult(currentUser?.SalesOrgId != null && sponsor.SalesOrgId == currentUser.SalesOrgId);
+            }
+
+            return Task.FromResult(true);
+        }
+
+        private async Task<bool> WouldCreateCommissionCycleAsync(string downlineId, string sponsorId)
+        {
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { downlineId };
+            var currentSponsorId = sponsorId;
+
+            while (!string.IsNullOrWhiteSpace(currentSponsorId))
+            {
+                if (!visited.Add(currentSponsorId))
+                {
+                    return true;
+                }
+
+                currentSponsorId = await _context.CommissionLinks
+                    .AsNoTracking()
+                    .Where(link => link.DownlineId == currentSponsorId)
+                    .Select(link => link.SponsorId)
+                    .SingleOrDefaultAsync() ?? string.Empty;
+            }
+
+            return false;
+        }
+
+        private async Task UpsertCommissionConfigurationAsync(ApplicationUser user, EditUserViewModel model)
+        {
+            if (model.CommissionDealType.HasValue)
+            {
+                if (user.CommissionDeal == null)
+                {
+                    user.CommissionDeal = new CommissionDeal
+                    {
+                        ApplicationUserId = user.Id
+                    };
+                    _context.CommissionDeals.Add(user.CommissionDeal);
+                }
+
+                user.CommissionDeal.DealType = model.CommissionDealType.Value;
+                user.CommissionDeal.Rate = model.CommissionRate ?? 0m;
+                user.CommissionDeal.BaseCost = model.CommissionBaseCost;
+                user.CommissionDeal.CalculationBasis = model.CommissionCalculationBasis ?? CommissionCalculationBasis.DownlineGross;
+            }
+            else if (user.CommissionDeal != null)
+            {
+                _context.CommissionDeals.Remove(user.CommissionDeal);
+            }
+
+            if (string.IsNullOrWhiteSpace(model.SponsorId))
+            {
+                if (user.SponsorLink != null)
+                {
+                    _context.CommissionLinks.Remove(user.SponsorLink);
+                }
+            }
+            else if (user.SponsorLink == null)
+            {
+                _context.CommissionLinks.Add(new CommissionLink
+                {
+                    DownlineId = user.Id,
+                    SponsorId = model.SponsorId
+                });
+            }
+            else
+            {
+                user.SponsorLink.SponsorId = model.SponsorId;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task<string?> GetLockedScopedRoleAsync(ApplicationUser user)
+        {
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            var currentRole = currentRoles.FirstOrDefault();
+
+            if (string.Equals(currentRole, UserRoles.SalesRep, StringComparison.Ordinal)
+                || string.Equals(currentRole, UserRoles.Affiliate, StringComparison.Ordinal))
+            {
+                return currentRole;
+            }
+
+            return null;
+        }
+
         private List<ApplicationRole> GetRolesAsync()
         {
             return _roleManager.Roles.ToList();
@@ -1034,6 +1251,23 @@ namespace LeadManagementPortal.Controllers
         public int? SalesOrgId { get; set; }
 
         public bool IsActive { get; set; }
+
+        [Display(Name = "Sponsor")]
+        public string? SponsorId { get; set; }
+
+        [Display(Name = "Deal type")]
+        public CommissionDealType? CommissionDealType { get; set; }
+
+        [Display(Name = "Rate / amount")]
+        [Range(typeof(decimal), "0", "999999999")]
+        public decimal? CommissionRate { get; set; }
+
+        [Display(Name = "Base cost")]
+        [Range(typeof(decimal), "0", "999999999")]
+        public decimal? CommissionBaseCost { get; set; }
+
+        [Display(Name = "Calculation basis")]
+        public CommissionCalculationBasis? CommissionCalculationBasis { get; set; }
     }
 
     public class DeactivateUserViewModel

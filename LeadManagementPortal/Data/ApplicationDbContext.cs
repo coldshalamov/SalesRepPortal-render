@@ -23,6 +23,10 @@ namespace LeadManagementPortal.Data
         public DbSet<LeadDocument> LeadDocuments { get; set; }
         public DbSet<LeadFollowUpTask> LeadFollowUpTasks { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<CommissionDeal> CommissionDeals { get; set; }
+        public DbSet<CommissionLink> CommissionLinks { get; set; }
+        public DbSet<SaleRecord> SaleRecords { get; set; }
+        public DbSet<CommissionLedger> CommissionLedgers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -107,6 +111,16 @@ namespace LeadManagementPortal.Data
                     .WithMany(o => o.SalesReps)
                     .HasForeignKey(e => e.SalesOrgId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(e => e.CommissionDeal)
+                    .WithOne(d => d.ApplicationUser)
+                    .HasForeignKey<CommissionDeal>(d => d.ApplicationUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.SponsorLink)
+                    .WithOne(l => l.Downline)
+                    .HasForeignKey<CommissionLink>(l => l.DownlineId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // SalesOrg Configuration
@@ -261,6 +275,69 @@ namespace LeadManagementPortal.Data
                     .HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .IsRequired(false);
+            });
+
+            builder.Entity<CommissionDeal>(entity =>
+            {
+                entity.HasKey(e => e.ApplicationUserId);
+                entity.Property(e => e.Rate).HasPrecision(18, 2);
+                entity.Property(e => e.BaseCost).HasPrecision(18, 2);
+            });
+
+            builder.Entity<CommissionLink>(entity =>
+            {
+                entity.HasKey(e => e.DownlineId);
+                entity.HasIndex(e => e.SponsorId);
+                entity.ToTable(table =>
+                {
+                    table.HasCheckConstraint("CK_CommissionLinks_NoSelfSponsor", "[DownlineId] <> [SponsorId]");
+                });
+
+                entity.HasOne(e => e.Sponsor)
+                    .WithMany(u => u.SponsoredDownlines)
+                    .HasForeignKey(e => e.SponsorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<SaleRecord>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.AccountId);
+                entity.HasIndex(e => e.SaleDate);
+                entity.HasIndex(e => e.ImportBatchId);
+                entity.Property(e => e.ProductName).HasMaxLength(256).IsRequired();
+                entity.Property(e => e.GrossAmount).HasPrecision(18, 2);
+                entity.Property(e => e.CostAmount).HasPrecision(18, 2);
+                entity.Property(e => e.ImportBatchId).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.RawPayload).IsRequired();
+
+                entity.HasOne(e => e.Account)
+                    .WithMany(u => u.SaleRecords)
+                    .HasForeignKey(e => e.AccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<CommissionLedger>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.SaleRecordId);
+                entity.HasIndex(e => e.BeneficiaryId);
+                entity.HasIndex(e => new { e.SaleRecordId, e.BeneficiaryId }).IsUnique();
+                entity.Property(e => e.GrossAmount).HasPrecision(18, 2);
+                entity.Property(e => e.NetAmount).HasPrecision(18, 2);
+                entity.Property(e => e.CommissionAmount).HasPrecision(18, 2);
+                entity.Property(e => e.DealSnapshot).IsRequired();
+                entity.Property(e => e.CalculationNotes).IsRequired();
+
+                entity.HasOne(e => e.SaleRecord)
+                    .WithMany(s => s.CommissionLedgers)
+                    .HasForeignKey(e => e.SaleRecordId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Beneficiary)
+                    .WithMany(u => u.CommissionLedgers)
+                    .HasForeignKey(e => e.BeneficiaryId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
         }
     }

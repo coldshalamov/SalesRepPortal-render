@@ -50,10 +50,10 @@
 
             @if (ViewBag.LockToGroup == true)
             {
-                <input type="hidden" asp-for="Role" value="SalesRep" />
+                <input type="hidden" asp-for="Role" />
                 <div class="mb-3">
                     <label class="form-label">Role</label>
-                    <input class="form-control" value="SalesRep" disabled />
+                    <input class="form-control" value="@Model.Role" disabled />
                 </div>
             }
             else
@@ -107,6 +107,61 @@
                 <span asp-validation-for="IsActive" class="text-danger"></span>
             </div>
 
+            <hr />
+
+            <div class="row mb-3">
+                <div class="col-12">
+                    <h5 class="mb-1">Commission Configuration</h5>
+                    <p class="text-muted mb-0">Configure the sponsored relationship and deal terms for this user.</p>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="SponsorSearch" class="form-label">Sponsor Search</label>
+                <input id="SponsorSearch" type="search" class="form-control" placeholder="Type to filter sponsor options..." />
+                <small class="text-muted">Search by name or email, then select the sponsor below.</small>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="SponsorId" class="form-label">Sponsor</label>
+                <select asp-for="SponsorId" class="form-select" asp-items="ViewBag.Sponsors">
+                    <option value="">-- No Sponsor --</option>
+                </select>
+                <span asp-validation-for="SponsorId" class="text-danger"></span>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="CommissionDealType" class="form-label">Deal Type</label>
+                    <select asp-for="CommissionDealType" class="form-select" asp-items="Html.GetEnumSelectList<CommissionDealType>()">
+                        <option value="">-- No Deal --</option>
+                    </select>
+                    <span asp-validation-for="CommissionDealType" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="CommissionCalculationBasis" class="form-label">Calculation Basis</label>
+                    <select asp-for="CommissionCalculationBasis" class="form-select" asp-items="Html.GetEnumSelectList<CommissionCalculationBasis>()">
+                        <option value="">-- Select Basis --</option>
+                    </select>
+                    <span asp-validation-for="CommissionCalculationBasis" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label asp-for="CommissionRate" class="form-label">Rate / Amount</label>
+                    <input asp-for="CommissionRate" class="form-control" type="number" step="0.01" min="0" />
+                    <small class="text-muted">Percent for percentage-based deals, dollar amount for markup deals.</small>
+                    <span asp-validation-for="CommissionRate" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="CommissionBaseCost" class="form-label">Base Cost</label>
+                    <input asp-for="CommissionBaseCost" class="form-control" type="number" step="0.01" min="0" />
+                    <small class="text-muted">Optional and mainly useful when the deal type is Markup.</small>
+                    <span asp-validation-for="CommissionBaseCost" class="text-danger"></span>
+                </div>
+            </div>
+
             @if (ViewBag.LockToGroup != true)
             {
                 <div class="alert alert-info">
@@ -117,6 +172,7 @@
                         <li><strong>SalesOrgAdmin:</strong> Manage sales organizations and related settings</li>
                         <li><strong>GroupAdmin:</strong> Manage leads within their sales group</li>
                         <li><strong>SalesRep:</strong> View and manage only their assigned leads</li>
+                        <li><strong>Affiliate:</strong> Earn commissions through sponsored relationships and ledger payouts</li>
                     </ul>
                 </div>
             }
@@ -137,6 +193,8 @@
         (function () {
             const groupSelect = document.getElementById('SalesGroupId');
             const orgSelect = document.getElementById('SalesOrgId');
+            const sponsorSearch = document.getElementById('SponsorSearch');
+            const sponsorSelect = document.getElementById('SponsorId');
 
             async function loadOrgs(groupId, selectedOrgId) {
                 orgSelect.innerHTML = '';
@@ -172,6 +230,31 @@
                 groupSelect.addEventListener('change', function () {
                     loadOrgs(groupSelect.value, null);
                 });
+
+                if (sponsorSearch && sponsorSelect) {
+                    const allOptions = Array.from(sponsorSelect.options).map(option => ({
+                        value: option.value,
+                        text: option.text,
+                        selected: option.selected
+                    }));
+
+                    sponsorSearch.addEventListener('input', function () {
+                        const term = sponsorSearch.value.toLowerCase();
+                        const currentValue = sponsorSelect.value;
+
+                        sponsorSelect.innerHTML = '';
+
+                        allOptions
+                            .filter(option => !term || option.text.toLowerCase().includes(term) || option.value === '')
+                            .forEach(option => {
+                                const nextOption = document.createElement('option');
+                                nextOption.value = option.value;
+                                nextOption.textContent = option.text;
+                                nextOption.selected = option.value === currentValue;
+                                sponsorSelect.appendChild(nextOption);
+                            });
+                    });
+                }
             });
         })();
     </script>
