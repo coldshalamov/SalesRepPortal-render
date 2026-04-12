@@ -294,9 +294,17 @@
         series: [{ name: 'Conversions', data: trendData }],
         chart: { type: 'bar', height: 240, toolbar: { show: false } },
         xaxis: { categories: trendLabels, labels: { rotate: -45 } },
+        yaxis: { labels: { formatter: function (val) { return Math.floor(val); } } },
         colors: ['#198754'],
         plotOptions: { bar: { borderRadius: 4 } },
         dataLabels: { enabled: false },
+        tooltip: {
+            enabled: true,
+            shared: true,
+            intersect: false,
+            x: { show: true },
+            y: { formatter: function (val) { return val + ' conversion' + (val === 1 ? '' : 's'); } }
+        },
         noData: { text: 'No conversions in the last 30 days' }
     };
     new ApexCharts(document.querySelector('#conversionBarChart'), barOptions).render();
