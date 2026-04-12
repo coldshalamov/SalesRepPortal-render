@@ -1,0 +1,87 @@
+@model LeadManagementPortal.Models.ViewModels.ImportBatchReviewViewModel
+
+@{
+    ViewData["Title"] = $"Review Batch #{Model.Batch.Id}";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1">Review Batch #@Model.Batch.Id</h2>
+        <p class="text-muted mb-0">@Model.Batch.SourceSystem | @Model.Batch.Status | @Model.Batch.Rows.Count rows</p>
+    </div>
+    <a asp-action="Imports" class="btn btn-outline-secondary">Back</a>
+</div>
+
+<div class="d-flex gap-2 mb-3">
+    <form asp-action="EvaluateBatch" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.Batch.Id" />
+        <button type="submit" class="btn btn-outline-primary">Evaluate Batch</button>
+    </form>
+    <form asp-action="PostBatch" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" value="@Model.Batch.Id" />
+        <button type="submit" class="btn btn-success">Post Ready Rows</button>
+    </form>
+    @if (Model.Batch.ImportProfile != null)
+    {
+        <span class="badge bg-info text-dark align-self-center">Profile: @Model.Batch.ImportProfile.Name</span>
+    }
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Row</th>
+                        <th>Status</th>
+                        <th>Account</th>
+                        <th>Product</th>
+                        <th>Sale Date</th>
+                        <th class="text-end">Gross</th>
+                        <th>Agreement</th>
+                        <th>Review Notes</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Rows.Any())
+                    {
+                        @foreach (var row in Model.Rows)
+                        {
+                            <tr>
+                                <td>@row.RowNumber</td>
+                                <td>@row.Status</td>
+                                <td>@(row.BusinessAccountName ?? row.BusinessAccountExternalKey ?? "-")</td>
+                                <td>@(row.ProductName ?? "-")</td>
+                                <td>@(row.SaleDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td class="text-end">@((row.GrossAmount ?? 0m).ToString("C"))</td>
+                                <td>@(row.SelectedAgreementId?.ToString() ?? "-")</td>
+                                <td class="small">@row.ReviewNotes</td>
+                                <td class="text-end">
+                                    @if (row.Status != LeadManagementPortal.Models.ImportRowStatus.Posted && row.Status != LeadManagementPortal.Models.ImportRowStatus.Rejected)
+                                    {
+                                        <a asp-action="EditRow" asp-route-id="@row.Id" class="btn btn-sm btn-outline-primary me-1">Edit</a>
+                                        <form asp-action="MarkRowRejected" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@row.Id" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">No rows found in this batch.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

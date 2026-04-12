@@ -1,0 +1,106 @@
+@model LeadManagementPortal.Models.ViewModels.ImportRowEditViewModel
+
+@{
+    ViewData["Title"] = $"Edit Import Row #{Model.RowNumber}";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1">Edit Row #@Model.RowNumber</h2>
+        <p class="text-muted mb-0">Correct staging data, assign the account/agreement, and send the row back through evaluation.</p>
+    </div>
+    <a asp-action="ReviewBatch" asp-route-id="@Model.ImportBatchId" class="btn btn-outline-secondary">Back to Batch</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="EditRow" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="ImportBatchId" />
+            <input type="hidden" asp-for="RowNumber" />
+
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <label asp-for="Status" class="form-label"></label>
+                    <input asp-for="Status" class="form-control" disabled />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ExternalRowId" class="form-label"></label>
+                    <input asp-for="ExternalRowId" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="CreditedRepId" class="form-label">Credited Rep</label>
+                    <select asp-for="CreditedRepId" class="form-select" asp-items="ViewBag.CreditedReps">
+                        <option value="">-- None --</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="BusinessAccountId" class="form-label">Business Account</label>
+                    <select asp-for="BusinessAccountId" class="form-select" asp-items="ViewBag.BusinessAccounts">
+                        <option value="">-- Resolve automatically / none --</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="BusinessAccountExternalKey" class="form-label"></label>
+                    <input asp-for="BusinessAccountExternalKey" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="BusinessAccountName" class="form-label"></label>
+                    <input asp-for="BusinessAccountName" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SelectedAgreementId" class="form-label">Agreement</label>
+                    <select asp-for="SelectedAgreementId" class="form-select" asp-items="ViewBag.Agreements">
+                        <option value="">-- Auto-match / none --</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="ProductName" class="form-label"></label>
+                    <input asp-for="ProductName" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="Quantity" class="form-label"></label>
+                    <input asp-for="Quantity" class="form-control" type="number" min="0" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="GrossAmount" class="form-label"></label>
+                    <input asp-for="GrossAmount" class="form-control" type="number" step="0.01" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="CostAmount" class="form-label"></label>
+                    <input asp-for="CostAmount" class="form-control" type="number" step="0.01" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="SaleDate" class="form-label"></label>
+                    <input asp-for="SaleDate" class="form-control" type="date" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="ReviewNotes" class="form-label"></label>
+                <textarea asp-for="ReviewNotes" rows="3" class="form-control"></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="MappedPayloadJson" class="form-label">Mapped Payload</label>
+                <textarea asp-for="MappedPayloadJson" rows="4" class="form-control font-monospace" readonly></textarea>
+            </div>
+
+            <div class="mb-4">
+                <label asp-for="RawPayloadJson" class="form-label">Raw Payload</label>
+                <textarea asp-for="RawPayloadJson" rows="6" class="form-control font-monospace" readonly></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save me-1"></i>Save And Re-Evaluate
+            </button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

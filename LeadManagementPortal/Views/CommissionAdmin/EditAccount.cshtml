@@ -1,0 +1,55 @@
+@model LeadManagementPortal.Models.ViewModels.BusinessAccountEditViewModel
+
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Edit Business Account" : "Create Business Account";
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="mb-0">@ViewData["Title"]</h2>
+            <a asp-action="Accounts" class="btn btn-outline-secondary">Back</a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form asp-action="@(Model.Id.HasValue ? "EditAccount" : "CreateAccount")" method="post">
+                    <input type="hidden" asp-for="Id" />
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label"></label>
+                        <input asp-for="Name" class="form-control" />
+                        <span asp-validation-for="Name" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="ExternalKey" class="form-label"></label>
+                        <input asp-for="ExternalKey" class="form-control" />
+                        <div class="form-text">Use this when an import source provides a stable account key.</div>
+                        <span asp-validation-for="ExternalKey" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Notes" class="form-label"></label>
+                        <textarea asp-for="Notes" rows="5" class="form-control"></textarea>
+                        <span asp-validation-for="Notes" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input asp-for="IsActive" class="form-check-input" />
+                        <label asp-for="IsActive" class="form-check-label"></label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>Save Account
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

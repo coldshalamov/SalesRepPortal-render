@@ -1,0 +1,88 @@
+@model LeadManagementPortal.Models.ViewModels.ImportProfileEditViewModel
+
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Edit Import Profile" : "Create Import Profile";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1">@ViewData["Title"]</h2>
+        <p class="text-muted mb-0">Map unpredictable spreadsheet columns into the canonical commission pipeline.</p>
+    </div>
+    <a asp-action="ImportProfiles" class="btn btn-outline-secondary">Back</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="@(Model.Id.HasValue ? "EditProfile" : "CreateProfile")" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="SourceSystem" class="form-label"></label>
+                    <input asp-for="SourceSystem" class="form-control" />
+                </div>
+            </div>
+
+            <div class="form-check mb-4">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="ExternalRowIdColumn" class="form-label">External Row Id Column</label>
+                    <input asp-for="ExternalRowIdColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="BusinessAccountExternalKeyColumn" class="form-label">Business Account Key Column</label>
+                    <input asp-for="BusinessAccountExternalKeyColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="BusinessAccountNameColumn" class="form-label">Business Account Name Column</label>
+                    <input asp-for="BusinessAccountNameColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ProductNameColumn" class="form-label">Product Column</label>
+                    <input asp-for="ProductNameColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="QuantityColumn" class="form-label">Quantity Column</label>
+                    <input asp-for="QuantityColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="GrossAmountColumn" class="form-label">Gross Amount Column</label>
+                    <input asp-for="GrossAmountColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="CostAmountColumn" class="form-label">Cost Amount Column</label>
+                    <input asp-for="CostAmountColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="SaleDateColumn" class="form-label">Sale Date Column</label>
+                    <input asp-for="SaleDateColumn" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="CreditedRepIdColumn" class="form-label">Credited Rep Column</label>
+                    <input asp-for="CreditedRepIdColumn" class="form-control" />
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-1"></i>Save Profile
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

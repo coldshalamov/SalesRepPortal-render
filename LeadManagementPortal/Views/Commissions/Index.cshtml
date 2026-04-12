@@ -7,6 +7,12 @@
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Commissions</h1>
     <div class="btn-toolbar">
+        @if (Model.IsAdminView)
+        {
+            <a asp-controller="CommissionAdmin" asp-action="Imports" class="btn btn-primary me-2">
+                <i class="bi bi-sliders me-1"></i>Open Control Plane
+            </a>
+        }
         <a asp-action="Details" class="btn btn-outline-primary">
             <i class="bi bi-table"></i> View All Ledger Rows
         </a>
@@ -28,26 +34,59 @@
             <div class="card-header">This Month</div>
             <div class="card-body">
                 <h2 class="card-title">@Model.CurrentMonthCommission.ToString("C")</h2>
-                <p class="card-text mb-0">Freshly queried from the commission ledger.</p>
+                <p class="card-text mb-0">Current-month earned commissions.</p>
             </div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card text-dark bg-info-subtle mb-3">
-            <div class="card-header">Deal Types</div>
+            <div class="card-header">Outstanding</div>
             <div class="card-body">
-                <h2 class="card-title">@Model.BreakdownByDealType.Count</h2>
-                <p class="card-text mb-0">Distinct deal types represented in visible rows.</p>
+                <h2 class="card-title">@Model.OutstandingBalance.ToString("C")</h2>
+                <p class="card-text mb-0">Earned plus adjustments minus payouts.</p>
             </div>
         </div>
     </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-dark bg-warning-subtle mb-3">
+            <div class="card-header">Adjustments</div>
+            <div class="card-body">
+                <h4 class="card-title">@Model.TotalAdjustments.ToString("C")</h4>
+                <p class="card-text mb-0">Net manual corrections applied.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-dark bg-secondary-subtle mb-3">
+            <div class="card-header">Paid</div>
+            <div class="card-body">
+                <h4 class="card-title">@Model.TotalPaid.ToString("C")</h4>
+                <p class="card-text mb-0">Amount already included in payout batches.</p>
+            </div>
+        </div>
+    </div>
+    @if (Model.IsAdminView)
+    {
+        <div class="col-md-4">
+            <div class="card text-dark bg-light mb-3">
+                <div class="card-header">Review Queue</div>
+                <div class="card-body">
+                    <h4 class="card-title">@Model.PendingReviewRows pending / @Model.ReadyToPostRows ready</h4>
+                    <p class="card-text mb-0">@Model.BusinessAccountCount accounts, @Model.ActiveAgreementCount active agreements.</p>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 <div class="row g-4">
     <div class="col-lg-4">
         <div class="card h-100">
             <div class="card-header">
-                Earnings By Deal Type
+                Earnings By Calculation Type
             </div>
             <div class="card-body">
                 @if (Model.BreakdownByDealType.Any())
@@ -85,7 +124,7 @@
     <div class="col-lg-8">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Recent Ledger Rows</span>
+                <span>@(Model.IsAdminView ? "Recent Ledger Rows" : "My Recent Statement Rows")</span>
                 <span class="text-muted small">Newest 20 visible rows</span>
             </div>
             <div class="card-body p-0">
@@ -94,11 +133,14 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Date</th>
+                                <th>Account</th>
                                 <th>Product</th>
                                 <th>Beneficiary</th>
                                 <th>Deal Type</th>
                                 <th class="text-end">Gross</th>
                                 <th class="text-end">Net</th>
+                                <th class="text-end">Paid</th>
+                                <th class="text-end">Outstanding</th>
                                 <th class="text-end">Commission</th>
                             </tr>
                         </thead>
@@ -109,11 +151,14 @@
                                 {
                                     <tr>
                                         <td>@row.SaleDate.ToString("MMM dd, yyyy")</td>
+                                        <td>@row.BusinessAccountName</td>
                                         <td>@row.ProductName</td>
                                         <td>@row.BeneficiaryName</td>
                                         <td>@row.DealType</td>
                                         <td class="text-end">@row.GrossAmount.ToString("C")</td>
                                         <td class="text-end">@row.NetAmount.ToString("C")</td>
+                                        <td class="text-end">@row.PaidAmount.ToString("C")</td>
+                                        <td class="text-end">@row.OutstandingAmount.ToString("C")</td>
                                         <td class="text-end fw-semibold text-success">@row.CommissionAmount.ToString("C")</td>
                                     </tr>
                                 }
@@ -121,7 +166,7 @@
                             else
                             {
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">No commission data is available yet.</td>
+                                    <td colspan="9" class="text-center text-muted py-4">No commission data is available yet.</td>
                                 </tr>
                             }
                         </tbody>
@@ -131,3 +176,77 @@
         </div>
     </div>
 </div>
+
+@if (Model.IsAdminView && (Model.RecentImportBatches.Any() || Model.OutstandingBeneficiaryBalances.Any()))
+{
+    <div class="row g-4 mt-1">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">Recent Import Batches</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Batch</th>
+                                    <th>Source</th>
+                                    <th>Status</th>
+                                    <th>Rows</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var batch in Model.RecentImportBatches)
+                                {
+                                    <tr>
+                                        <td>
+                                            <a asp-controller="CommissionAdmin" asp-action="ReviewBatch" asp-route-id="@batch.Id">#@batch.Id</a>
+                                        </td>
+                                        <td>@batch.SourceSystem</td>
+                                        <td>@batch.Status</td>
+                                        <td>@batch.RowCount</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">Largest Outstanding Balances</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Beneficiary</th>
+                                    <th class="text-end">Outstanding</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.OutstandingBeneficiaryBalances.Any())
+                                {
+                                    @foreach (var balance in Model.OutstandingBeneficiaryBalances)
+                                    {
+                                        <tr>
+                                            <td>@balance.BeneficiaryName</td>
+                                            <td class="text-end">@balance.OutstandingBalance.ToString("C")</td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="2" class="text-center text-muted py-3">No outstanding balances.</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}

@@ -20,13 +20,15 @@
                 <thead class="table-light">
                     <tr>
                         <th>Date</th>
+                        <th>Account</th>
                         <th>Product</th>
                         <th>Beneficiary</th>
-                        <th>Depth</th>
                         <th>Deal Type</th>
                         <th>Basis</th>
                         <th class="text-end">Gross</th>
                         <th class="text-end">Net</th>
+                        <th class="text-end">Paid</th>
+                        <th class="text-end">Outstanding</th>
                         <th class="text-end">Commission</th>
                         <th>Notes</th>
                     </tr>
@@ -38,13 +40,15 @@
                         {
                             <tr>
                                 <td>@row.SaleDate.ToString("MMM dd, yyyy")</td>
+                                <td>@row.BusinessAccountName</td>
                                 <td>@row.ProductName</td>
                                 <td>@row.BeneficiaryName</td>
-                                <td>@row.ChainDepth</td>
                                 <td>@row.DealType</td>
                                 <td>@row.CalculationBasis</td>
                                 <td class="text-end">@row.GrossAmount.ToString("C")</td>
                                 <td class="text-end">@row.NetAmount.ToString("C")</td>
+                                <td class="text-end">@row.PaidAmount.ToString("C")</td>
+                                <td class="text-end">@row.OutstandingAmount.ToString("C")</td>
                                 <td class="text-end fw-semibold text-success">@row.CommissionAmount.ToString("C")</td>
                                 <td>@row.CalculationNotes</td>
                             </tr>
@@ -53,7 +57,7 @@
                     else
                     {
                         <tr>
-                            <td colspan="10" class="text-center text-muted py-4">No ledger rows are visible for this user.</td>
+                            <td colspan="11" class="text-center text-muted py-4">No ledger rows are visible for this user.</td>
                         </tr>
                     }
                 </tbody>

@@ -27,6 +27,17 @@ namespace LeadManagementPortal.Data
         public DbSet<CommissionLink> CommissionLinks { get; set; }
         public DbSet<SaleRecord> SaleRecords { get; set; }
         public DbSet<CommissionLedger> CommissionLedgers { get; set; }
+        public DbSet<BusinessAccount> BusinessAccounts { get; set; }
+        public DbSet<CommissionAgreement> CommissionAgreements { get; set; }
+        public DbSet<CommissionAgreementRecipient> CommissionAgreementRecipients { get; set; }
+        public DbSet<ImportProfile> ImportProfiles { get; set; }
+        public DbSet<ImportBatch> ImportBatches { get; set; }
+        public DbSet<ImportRow> ImportRows { get; set; }
+        public DbSet<SaleEvent> SaleEvents { get; set; }
+        public DbSet<CommissionLedgerEntry> CommissionLedgerEntries { get; set; }
+        public DbSet<CommissionAdjustment> CommissionAdjustments { get; set; }
+        public DbSet<PayoutBatch> PayoutBatches { get; set; }
+        public DbSet<PayoutEntry> PayoutEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -337,6 +348,226 @@ namespace LeadManagementPortal.Data
                 entity.HasOne(e => e.Beneficiary)
                     .WithMany(u => u.CommissionLedgers)
                     .HasForeignKey(e => e.BeneficiaryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<BusinessAccount>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Name);
+                entity.HasIndex(e => e.ExternalKey);
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.ExternalKey).HasMaxLength(100);
+                entity.Property(e => e.Notes).HasMaxLength(4000);
+            });
+
+            builder.Entity<CommissionAgreement>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.BusinessAccountId, e.IsActive, e.EffectiveStartDate, e.EffectiveEndDate });
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.ProductNameFilter).HasMaxLength(200);
+                entity.Property(e => e.Notes).HasMaxLength(4000);
+                entity.HasOne(e => e.BusinessAccount)
+                    .WithMany(a => a.Agreements)
+                    .HasForeignKey(e => e.BusinessAccountId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            builder.Entity<CommissionAgreementRecipient>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.CommissionAgreementId);
+                entity.HasIndex(e => e.BeneficiaryId);
+                entity.Property(e => e.RateOrAmount).HasPrecision(18, 2);
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.HasOne(e => e.CommissionAgreement)
+                    .WithMany(a => a.Recipients)
+                    .HasForeignKey(e => e.CommissionAgreementId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.Beneficiary)
+                    .WithMany()
+                    .HasForeignKey(e => e.BeneficiaryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.BasisRecipient)
+                    .WithMany(r => r.DownstreamRecipients)
+                    .HasForeignKey(e => e.BasisRecipientId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<ImportProfile>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.Name, e.IsActive });
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.SourceSystem).HasMaxLength(100);
+                entity.Property(e => e.ColumnMappingsJson).IsRequired();
+            });
+
+            builder.Entity<ImportBatch>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.ReceivedAtUtc);
+                entity.Property(e => e.SourceSystem).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.SourceFileName).HasMaxLength(260);
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.HasOne(e => e.ImportProfile)
+                    .WithMany(p => p.ImportBatches)
+                    .HasForeignKey(e => e.ImportProfileId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(e => e.UploadedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.UploadedById)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            builder.Entity<ImportRow>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.ImportBatchId, e.RowNumber });
+                entity.HasIndex(e => e.Status);
+                entity.Property(e => e.ExternalRowId).HasMaxLength(200);
+                entity.Property(e => e.BusinessAccountExternalKey).HasMaxLength(100);
+                entity.Property(e => e.BusinessAccountName).HasMaxLength(200);
+                entity.Property(e => e.ProductName).HasMaxLength(256);
+                entity.Property(e => e.GrossAmount).HasPrecision(18, 2);
+                entity.Property(e => e.CostAmount).HasPrecision(18, 2);
+                entity.Property(e => e.RawPayloadJson).IsRequired();
+                entity.Property(e => e.MappedPayloadJson).IsRequired();
+                entity.Property(e => e.ReviewNotes).HasMaxLength(2000);
+                entity.HasOne(e => e.ImportBatch)
+                    .WithMany(b => b.Rows)
+                    .HasForeignKey(e => e.ImportBatchId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.BusinessAccount)
+                    .WithMany()
+                    .HasForeignKey(e => e.BusinessAccountId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(e => e.SelectedAgreement)
+                    .WithMany()
+                    .HasForeignKey(e => e.SelectedAgreementId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(e => e.CreditedRep)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreditedRepId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(e => e.SaleEvent)
+                    .WithMany()
+                    .HasForeignKey(e => e.SaleEventId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            builder.Entity<SaleEvent>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.BusinessAccountId);
+                entity.HasIndex(e => e.SaleDate);
+                entity.Property(e => e.ExternalRowId).HasMaxLength(200);
+                entity.Property(e => e.ProductName).HasMaxLength(256).IsRequired();
+                entity.Property(e => e.GrossAmount).HasPrecision(18, 2);
+                entity.Property(e => e.CostAmount).HasPrecision(18, 2);
+                entity.Property(e => e.SourceSystem).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.RawPayloadJson).IsRequired();
+                entity.Property(e => e.PostedById).HasMaxLength(450).IsRequired();
+                entity.HasOne(e => e.BusinessAccount)
+                    .WithMany(a => a.SaleEvents)
+                    .HasForeignKey(e => e.BusinessAccountId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.CreditedRep)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreditedRepId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(e => e.PostedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.PostedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<CommissionLedgerEntry>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.BeneficiaryId);
+                entity.HasIndex(e => e.EarnedAtUtc);
+                entity.Property(e => e.GrossAmount).HasPrecision(18, 2);
+                entity.Property(e => e.NetAmount).HasPrecision(18, 2);
+                entity.Property(e => e.CommissionAmount).HasPrecision(18, 2);
+                entity.Property(e => e.CalculationDetailsJson).IsRequired();
+                entity.HasOne(e => e.SaleEvent)
+                    .WithMany(s => s.LedgerEntries)
+                    .HasForeignKey(e => e.SaleEventId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.CommissionAgreement)
+                    .WithMany(a => a.LedgerEntries)
+                    .HasForeignKey(e => e.CommissionAgreementId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.CommissionAgreementRecipient)
+                    .WithMany(r => r.LedgerEntries)
+                    .HasForeignKey(e => e.CommissionAgreementRecipientId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne(e => e.Beneficiary)
+                    .WithMany()
+                    .HasForeignKey(e => e.BeneficiaryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<CommissionAdjustment>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.BeneficiaryId);
+                entity.HasIndex(e => e.CreatedAtUtc);
+                entity.Property(e => e.Amount).HasPrecision(18, 2);
+                entity.Property(e => e.Reason).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.Notes).HasMaxLength(2000);
+                entity.HasOne(e => e.Beneficiary)
+                    .WithMany()
+                    .HasForeignKey(e => e.BeneficiaryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<PayoutBatch>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Reference).IsUnique();
+                entity.HasIndex(e => e.PaidAtUtc);
+                entity.Property(e => e.Reference).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.Notes).HasMaxLength(2000);
+                entity.HasOne(e => e.CreatedBy)
+                    .WithMany()
+                    .HasForeignKey(e => e.CreatedById)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<PayoutEntry>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.BeneficiaryId);
+                entity.Property(e => e.Amount).HasPrecision(18, 2);
+                entity.ToTable(table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_PayoutEntries_SourceSelection",
+                        "(([CommissionLedgerEntryId] IS NOT NULL AND [CommissionAdjustmentId] IS NULL) OR ([CommissionLedgerEntryId] IS NULL AND [CommissionAdjustmentId] IS NOT NULL))");
+                });
+                entity.HasOne(e => e.PayoutBatch)
+                    .WithMany(b => b.Entries)
+                    .HasForeignKey(e => e.PayoutBatchId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(e => e.Beneficiary)
+                    .WithMany()
+                    .HasForeignKey(e => e.BeneficiaryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.CommissionLedgerEntry)
+                    .WithMany(l => l.PayoutEntries)
+                    .HasForeignKey(e => e.CommissionLedgerEntryId)
+                    .OnDelete(DeleteBehavior.Restrict);
+                entity.HasOne(e => e.CommissionAdjustment)
+                    .WithMany(a => a.PayoutEntries)
+                    .HasForeignKey(e => e.CommissionAdjustmentId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
         }

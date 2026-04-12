@@ -1,0 +1,79 @@
+@model IReadOnlyList<LeadManagementPortal.Models.ImportBatch>
+
+@{
+    ViewData["Title"] = "Commission Imports";
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Upload CSV</div>
+            <div class="card-body">
+                <form asp-action="UploadCsv" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label">Import Profile</label>
+                        <select name="importProfileId" class="form-select" asp-items="ViewBag.ImportProfiles">
+                            <option value="">-- No Profile / raw only --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">CSV File</label>
+                        <input name="file" type="file" accept=".csv,text/csv" class="form-control" />
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-1"></i>Upload
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">Recent Import Batches</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Batch</th>
+                                <th>Source</th>
+                                <th>Profile</th>
+                                <th>Status</th>
+                                <th>Rows</th>
+                                <th>Received</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Any())
+                            {
+                                @foreach (var batch in Model)
+                                {
+                                    <tr>
+                                        <td>#@batch.Id</td>
+                                        <td>@batch.SourceSystem</td>
+                                        <td>@(batch.ImportProfile?.Name ?? "-")</td>
+                                        <td>@batch.Status</td>
+                                        <td>@batch.Rows.Count</td>
+                                        <td>@batch.ReceivedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td class="text-end">
+                                            <a asp-action="ReviewBatch" asp-route-id="@batch.Id" class="btn btn-sm btn-outline-primary">Review</a>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">No import batches yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

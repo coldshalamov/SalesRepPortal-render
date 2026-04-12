@@ -5,6 +5,7 @@ using LeadManagementPortal.Data;
 using LeadManagementPortal.Models;
 using LeadManagementPortal.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -327,7 +328,7 @@ namespace LeadManagementPortal.Tests
         {
             using var context = CreateContext();
 
-            var entityType = context.Model.FindEntityType(typeof(CommissionLink));
+            var entityType = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(CommissionLink));
 
             Assert.NotNull(entityType);
             Assert.Contains(

@@ -1,0 +1,60 @@
+@model IReadOnlyList<LeadManagementPortal.Models.BusinessAccount>
+
+@{
+    ViewData["Title"] = "Business Accounts";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1">Business Accounts</h2>
+        <p class="text-muted mb-0">Commissionable accounts that agreements and imports resolve against.</p>
+    </div>
+    <a asp-action="CreateAccount" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>New Account
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>External Key</th>
+                        <th>Status</th>
+                        <th>Notes</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Any())
+                    {
+                        @foreach (var account in Model)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@account.Name</td>
+                                <td>@(account.ExternalKey ?? "-")</td>
+                                <td>
+                                    <span class="badge @(account.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(account.IsActive ? "Active" : "Archived")
+                                    </span>
+                                </td>
+                                <td>@(string.IsNullOrWhiteSpace(account.Notes) ? "-" : account.Notes)</td>
+                                <td class="text-end">
+                                    <a asp-action="EditAccount" asp-route-id="@account.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No business accounts exist yet.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

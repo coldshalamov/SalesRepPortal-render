@@ -1,11 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using LeadManagementPortal.Data;
-using LeadManagementPortal.Models;
 using LeadManagementPortal.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace LeadManagementPortal.Controllers
 {
@@ -13,17 +10,14 @@ namespace LeadManagementPortal.Controllers
     [Route("api/sales")]
     public class SalesIngestController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        private readonly ICommissionCalculationService _commissionCalculationService;
+        private readonly ICommissionControlPlaneService _commissionControlPlaneService;
         private readonly IConfiguration _configuration;
 
         public SalesIngestController(
-            ApplicationDbContext context,
-            ICommissionCalculationService commissionCalculationService,
+            ICommissionControlPlaneService commissionControlPlaneService,
             IConfiguration configuration)
         {
-            _context = context;
-            _commissionCalculationService = commissionCalculationService;
+            _commissionControlPlaneService = commissionControlPlaneService;
             _configuration = configuration;
         }
 
@@ -31,23 +25,10 @@ namespace LeadManagementPortal.Controllers
         [HttpPost("ingest")]
         public async Task<IActionResult> Ingest([FromBody] IReadOnlyList<SalesIngestRecordRequest>? records, CancellationToken cancellationToken = default)
         {
-            var configuredApiKey = _configuration["SalesIngest:ApiKey"];
-            if (string.IsNullOrWhiteSpace(configuredApiKey))
+            var authResult = ValidateApiKey();
+            if (authResult != null)
             {
-                return StatusCode(StatusCodes.Status500InternalServerError, new
-                {
-                    status = "error",
-                    message = "Sales ingest API key is not configured."
-                });
-            }
-
-            if (!Request.Headers.TryGetValue("X-Api-Key", out var providedApiKey) || providedApiKey != configuredApiKey)
-            {
-                return Unauthorized(new
-                {
-                    status = "unauthorized",
-                    message = "A valid X-Api-Key header is required."
-                });
+                return authResult;
             }
 
             if (records == null || records.Count == 0)
@@ -68,61 +49,89 @@ namespace LeadManagementPortal.Controllers
                 });
             }
 
-            var accountIds = records
-                .Select(r => r.AccountId.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var batch = await _commissionControlPlaneService.CreateBatchFromLegacySalesAsync(records, "legacy-api", cancellationToken);
 
-            var knownAccountIds = await _context.Users
-                .AsNoTracking()
-                .Where(u => accountIds.Contains(u.Id))
-                .Select(u => u.Id)
-                .ToListAsync(cancellationToken);
+            return Ok(new
+            {
+                batchId = batch.Id,
+                recordCount = batch.Rows.Count,
+                status = "pending_review"
+            });
+        }
 
-            var missingAccountIds = accountIds
-                .Except(knownAccountIds, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+        [AllowAnonymous]
+        [HttpPost("raw-ingest")]
+        public async Task<IActionResult> IngestRaw([FromBody] RawSalesImportRequest? request, CancellationToken cancellationToken = default)
+        {
+            var authResult = ValidateApiKey();
+            if (authResult != null)
+            {
+                return authResult;
+            }
 
-            if (missingAccountIds.Count > 0)
+            if (request == null || request.Rows == null || request.Rows.Count == 0)
             {
                 return BadRequest(new
                 {
                     status = "invalid",
-                    message = "One or more account ids do not exist.",
-                    missingAccountIds
+                    message = "At least one raw row is required."
                 });
             }
 
-            var batchId = Guid.NewGuid().ToString("N");
-            var importedAt = DateTime.UtcNow;
-            var sales = records.Select(record => new SaleRecord
-            {
-                AccountId = record.AccountId.Trim(),
-                ProductName = record.ProductName.Trim(),
-                Quantity = record.Quantity,
-                GrossAmount = record.GrossAmount,
-                CostAmount = record.CostAmount,
-                SaleDate = record.SaleDate,
-                ImportBatchId = batchId,
-                ImportedAt = importedAt,
-                RawPayload = record.ToRawPayloadJson()
-            }).ToList();
+            var rows = request.Rows
+                .Select(row => (IDictionary<string, string?>)row.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value.ValueKind == JsonValueKind.Null ? null : kvp.Value.ToString(),
+                    StringComparer.OrdinalIgnoreCase))
+                .ToList();
 
-            _context.SaleRecords.AddRange(sales);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            foreach (var sale in sales)
-            {
-                await _commissionCalculationService.CalculateForSaleAsync(sale, cancellationToken);
-            }
+            var batch = await _commissionControlPlaneService.CreateBatchFromRawRowsAsync(
+                request.SourceSystem ?? "raw-api",
+                rows,
+                request.ImportProfileId,
+                uploadedById: null,
+                sourceFileName: request.SourceFileName,
+                cancellationToken);
 
             return Ok(new
             {
-                batchId,
-                recordCount = sales.Count,
-                status = "processed"
+                batchId = batch.Id,
+                recordCount = batch.Rows.Count,
+                status = batch.Status.ToString()
             });
         }
+
+        private IActionResult? ValidateApiKey()
+        {
+            var configuredApiKey = _configuration["SalesIngest:ApiKey"];
+            if (string.IsNullOrWhiteSpace(configuredApiKey))
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    status = "error",
+                    message = "Sales ingest API key is not configured."
+                });
+            }
+
+            if (!Request.Headers.TryGetValue("X-Api-Key", out var providedApiKey) || providedApiKey != configuredApiKey)
+            {
+                return Unauthorized(new
+                {
+                    status = "unauthorized",
+                    message = "A valid X-Api-Key header is required."
+                });
+            }
+
+            return null;
+        }
+    }
+
+    public class RawSalesImportRequest
+    {
+        public string? SourceSystem { get; set; }
+        public string? SourceFileName { get; set; }
+        public int? ImportProfileId { get; set; }
+        public List<Dictionary<string, JsonElement>> Rows { get; set; } = new();
     }
 
     public class SalesIngestRecordRequest
@@ -136,15 +145,5 @@ namespace LeadManagementPortal.Controllers
 
         [JsonExtensionData]
         public Dictionary<string, JsonElement>? AdditionalData { get; set; }
-
-        public string ToRawPayloadJson()
-        {
-            if (AdditionalData == null || AdditionalData.Count == 0)
-            {
-                return "{}";
-            }
-
-            return JsonSerializer.Serialize(AdditionalData);
-        }
     }
 }
