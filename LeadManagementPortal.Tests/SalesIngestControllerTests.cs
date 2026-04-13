@@ -37,13 +37,10 @@ namespace LeadManagementPortal.Tests
                 .Build();
         }
 
-        [Fact]
-        public async Task Ingest_WithWrongApiKey_ReturnsUnauthorized()
+        private static SalesIngestController CreateController(ApplicationDbContext context)
         {
-            await using var context = CreateContext();
-            var controller = new SalesIngestController(
-                context,
-                new CommissionCalculationService(context, NullLogger<CommissionCalculationService>.Instance),
+            return new SalesIngestController(
+                new CommissionControlPlaneService(context, NullLogger<CommissionControlPlaneService>.Instance),
                 CreateConfiguration("expected-key"))
             {
                 ControllerContext = new ControllerContext
@@ -51,7 +48,13 @@ namespace LeadManagementPortal.Tests
                     HttpContext = new DefaultHttpContext()
                 }
             };
+        }
 
+        [Fact]
+        public async Task Ingest_WithWrongApiKey_ReturnsUnauthorized()
+        {
+            await using var context = CreateContext();
+            var controller = CreateController(context);
             controller.Request.Headers["X-Api-Key"] = "wrong-key";
 
             var result = await controller.Ingest(new List<SalesIngestRecordRequest>());
@@ -63,22 +66,13 @@ namespace LeadManagementPortal.Tests
         public async Task Ingest_WithMissingApiKeyHeader_ReturnsUnauthorized()
         {
             await using var context = CreateContext();
-            var controller = new SalesIngestController(
-                context,
-                new CommissionCalculationService(context, NullLogger<CommissionCalculationService>.Instance),
-                CreateConfiguration("expected-key"))
-            {
-                ControllerContext = new ControllerContext
-                {
-                    HttpContext = new DefaultHttpContext()
-                }
-            };
+            var controller = CreateController(context);
 
             var result = await controller.Ingest(new List<SalesIngestRecordRequest>
             {
                 new SalesIngestRecordRequest
                 {
-                    AccountId = "rep-1",
+                    AccountId = "acct-1",
                     ProductName = "Starter Pack",
                     Quantity = 1,
                     GrossAmount = 100m,
@@ -99,54 +93,35 @@ namespace LeadManagementPortal.Tests
         }
 
         [Fact]
-        public async Task Ingest_WithValidApiKey_PersistsRecords_AndCalculatesLedgers()
+        public async Task Ingest_WithValidApiKey_CreatesRawImportBatch_AndDoesNotPostLedger()
         {
             await using var context = CreateContext();
-
-            context.Users.Add(new ApplicationUser
-            {
-                Id = "rep-1",
-                UserName = "rep1@example.com",
-                Email = "rep1@example.com"
-            });
-            context.CommissionDeals.Add(new CommissionDeal
-            {
-                ApplicationUserId = "rep-1",
-                DealType = CommissionDealType.GrossPercent,
-                Rate = 10m,
-                CalculationBasis = CommissionCalculationBasis.DownlineGross
-            });
-            await context.SaveChangesAsync();
-
-            var controller = new SalesIngestController(
-                context,
-                new CommissionCalculationService(context, NullLogger<CommissionCalculationService>.Instance),
-                CreateConfiguration("expected-key"))
-            {
-                ControllerContext = new ControllerContext
-                {
-                    HttpContext = new DefaultHttpContext()
-                }
-            };
-
+            var controller = CreateController(context);
             controller.Request.Headers["X-Api-Key"] = "expected-key";
 
             var result = await controller.Ingest(new List<SalesIngestRecordRequest>
             {
                 new SalesIngestRecordRequest
                 {
-                    AccountId = "rep-1",
+                    AccountId = "acct-1",
                     ProductName = "Starter Pack",
                     Quantity = 2,
                     GrossAmount = 500m,
                     CostAmount = 300m,
-                    SaleDate = DateTime.UtcNow
+                    SaleDate = DateTime.UtcNow,
+                    AdditionalData = new Dictionary<string, System.Text.Json.JsonElement>()
                 }
             });
 
             var ok = Assert.IsType<OkObjectResult>(result);
-            Assert.Equal(1, context.SaleRecords.Count());
-            Assert.Equal(1, context.CommissionLedgers.Count());
+            Assert.Equal(1, context.ImportBatches.Count());
+            Assert.Equal(1, context.ImportRows.Count());
+            Assert.Equal(0, context.SaleEvents.Count());
+            Assert.Equal(0, context.CommissionLedgerEntries.Count());
+
+            var row = await context.ImportRows.SingleAsync();
+            Assert.Equal(ImportRowStatus.PendingReview, row.Status);
+            Assert.Contains("acct-1", row.RawPayloadJson, StringComparison.OrdinalIgnoreCase);
 
             var recordCountProperty = ok.Value?.GetType().GetProperty("recordCount");
             Assert.NotNull(recordCountProperty);
@@ -157,22 +132,52 @@ namespace LeadManagementPortal.Tests
         public async Task Ingest_WithNullRecord_ReturnsBadRequest()
         {
             await using var context = CreateContext();
-            var controller = new SalesIngestController(
-                context,
-                new CommissionCalculationService(context, NullLogger<CommissionCalculationService>.Instance),
-                CreateConfiguration("expected-key"))
-            {
-                ControllerContext = new ControllerContext
-                {
-                    HttpContext = new DefaultHttpContext()
-                }
-            };
-
+            var controller = CreateController(context);
             controller.Request.Headers["X-Api-Key"] = "expected-key";
 
             var result = await controller.Ingest(new List<SalesIngestRecordRequest> { null! });
 
             Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task IngestRaw_WithValidApiKey_PreservesOpaqueFieldsInRawImportBatch()
+        {
+            await using var context = CreateContext();
+            var controller = CreateController(context);
+            controller.Request.Headers["X-Api-Key"] = "expected-key";
+
+            var result = await controller.IngestRaw(new RawSalesImportRequest
+            {
+                SourceSystem = "apps-script",
+                SourceFileName = "sheet-export.json",
+                Rows =
+                {
+                    new Dictionary<string, System.Text.Json.JsonElement>
+                    {
+                        ["Account"] = System.Text.Json.JsonDocument.Parse("\"Acme Clinic\"").RootElement,
+                        ["Gross Sales"] = System.Text.Json.JsonDocument.Parse("\"1200.50\"").RootElement,
+                        ["MysteryColumn"] = System.Text.Json.JsonDocument.Parse("\"keep-me\"").RootElement
+                    }
+                }
+            });
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.Equal(1, context.ImportBatches.Count());
+            Assert.Equal(1, context.ImportRows.Count());
+
+            var batch = await context.ImportBatches.SingleAsync();
+            Assert.Equal("apps-script", batch.SourceSystem);
+            Assert.Equal("sheet-export.json", batch.SourceFileName);
+
+            var row = await context.ImportRows.SingleAsync();
+            Assert.Equal(ImportRowStatus.PendingMapping, row.Status);
+            Assert.Contains("MysteryColumn", row.RawPayloadJson, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("keep-me", row.RawPayloadJson, StringComparison.OrdinalIgnoreCase);
+
+            var statusProperty = ok.Value?.GetType().GetProperty("status");
+            Assert.NotNull(statusProperty);
+            Assert.Equal("PendingReview", statusProperty!.GetValue(ok.Value)?.ToString());
         }
     }
 }

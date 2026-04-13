@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -96,6 +97,13 @@ namespace LeadManagementPortal.Tests
             return new ClaimsPrincipal(identity);
         }
 
+        private static void AttachTempData(Controller controller)
+        {
+            controller.TempData = new TempDataDictionary(
+                controller.ControllerContext.HttpContext!,
+                Mock.Of<ITempDataProvider>());
+        }
+
         [Fact]
         public async Task Edit_WhenCommissionConfigured_UpsertsDealAndSponsorLink()
         {
@@ -121,6 +129,7 @@ namespace LeadManagementPortal.Tests
                     }
                 }
             };
+            AttachTempData(controller);
 
             var result = await controller.Edit(new EditUserViewModel
             {
@@ -175,6 +184,7 @@ namespace LeadManagementPortal.Tests
                     }
                 }
             };
+            AttachTempData(controller);
 
             var result = await controller.Edit(editedUser.Id);
 
@@ -222,6 +232,7 @@ namespace LeadManagementPortal.Tests
                     }
                 }
             };
+            AttachTempData(controller);
 
             var result = await controller.Edit(new EditUserViewModel
             {
@@ -280,6 +291,18 @@ namespace LeadManagementPortal.Tests
                 SalesOrgId = 3
             };
 
+            context.SalesGroups.Add(new SalesGroup
+            {
+                Id = "group-1",
+                Name = "Group One",
+                IsActive = true
+            });
+            context.SalesOrgs.Add(new SalesOrg
+            {
+                Id = 3,
+                Name = "Org Three",
+                SalesGroupId = "group-1"
+            });
             context.Users.AddRange(admin, editedUser, sponsor);
             await context.SaveChangesAsync();
 
@@ -298,6 +321,7 @@ namespace LeadManagementPortal.Tests
                     }
                 }
             };
+            AttachTempData(controller);
 
             var result = await controller.Edit(new EditUserViewModel
             {
@@ -307,7 +331,7 @@ namespace LeadManagementPortal.Tests
                 Email = "user@example.com",
                 Role = UserRoles.SalesRep,
                 SalesGroupId = "other-group",
-                SalesOrgId = 99,
+                SalesOrgId = 3,
                 IsActive = true,
                 SponsorId = sponsor.Id,
                 CommissionDealType = CommissionDealType.GrossPercent,

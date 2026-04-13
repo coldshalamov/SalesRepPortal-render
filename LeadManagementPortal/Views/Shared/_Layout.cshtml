@@ -96,6 +96,12 @@
                             @if (User.IsInRole("OrganizationAdmin"))
                             {
                                 <li class="nav-item">
+                                    <a class="nav-link @(navController == "CommissionAdmin" ? "active" : "")" asp-controller="CommissionAdmin" asp-action="Imports"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage accounts, agreements, imports, payouts, and adjustments">
+                                        <i class="bi bi-sliders me-1 nav-icon" aria-hidden="true"></i>Commission Admin
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="Index"
                                        data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage sales groups">
                                         <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>Groups

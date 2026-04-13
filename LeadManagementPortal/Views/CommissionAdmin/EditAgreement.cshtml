@@ -1,0 +1,173 @@
+@model LeadManagementPortal.Models.ViewModels.CommissionAgreementEditViewModel
+
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Edit Agreement" : "Create Agreement";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1">@ViewData["Title"]</h2>
+        <p class="text-muted mb-0">Attach one account to one or more beneficiaries with explicit calculation rules.</p>
+    </div>
+    <a asp-action="Agreements" class="btn btn-outline-secondary">Back</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="@(Model.Id.HasValue ? "EditAgreement" : "CreateAgreement")" method="post">
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label asp-for="BusinessAccountId" class="form-label"></label>
+                    <select asp-for="BusinessAccountId" class="form-select" asp-items="ViewBag.BusinessAccounts"></select>
+                    <span asp-validation-for="BusinessAccountId" class="text-danger"></span>
+                </div>
+                <div class="col-md-6">
+                    <label asp-for="Name" class="form-label"></label>
+                    <input asp-for="Name" class="form-control" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="EffectiveStartDate" class="form-label"></label>
+                    <input asp-for="EffectiveStartDate" class="form-control" type="date" />
+                    <span asp-validation-for="EffectiveStartDate" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="EffectiveEndDate" class="form-label"></label>
+                    <input asp-for="EffectiveEndDate" class="form-control" type="date" />
+                    <span asp-validation-for="EffectiveEndDate" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ProductNameFilter" class="form-label"></label>
+                    <input asp-for="ProductNameFilter" class="form-control" />
+                    <div class="form-text">Optional exact-match product filter.</div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Notes" class="form-label"></label>
+                <textarea asp-for="Notes" rows="3" class="form-control"></textarea>
+            </div>
+
+            <div class="form-check mb-4">
+                <input asp-for="IsActive" class="form-check-input" />
+                <label asp-for="IsActive" class="form-check-label"></label>
+            </div>
+
+            <hr />
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">Recipients</h5>
+                <button id="addRecipient" type="button" class="btn btn-sm btn-outline-primary">Add Recipient</button>
+            </div>
+            <div class="alert alert-info">
+                Use <strong>Sort Order</strong> to control evaluation order. For override-style rules, set <strong>Basis Recipient Sort Order</strong> to the recipient that should be referenced.
+            </div>
+
+            <div id="recipientRows">
+                @for (var i = 0; i < Model.Recipients.Count; i++)
+                {
+                    <div class="border rounded p-3 mb-3 recipient-row">
+                        <input type="hidden" asp-for="Recipients[i].Id" />
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label asp-for="Recipients[i].BeneficiaryId" class="form-label">Beneficiary</label>
+                                <select asp-for="Recipients[i].BeneficiaryId" class="form-select" asp-items="ViewBag.Beneficiaries"></select>
+                            </div>
+                            <div class="col-md-3">
+                                <label asp-for="Recipients[i].CalculationType" class="form-label">Calculation</label>
+                                <select asp-for="Recipients[i].CalculationType" class="form-select" asp-items="Html.GetEnumSelectList<LeadManagementPortal.Models.CommissionRecipientCalculationType>()"></select>
+                            </div>
+                            <div class="col-md-2">
+                                <label asp-for="Recipients[i].RateOrAmount" class="form-label">Rate / Amount</label>
+                                <input asp-for="Recipients[i].RateOrAmount" class="form-control" type="number" step="0.01" />
+                            </div>
+                            <div class="col-md-1">
+                                <label asp-for="Recipients[i].SortOrder" class="form-label">Order</label>
+                                <input asp-for="Recipients[i].SortOrder" class="form-control" type="number" min="1" />
+                            </div>
+                            <div class="col-md-2">
+                                <label asp-for="Recipients[i].BasisRecipientKey" class="form-label">Basis Order</label>
+                                <input asp-for="Recipients[i].BasisRecipientKey" class="form-control" type="number" min="1" />
+                            </div>
+                            <div class="col-12">
+                                <label asp-for="Recipients[i].Notes" class="form-label">Notes</label>
+                                <input asp-for="Recipients[i].Notes" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save me-1"></i>Save Agreement
+            </button>
+        </form>
+    </div>
+</div>
+
+<template id="recipientTemplate">
+    <div class="border rounded p-3 mb-3 recipient-row">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Beneficiary</label>
+                <select class="form-select recipient-beneficiary"></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Calculation</label>
+                <select class="form-select recipient-calculation">
+                    @foreach (var option in Html.GetEnumSelectList<LeadManagementPortal.Models.CommissionRecipientCalculationType>())
+                    {
+                        <option value="@option.Value">@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Rate / Amount</label>
+                <input class="form-control recipient-rate" type="number" step="0.01" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">Order</label>
+                <input class="form-control recipient-order" type="number" min="1" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Basis Order</label>
+                <input class="form-control recipient-basis" type="number" min="1" />
+            </div>
+            <div class="col-12">
+                <label class="form-label">Notes</label>
+                <input class="form-control recipient-notes" />
+            </div>
+        </div>
+    </div>
+</template>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (() => {
+            const rows = document.getElementById('recipientRows');
+            const template = document.getElementById('recipientTemplate');
+            const addButton = document.getElementById('addRecipient');
+            const beneficiaryOptions = `@Html.Raw(string.Join("", ((IEnumerable<SelectListItem>)ViewBag.Beneficiaries).Select(x => $"<option value=\"{x.Value}\">{x.Text}</option>")))`;
+
+            addButton?.addEventListener('click', () => {
+                const index = rows.querySelectorAll('.recipient-row').length;
+                const clone = template.content.firstElementChild.cloneNode(true);
+
+                clone.querySelector('.recipient-beneficiary').name = `Recipients[${index}].BeneficiaryId`;
+                clone.querySelector('.recipient-beneficiary').innerHTML = beneficiaryOptions;
+                clone.querySelector('.recipient-calculation').name = `Recipients[${index}].CalculationType`;
+                clone.querySelector('.recipient-rate').name = `Recipients[${index}].RateOrAmount`;
+                clone.querySelector('.recipient-order').name = `Recipients[${index}].SortOrder`;
+                clone.querySelector('.recipient-order').value = index + 1;
+                clone.querySelector('.recipient-basis').name = `Recipients[${index}].BasisRecipientKey`;
+                clone.querySelector('.recipient-notes').name = `Recipients[${index}].Notes`;
+
+                rows.appendChild(clone);
+            });
+        })();
+    </script>
+}

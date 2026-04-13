@@ -1,0 +1,116 @@
+@model IReadOnlyList<LeadManagementPortal.Models.PayoutBatch>
+@{
+    var payoutForm = ViewBag.PayoutForm as LeadManagementPortal.Models.ViewModels.PayoutBatchCreateViewModel;
+    ViewData["Title"] = "Payout Batches";
+}
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Create Payout Batch</div>
+            <div class="card-body">
+                <form asp-action="Payouts" method="get" class="mb-4">
+                    <div class="mb-3">
+                        <label class="form-label">Beneficiary</label>
+                        <select name="beneficiaryId" class="form-select" asp-items="ViewBag.Beneficiaries"></select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary">Load Outstanding Items</button>
+                </form>
+
+                @if (payoutForm != null)
+                {
+                    <form asp-action="CreatePayout" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="BeneficiaryId" value="@payoutForm.BeneficiaryId" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Beneficiary</label>
+                            <input class="form-control" value="@payoutForm.BeneficiaryName" disabled />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Reference</label>
+                            <input name="Reference" value="@payoutForm.Reference" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea name="Notes" rows="3" class="form-control">@payoutForm.Notes</textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Outstanding Items</label>
+                            @if (payoutForm.Items.Any())
+                            {
+                                @for (var i = 0; i < payoutForm.Items.Count; i++)
+                                {
+                                    <div class="border rounded p-3 mb-2">
+                                        <input type="hidden" name="Items[@i].ItemType" value="@payoutForm.Items[i].ItemType" />
+                                        <input type="hidden" name="Items[@i].SourceId" value="@payoutForm.Items[i].SourceId" />
+                                        <input type="hidden" name="Items[@i].Description" value="@payoutForm.Items[i].Description" />
+                                        <input type="hidden" name="Items[@i].OutstandingAmount" value="@payoutForm.Items[i].OutstandingAmount" />
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" name="Items[@i].IsSelected" value="true" checked />
+                                            <input type="hidden" name="Items[@i].IsSelected" value="false" />
+                                            <label class="form-check-label fw-semibold">@payoutForm.Items[i].Description</label>
+                                        </div>
+                                        <div class="row g-2 align-items-center">
+                                            <div class="col-6 text-muted">@payoutForm.Items[i].ItemType</div>
+                                            <div class="col-6">
+                                                <input name="Items[@i].SelectedAmount" class="form-control" type="number" step="0.01" value="@payoutForm.Items[i].SelectedAmount" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-muted">No unpaid commission items for this beneficiary.</div>
+                            }
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" @(payoutForm.Items.Any() ? null : "disabled")>Create Payout Batch</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">Recent Payout Batches</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Reference</th>
+                                <th>Paid At</th>
+                                <th>Entries</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Any())
+                            {
+                                @foreach (var batch in Model)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@batch.Reference</td>
+                                        <td>@batch.PaidAtUtc?.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td>@batch.Entries.Count</td>
+                                        <td>@batch.Notes</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">No payout batches yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
