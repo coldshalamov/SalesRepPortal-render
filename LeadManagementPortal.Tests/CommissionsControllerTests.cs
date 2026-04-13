@@ -345,5 +345,220 @@ namespace LeadManagementPortal.Tests
             Assert.Equal("rep-1", row.BeneficiaryId);
             Assert.Equal(50m, row.CommissionAmount);
         }
+
+        [Fact]
+        public async Task Hierarchy_AsOrganizationAdmin_ReturnsHierarchyViewModelWithOrphansAndLinks()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" },
+                new ApplicationUser { Id = "root-1", UserName = "root@example.com", Email = "root@example.com", FirstName = "Root", LastName = "User" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", FirstName = "Child", LastName = "User" });
+            context.CommissionDeals.Add(new CommissionDeal
+            {
+                ApplicationUserId = "child-1",
+                DealType = CommissionDealType.GrossPercent,
+                Rate = 15m,
+                CalculationBasis = CommissionCalculationBasis.DownlineGross
+            });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "child-1",
+                SponsorId = "root-1"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.Hierarchy();
+
+            var view = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<CommissionHierarchyViewModel>(view.Model);
+            Assert.Equal(3, model.TotalAccounts);
+            Assert.Equal(2, model.RootAccounts);
+            Assert.Equal(1, model.LinkedAccounts);
+            Assert.Equal(1, model.ConfiguredDeals);
+            Assert.Contains(model.Nodes, node => node.Id == "child-1" && node.SponsorId == "root-1");
+        }
+
+        [Fact]
+        public async Task SaveHierarchy_UpsertsSponsorAndDealAndReturnsUpdatedHierarchy()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" },
+                new ApplicationUser { Id = "owner-1", UserName = "owner@example.com", Email = "owner@example.com", FirstName = "Owner", LastName = "User" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", FirstName = "Child", LastName = "User" });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.SaveHierarchy(new SaveCommissionHierarchyRequest
+            {
+                AccountId = "child-1",
+                SponsorId = "owner-1",
+                CommissionDealType = CommissionDealType.NetPercent,
+                CommissionCalculationBasis = CommissionCalculationBasis.DownlineNet,
+                CommissionRate = 8m
+            });
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.NotNull(ok.Value);
+
+            var link = await context.CommissionLinks.SingleAsync(item => item.DownlineId == "child-1");
+            Assert.Equal("owner-1", link.SponsorId);
+
+            var deal = await context.CommissionDeals.SingleAsync(item => item.ApplicationUserId == "child-1");
+            Assert.Equal(CommissionDealType.NetPercent, deal.DealType);
+            Assert.Equal(CommissionCalculationBasis.DownlineNet, deal.CalculationBasis);
+            Assert.Equal(8m, deal.Rate);
+        }
+
+        [Fact]
+        public async Task SaveHierarchy_WhenCycleWouldBeCreated_ReturnsBadRequest()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" },
+                new ApplicationUser { Id = "owner-1", UserName = "owner@example.com", Email = "owner@example.com" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com" });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "owner-1",
+                SponsorId = "child-1"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.SaveHierarchy(new SaveCommissionHierarchyRequest
+            {
+                AccountId = "child-1",
+                SponsorId = "owner-1"
+            });
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.NotNull(badRequest.Value);
+        }
+
+        [Fact]
+        public async Task Hierarchy_AsGroupAdmin_PreservesOutOfScopeSponsorWithoutMarkingNodeAsOrphan()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "group-admin-1", UserName = "groupadmin@example.com", Email = "groupadmin@example.com", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", FirstName = "Child", LastName = "User", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "owner-outside", UserName = "outside@example.com", Email = "outside@example.com", FirstName = "Outside", LastName = "Owner", SalesGroupId = "group-b" });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "child-1",
+                SponsorId = "owner-outside"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("group-admin-1", UserRoles.GroupAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.Hierarchy();
+
+            var view = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<CommissionHierarchyViewModel>(view.Model);
+            var childNode = Assert.Single(model.Nodes.Where(node => node.Id == "child-1"));
+            Assert.Equal("owner-outside", childNode.SponsorId);
+            Assert.Equal("Owner outside current scope", childNode.SponsorName);
+            Assert.False(childNode.IsOrphan);
+            Assert.Equal(1, model.RootAccounts);
+            Assert.Equal(1, model.LinkedAccounts);
+        }
+
+        [Fact]
+        public async Task SaveHierarchy_AllowsUpdatingDealWhenExistingSponsorIsOutsideScopeAndUnchanged()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "group-admin-1", UserName = "groupadmin@example.com", Email = "groupadmin@example.com", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "owner-outside", UserName = "outside@example.com", Email = "outside@example.com", SalesGroupId = "group-b" });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "child-1",
+                SponsorId = "owner-outside"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("group-admin-1", UserRoles.GroupAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.SaveHierarchy(new SaveCommissionHierarchyRequest
+            {
+                AccountId = "child-1",
+                SponsorId = "owner-outside",
+                CommissionDealType = CommissionDealType.GrossPercent,
+                CommissionCalculationBasis = CommissionCalculationBasis.DownlineGross,
+                CommissionRate = 12m
+            });
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.NotNull(ok.Value);
+
+            var link = await context.CommissionLinks.SingleAsync(item => item.DownlineId == "child-1");
+            Assert.Equal("owner-outside", link.SponsorId);
+
+            var deal = await context.CommissionDeals.SingleAsync(item => item.ApplicationUserId == "child-1");
+            Assert.Equal(12m, deal.Rate);
+        }
     }
 }

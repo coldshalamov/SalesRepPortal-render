@@ -6,7 +6,13 @@
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Commissions</h1>
-    <div class="btn-toolbar">
+    <div class="btn-toolbar gap-2">
+        @if (User.IsInRole("OrganizationAdmin") || User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))
+        {
+            <a asp-action="Hierarchy" class="btn btn-primary">
+                <i class="bi bi-diagram-2"></i> Open Hierarchy
+            </a>
+        }
         <a asp-action="Details" class="btn btn-outline-primary">
             <i class="bi bi-table"></i> View All Ledger Rows
         </a>

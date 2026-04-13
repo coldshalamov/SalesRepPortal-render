@@ -1,0 +1,187 @@
+@using System.Text.Json
+@model LeadManagementPortal.Models.ViewModels.CommissionHierarchyViewModel
+
+@{
+    ViewData["Title"] = "Commission Hierarchy";
+    var hierarchyJson = JsonSerializer.Serialize(Model, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
+}
+
+<link rel="stylesheet" href="~/css/commission-hierarchy.css" asp-append-version="true" />
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-start pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <h1 class="h2 mb-1">Commission Hierarchy</h1>
+        <p class="text-muted mb-0">
+            Visualize who owns which account, spot orphans fast, and define the commission model that sits on each linked account.
+        </p>
+    </div>
+    <div class="btn-toolbar gap-2">
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="bi bi-bar-chart-line me-1"></i> Dashboard
+        </a>
+        <a asp-action="Details" class="btn btn-outline-primary">
+            <i class="bi bi-table me-1"></i> Ledger Rows
+        </a>
+    </div>
+</div>
+
+<div class="commission-hierarchy-shell">
+    <div class="commission-hierarchy-summary">
+        <article class="commission-kpi">
+            <span class="commission-kpi-label">Visible accounts</span>
+            <strong class="commission-kpi-value">@Model.TotalAccounts</strong>
+        </article>
+        <article class="commission-kpi">
+            <span class="commission-kpi-label">Root / orphan nodes</span>
+            <strong class="commission-kpi-value">@Model.RootAccounts</strong>
+        </article>
+        <article class="commission-kpi">
+            <span class="commission-kpi-label">Linked relationships</span>
+            <strong class="commission-kpi-value">@Model.LinkedAccounts</strong>
+        </article>
+        <article class="commission-kpi">
+            <span class="commission-kpi-label">Configured deal rules</span>
+            <strong class="commission-kpi-value">@Model.ConfiguredDeals</strong>
+        </article>
+    </div>
+
+    <div class="commission-hierarchy-grid">
+        <aside class="commission-panel commission-panel-left">
+            <div class="commission-panel-header">
+                <h2>Unlinked Accounts</h2>
+                <p>Accounts without a visible owner stay here until you assign one.</p>
+            </div>
+
+            <div id="commissionOrphanList" class="commission-list"></div>
+
+            <div class="commission-panel-section">
+                <label class="form-label" for="commissionAccountSearch">Find Account</label>
+                <input id="commissionAccountSearch" type="search" class="form-control" placeholder="Search by name or email" />
+            </div>
+
+            <div id="commissionAccountList" class="commission-list commission-list-all"></div>
+        </aside>
+
+        <section class="commission-panel commission-panel-center">
+            <div class="commission-panel-header commission-panel-header-inline">
+                <div>
+                    <h2>Relationship Map</h2>
+                    <p>Click any account card in the map or side list to edit its owner and deal settings.</p>
+                </div>
+                <div class="commission-legend">
+                    <span class="commission-legend-chip commission-legend-root">Root</span>
+                    <span class="commission-legend-chip commission-legend-linked">Linked</span>
+                    <span class="commission-legend-chip commission-legend-selected">Selected</span>
+                </div>
+            </div>
+
+            <div id="commissionHierarchyNotice" class="alert alert-info commission-hierarchy-notice d-none" role="alert"></div>
+
+            <div id="commissionGraphEmpty" class="commission-graph-empty d-none">
+                No accounts are visible in this scope yet.
+            </div>
+
+            <div class="commission-graph-surface">
+                <div id="commissionGraph" class="commission-graph"></div>
+            </div>
+        </section>
+
+        <aside class="commission-panel commission-panel-right">
+            <div class="commission-panel-header">
+                <h2>Relationship Editor</h2>
+                <p>Pick an account, assign its owner, then describe how this account earns within the chain.</p>
+            </div>
+
+            <div id="commissionSelectionEmpty" class="commission-selection-empty">
+                Select an account from the graph or the left panel to start editing.
+            </div>
+
+            <div id="commissionSelectionContent" class="d-none">
+                <div class="commission-account-hero">
+                    <div class="commission-account-hero-top">
+                        <div>
+                            <span class="commission-account-kicker">Selected account</span>
+                            <h3 id="commissionSelectedName" class="mb-1"></h3>
+                            <p id="commissionSelectedMeta" class="mb-0 text-muted"></p>
+                        </div>
+                        <span id="commissionSelectedRole" class="badge text-bg-light"></span>
+                    </div>
+                    <div id="commissionRelationshipSummary" class="commission-relationship-summary"></div>
+                </div>
+
+                <form id="commissionHierarchyForm">
+                    @Html.AntiForgeryToken()
+                    <input id="commissionAccountId" name="AccountId" type="hidden" />
+
+                    <div class="mb-3">
+                        <label class="form-label" for="commissionSponsorId">Owned By</label>
+                        <select id="commissionSponsorId" name="SponsorId" class="form-select"></select>
+                        <small class="text-muted">Changing the owner will redraw the hierarchy and move this account under that parent.</small>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="commissionDealType">Commission Model</label>
+                            <select id="commissionDealType" name="CommissionDealType" class="form-select">
+                                <option value="">-- No Deal --</option>
+                                @foreach (var dealType in Enum.GetValues<LeadManagementPortal.Models.CommissionDealType>())
+                                {
+                                    <option value="@dealType">@dealType</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="commissionCalculationBasis">Percentage Of</label>
+                            <select id="commissionCalculationBasis" name="CommissionCalculationBasis" class="form-select">
+                                <option value="">-- Select Basis --</option>
+                                @foreach (var basis in Enum.GetValues<LeadManagementPortal.Models.CommissionCalculationBasis>())
+                                {
+                                    <option value="@basis">@basis</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="commissionRate">Rate / Percent</label>
+                            <input id="commissionRate" name="CommissionRate" class="form-control" type="number" step="0.01" min="0" />
+                            <small class="text-muted">Use a percent for percent deals and a dollar amount for markup deals.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="commissionBaseCost">Base Cost</label>
+                            <input id="commissionBaseCost" name="CommissionBaseCost" class="form-control" type="number" step="0.01" min="0" />
+                            <small class="text-muted">Optional helper for markup scenarios.</small>
+                        </div>
+                    </div>
+
+                    <div class="commission-model-explainer">
+                        <h4>How the current engine reads these fields</h4>
+                        <ul class="mb-0">
+                            <li><strong>GrossPercent</strong>: percentage of the imported sale gross.</li>
+                            <li><strong>NetPercent</strong>: percentage of gross minus imported cost.</li>
+                            <li><strong>Markup</strong>: fixed amount per quantity sold.</li>
+                            <li><strong>ProfitSplit</strong>: percentage split using the chosen basis.</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button id="commissionSaveButton" type="submit" class="btn btn-primary">
+                            <i class="bi bi-diagram-3 me-1"></i> Save Relationship
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<script id="commissionHierarchyInitialData" type="application/json">@Html.Raw(hierarchyJson)</script>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script src="~/js/commission-hierarchy.js" asp-append-version="true"></script>
+}
