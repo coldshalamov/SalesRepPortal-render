@@ -587,7 +587,7 @@ namespace LeadManagementPortal.Tests
 
             var view = Assert.IsType<ViewResult>(result);
             var model = Assert.IsType<CommissionHierarchyViewModel>(view.Model);
-            var childNode = Assert.Single(model.Nodes.Where(node => node.Id == "child-1"));
+            var childNode = Assert.Single(model.Nodes, node => node.Id == "child-1");
             Assert.Equal("owner-outside", childNode.SponsorId);
             Assert.Equal("Owner outside current scope", childNode.SponsorName);
             Assert.False(childNode.IsOrphan);
