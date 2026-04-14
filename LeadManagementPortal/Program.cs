@@ -131,7 +131,6 @@ using (var scope = app.Services.CreateScope())
         if (db.Database.IsSqlite())
         {
             EnsureSqliteDataSourceDirectoryExists(db.Database.GetDbConnection().ConnectionString);
-            await db.Database.EnsureCreatedAsync();
             await SqliteCommissionSchemaCompatibility.EnsureCommissionSchemaAsync(db, startupLogger);
         }
         else

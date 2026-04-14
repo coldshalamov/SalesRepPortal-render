@@ -60,6 +60,60 @@ namespace LeadManagementPortal.Tests
             }
         }
 
+        [Fact]
+        public async Task StartupSqlitePath_UpgradesLegacyDatabaseToCurrentCommissionControlPlaneSchema()
+        {
+            var dbPath = await CreateLegacySqliteDatabaseAsync();
+
+            try
+            {
+                await using var context = CreateContext(dbPath);
+
+                await SqliteCommissionSchemaCompatibility.EnsureCommissionSchemaAsync(context, NullLogger.Instance);
+
+                var tableNames = await ReadObjectNamesAsync(dbPath, "table");
+                Assert.Contains("BusinessAccounts", tableNames);
+                Assert.Contains("CommissionAgreements", tableNames);
+                Assert.Contains("CommissionAgreementRecipients", tableNames);
+                Assert.Contains("ImportProfiles", tableNames);
+                Assert.Contains("ImportBatches", tableNames);
+                Assert.Contains("ImportRows", tableNames);
+                Assert.Contains("SaleEvents", tableNames);
+                Assert.Contains("CommissionLedgerEntries", tableNames);
+                Assert.Contains("CommissionAdjustments", tableNames);
+                Assert.Contains("PayoutBatches", tableNames);
+                Assert.Contains("PayoutEntries", tableNames);
+            }
+            finally
+            {
+                DeleteSqliteFile(dbPath);
+            }
+        }
+
+        [Fact]
+        public async Task PersistentSqlitePath_WithSchemaDrift_ThrowsInsteadOfDeletingDatabase()
+        {
+            var dbPath = await CreateLegacySqliteDatabaseAsync(useEphemeralPath: false);
+
+            try
+            {
+                await using var context = CreateContext(dbPath);
+
+                var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    SqliteCommissionSchemaCompatibility.EnsureCommissionSchemaAsync(context, NullLogger.Instance));
+
+                Assert.Contains("Refusing to recreate a non-ephemeral SQLite database", ex.Message);
+
+                var tableNames = await ReadObjectNamesAsync(dbPath, "table");
+                Assert.Contains("AspNetUsers", tableNames);
+                Assert.DoesNotContain("BusinessAccounts", tableNames);
+            }
+            finally
+            {
+                DeleteSqliteFile(dbPath);
+            }
+        }
+
         private static ApplicationDbContext CreateContext(string dbPath)
         {
             var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -69,9 +123,14 @@ namespace LeadManagementPortal.Tests
             return new ApplicationDbContext(options);
         }
 
-        private static async Task<string> CreateLegacySqliteDatabaseAsync()
+        private static async Task<string> CreateLegacySqliteDatabaseAsync(bool useEphemeralPath = true)
         {
-            var dbPath = Path.Combine(Path.GetTempPath(), $"legacy-commission-{Guid.NewGuid():N}.db");
+            var basePath = useEphemeralPath
+                ? Path.GetTempPath()
+                : Path.Combine(AppContext.BaseDirectory, "sqlite-schema-compat");
+            Directory.CreateDirectory(basePath);
+
+            var dbPath = Path.Combine(basePath, $"legacy-commission-{Guid.NewGuid():N}.db");
 
             await using var connection = new SqliteConnection($"Data Source={dbPath}");
             await connection.OpenAsync();

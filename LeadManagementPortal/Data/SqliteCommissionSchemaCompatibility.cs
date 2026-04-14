@@ -1,4 +1,4 @@
-using System.Data;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -8,71 +8,21 @@ namespace LeadManagementPortal.Data
     {
         private static readonly string[] RequiredTables =
         {
+            "BusinessAccounts",
+            "CommissionAdjustments",
+            "CommissionAgreements",
+            "CommissionAgreementRecipients",
             "CommissionDeals",
             "CommissionLinks",
+            "ImportBatches",
+            "ImportProfiles",
+            "ImportRows",
+            "PayoutBatches",
+            "PayoutEntries",
+            "SaleEvents",
             "SaleRecords",
+            "CommissionLedgerEntries",
             "CommissionLedgers"
-        };
-
-        private static readonly string[] CompatibilityStatements =
-        {
-            "PRAGMA foreign_keys = ON;",
-            """
-            CREATE TABLE IF NOT EXISTS "CommissionDeals" (
-                "ApplicationUserId" TEXT NOT NULL CONSTRAINT "PK_CommissionDeals" PRIMARY KEY,
-                "DealType" INTEGER NOT NULL,
-                "Rate" TEXT NOT NULL,
-                "BaseCost" TEXT NULL,
-                "CalculationBasis" INTEGER NOT NULL,
-                CONSTRAINT "FK_CommissionDeals_AspNetUsers_ApplicationUserId" FOREIGN KEY ("ApplicationUserId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE
-            );
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS "CommissionLinks" (
-                "DownlineId" TEXT NOT NULL CONSTRAINT "PK_CommissionLinks" PRIMARY KEY,
-                "SponsorId" TEXT NOT NULL,
-                CONSTRAINT "CK_CommissionLinks_NoSelfSponsor" CHECK ([DownlineId] <> [SponsorId]),
-                CONSTRAINT "FK_CommissionLinks_AspNetUsers_DownlineId" FOREIGN KEY ("DownlineId") REFERENCES "AspNetUsers" ("Id") ON DELETE CASCADE,
-                CONSTRAINT "FK_CommissionLinks_AspNetUsers_SponsorId" FOREIGN KEY ("SponsorId") REFERENCES "AspNetUsers" ("Id") ON DELETE RESTRICT
-            );
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS "SaleRecords" (
-                "Id" INTEGER NOT NULL CONSTRAINT "PK_SaleRecords" PRIMARY KEY AUTOINCREMENT,
-                "AccountId" TEXT NOT NULL,
-                "ProductName" TEXT NOT NULL,
-                "Quantity" INTEGER NOT NULL,
-                "GrossAmount" TEXT NOT NULL,
-                "CostAmount" TEXT NULL,
-                "SaleDate" TEXT NOT NULL,
-                "ImportBatchId" TEXT NOT NULL,
-                "ImportedAt" TEXT NOT NULL,
-                "RawPayload" TEXT NOT NULL,
-                CONSTRAINT "FK_SaleRecords_AspNetUsers_AccountId" FOREIGN KEY ("AccountId") REFERENCES "AspNetUsers" ("Id") ON DELETE RESTRICT
-            );
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS "CommissionLedgers" (
-                "Id" INTEGER NOT NULL CONSTRAINT "PK_CommissionLedgers" PRIMARY KEY AUTOINCREMENT,
-                "SaleRecordId" INTEGER NOT NULL,
-                "BeneficiaryId" TEXT NOT NULL,
-                "GrossAmount" TEXT NOT NULL,
-                "NetAmount" TEXT NOT NULL,
-                "CommissionAmount" TEXT NOT NULL,
-                "ChainDepth" INTEGER NOT NULL,
-                "DealSnapshot" TEXT NOT NULL,
-                "CalculationNotes" TEXT NOT NULL,
-                CONSTRAINT "FK_CommissionLedgers_AspNetUsers_BeneficiaryId" FOREIGN KEY ("BeneficiaryId") REFERENCES "AspNetUsers" ("Id") ON DELETE RESTRICT,
-                CONSTRAINT "FK_CommissionLedgers_SaleRecords_SaleRecordId" FOREIGN KEY ("SaleRecordId") REFERENCES "SaleRecords" ("Id") ON DELETE CASCADE
-            );
-            """,
-            """CREATE INDEX IF NOT EXISTS "IX_CommissionLinks_SponsorId" ON "CommissionLinks" ("SponsorId");""",
-            """CREATE INDEX IF NOT EXISTS "IX_SaleRecords_AccountId" ON "SaleRecords" ("AccountId");""",
-            """CREATE INDEX IF NOT EXISTS "IX_SaleRecords_ImportBatchId" ON "SaleRecords" ("ImportBatchId");""",
-            """CREATE INDEX IF NOT EXISTS "IX_SaleRecords_SaleDate" ON "SaleRecords" ("SaleDate");""",
-            """CREATE INDEX IF NOT EXISTS "IX_CommissionLedgers_BeneficiaryId" ON "CommissionLedgers" ("BeneficiaryId");""",
-            """CREATE INDEX IF NOT EXISTS "IX_CommissionLedgers_SaleRecordId" ON "CommissionLedgers" ("SaleRecordId");""",
-            """CREATE UNIQUE INDEX IF NOT EXISTS "IX_CommissionLedgers_SaleRecordId_BeneficiaryId" ON "CommissionLedgers" ("SaleRecordId", "BeneficiaryId");"""
         };
 
         public static async Task EnsureCommissionSchemaAsync(
@@ -85,8 +35,51 @@ namespace LeadManagementPortal.Data
                 return;
             }
 
+            var existingTables = await ReadExistingTablesAsync(db, cancellationToken);
+            var missingTables = RequiredTables
+                .Where(table => !existingTables.Contains(table))
+                .ToArray();
+
+            if (missingTables.Length == 0)
+            {
+                return;
+            }
+
+            if (existingTables.Count > 0)
+            {
+                var connectionString = db.Database.GetDbConnection().ConnectionString;
+                if (!IsEphemeralSqliteDataSource(connectionString))
+                {
+                    var missingTablesList = string.Join(", ", missingTables);
+                    var dataSource = DescribeSqliteDataSource(connectionString);
+                    var message = $"SQLite database '{dataSource}' is missing current commission schema tables: {missingTablesList}. Refusing to recreate a non-ephemeral SQLite database because that could delete real commission/accounting history. Run a proper migration or move this environment to the production database provider.";
+
+                    logger.LogError(message);
+                    throw new InvalidOperationException(message);
+                }
+
+                logger.LogWarning(
+                    "SQLite database is missing current commission schema tables: {MissingTables}. Recreating the SQLite database so the latest schema is applied.",
+                    string.Join(", ", missingTables));
+
+                await db.Database.EnsureDeletedAsync(cancellationToken);
+            }
+            else
+            {
+                logger.LogInformation("SQLite database does not have any application tables yet. Creating the latest schema.");
+            }
+
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+        }
+
+        private static async Task<HashSet<string>> ReadExistingTablesAsync(
+            ApplicationDbContext db,
+            CancellationToken cancellationToken)
+        {
+            var tables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var connection = db.Database.GetDbConnection();
-            var shouldClose = connection.State != ConnectionState.Open;
+            var shouldClose = connection.State != System.Data.ConnectionState.Open;
+
             if (shouldClose)
             {
                 await connection.OpenAsync(cancellationToken);
@@ -94,30 +87,21 @@ namespace LeadManagementPortal.Data
 
             try
             {
-                var existingTables = await ReadExistingTablesAsync(connection, cancellationToken);
-                var missingTables = RequiredTables
-                    .Where(table => !existingTables.Contains(table))
-                    .ToArray();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table';";
 
-                if (missingTables.Length == 0)
+                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
                 {
-                    return;
+                    if (!reader.IsDBNull(0))
+                    {
+                        var name = reader.GetString(0);
+                        if (!name.StartsWith("sqlite_", StringComparison.OrdinalIgnoreCase))
+                        {
+                            tables.Add(name);
+                        }
+                    }
                 }
-
-                logger.LogWarning(
-                    "SQLite database is missing commission schema tables: {MissingTables}. Applying compatibility DDL.",
-                    string.Join(", ", missingTables));
-
-                await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-                foreach (var statement in CompatibilityStatements)
-                {
-                    await using var command = connection.CreateCommand();
-                    command.Transaction = transaction;
-                    command.CommandText = statement;
-                    await command.ExecuteNonQueryAsync(cancellationToken);
-                }
-
-                await transaction.CommitAsync(cancellationToken);
             }
             finally
             {
@@ -126,27 +110,44 @@ namespace LeadManagementPortal.Data
                     await connection.CloseAsync();
                 }
             }
-        }
-
-        private static async Task<HashSet<string>> ReadExistingTablesAsync(
-            System.Data.Common.DbConnection connection,
-            CancellationToken cancellationToken)
-        {
-            var tables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table';";
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                if (!reader.IsDBNull(0))
-                {
-                    tables.Add(reader.GetString(0));
-                }
-            }
 
             return tables;
+        }
+
+        private static bool IsEphemeralSqliteDataSource(string connectionString)
+        {
+            var builder = new SqliteConnectionStringBuilder(connectionString);
+            var dataSource = builder.DataSource?.Trim();
+
+            if (string.IsNullOrWhiteSpace(dataSource))
+            {
+                return false;
+            }
+
+            if (string.Equals(dataSource, ":memory:", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (dataSource.Contains("://", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var fullPath = Path.GetFullPath(dataSource);
+            var tempRoot = Path.GetFullPath(Path.GetTempPath());
+            if (fullPath.StartsWith(tempRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string DescribeSqliteDataSource(string connectionString)
+        {
+            var builder = new SqliteConnectionStringBuilder(connectionString);
+            return string.IsNullOrWhiteSpace(builder.DataSource) ? "(unknown datasource)" : builder.DataSource;
         }
     }
 }

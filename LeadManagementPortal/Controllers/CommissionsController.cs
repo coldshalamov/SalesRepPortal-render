@@ -45,8 +45,8 @@ namespace LeadManagementPortal.Controllers
                     .ToListAsync();
 
                 var legacyLedgerRows = await QueryLegacyLedgerRowsAsync();
-                var adjustmentsTotal = await _context.CommissionAdjustments.SumAsync(a => a.Amount);
-                var paidTotal = await _context.PayoutEntries.SumAsync(p => p.Amount);
+                var adjustmentsTotal = await SumCommissionAdjustmentsAsync();
+                var paidTotal = await SumPayoutEntriesAsync();
                 var detailRows = ledgerEntries.Select(ToViewModel)
                     .Concat(legacyLedgerRows.Select(ToViewModel))
                     .OrderByDescending(r => r.SaleDate)
@@ -589,23 +589,14 @@ namespace LeadManagementPortal.Controllers
 
         private async Task<List<OutstandingBeneficiaryBalanceViewModel>> BuildOutstandingBalancesAsync()
         {
-            var earnings = await _context.CommissionLedgerEntries
-                .AsNoTracking()
-                .GroupBy(e => e.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.CommissionAmount) })
-                .ToListAsync();
+            var earnings = await LoadAmountsByBeneficiaryAsync(
+                _context.CommissionLedgerEntries.AsNoTracking().Select(e => new BeneficiaryAmount(e.BeneficiaryId, e.CommissionAmount)));
 
-            var adjustments = await _context.CommissionAdjustments
-                .AsNoTracking()
-                .GroupBy(a => a.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.Amount) })
-                .ToListAsync();
+            var adjustments = await LoadAmountsByBeneficiaryAsync(
+                _context.CommissionAdjustments.AsNoTracking().Select(a => new BeneficiaryAmount(a.BeneficiaryId, a.Amount)));
 
-            var paid = await _context.PayoutEntries
-                .AsNoTracking()
-                .GroupBy(p => p.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.Amount) })
-                .ToListAsync();
+            var paid = await LoadAmountsByBeneficiaryAsync(
+                _context.PayoutEntries.AsNoTracking().Select(p => new BeneficiaryAmount(p.BeneficiaryId, p.Amount)));
 
             var users = await _context.Users
                 .AsNoTracking()
@@ -613,11 +604,8 @@ namespace LeadManagementPortal.Controllers
                     u => u.Id,
                     u => string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? u.Id) : u.FullName);
 
-            var legacyEarnings = await _context.CommissionLedgers
-                .AsNoTracking()
-                .GroupBy(e => e.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.CommissionAmount) })
-                .ToListAsync();
+            var legacyEarnings = await LoadAmountsByBeneficiaryAsync(
+                _context.CommissionLedgers.AsNoTracking().Select(e => new BeneficiaryAmount(e.BeneficiaryId, e.CommissionAmount)));
 
             return earnings
                 .Concat(legacyEarnings)
@@ -638,6 +626,37 @@ namespace LeadManagementPortal.Controllers
                 .OrderByDescending(x => x.OutstandingBalance)
                 .Take(10)
                 .ToList();
+        }
+
+        private async Task<decimal> SumCommissionAdjustmentsAsync()
+        {
+            var amounts = await _context.CommissionAdjustments
+                .AsNoTracking()
+                .Select(a => a.Amount)
+                .ToListAsync();
+
+            return amounts.Sum();
+        }
+
+        private async Task<decimal> SumPayoutEntriesAsync()
+        {
+            var amounts = await _context.PayoutEntries
+                .AsNoTracking()
+                .Select(p => p.Amount)
+                .ToListAsync();
+
+            return amounts.Sum();
+        }
+
+        private static List<BeneficiaryAmount> AggregateAmountsByBeneficiary(IEnumerable<BeneficiaryAmount> rows) =>
+            rows.GroupBy(row => row.BeneficiaryId)
+                .Select(group => new BeneficiaryAmount(group.Key, group.Sum(row => row.Amount)))
+                .ToList();
+
+        private async Task<List<BeneficiaryAmount>> LoadAmountsByBeneficiaryAsync(IQueryable<BeneficiaryAmount> query)
+        {
+            var rows = await query.ToListAsync();
+            return AggregateAmountsByBeneficiary(rows);
         }
 
         private async Task<List<CommissionLedger>> QueryLegacyLedgerRowsAsync(string? beneficiaryId = null)
@@ -687,6 +706,8 @@ namespace LeadManagementPortal.Controllers
                 CalculationNotes = calculationDetails
             };
         }
+
+        private sealed record BeneficiaryAmount(string BeneficiaryId, decimal Amount);
 
         private static CommissionLedgerRowViewModel ToViewModel(CommissionLedger ledger)
         {

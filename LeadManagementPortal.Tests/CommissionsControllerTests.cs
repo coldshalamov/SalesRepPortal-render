@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -11,6 +12,7 @@ using LeadManagementPortal.Models.ViewModels;
 using LeadManagementPortal.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 
@@ -25,6 +27,18 @@ namespace LeadManagementPortal.Tests
                 .Options;
 
             return new ApplicationDbContext(options);
+        }
+
+        private static async Task<(ApplicationDbContext Context, string DbPath)> CreateSqliteContextAsync()
+        {
+            var dbPath = Path.Combine(Path.GetTempPath(), $"commissions-controller-tests-{Guid.NewGuid():N}.db");
+            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            var context = new ApplicationDbContext(options);
+            await context.Database.EnsureCreatedAsync();
+            return (context, dbPath);
         }
 
         private static ClaimsPrincipal BuildUser(string userId, string role, string? name = null)
@@ -425,6 +439,147 @@ namespace LeadManagementPortal.Tests
             Assert.Single(model.RecentImportBatches);
             Assert.Single(model.OutstandingBeneficiaryBalances);
             service.VerifyNoOtherCalls();
+        }
+
+        [Fact]
+        public async Task Index_AsOrganizationAdmin_WithSqliteBackend_DoesNotThrowDecimalAggregateTranslationErrors()
+        {
+            var (context, dbPath) = await CreateSqliteContextAsync();
+
+            try
+            {
+                await using (context)
+                {
+                    var admin = new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" };
+                    var rep = new ApplicationUser { Id = "rep-1", UserName = "rep@example.com", Email = "rep@example.com", FirstName = "Rep", LastName = "One" };
+                    var account = new BusinessAccount { Id = 101, Name = "Delta Care", IsActive = true };
+                    var activeAgreement = new CommissionAgreement
+                    {
+                        Id = 500,
+                        BusinessAccountId = account.Id,
+                        Name = "Delta 2026",
+                        EffectiveStartDate = new DateTime(2026, 1, 1),
+                        EffectiveEndDate = new DateTime(2026, 12, 31),
+                        IsActive = true
+                    };
+                    var saleEvent = new SaleEvent
+                    {
+                        Id = 600,
+                        BusinessAccountId = account.Id,
+                        SaleDate = DateTime.UtcNow.Date,
+                        ProductName = "Consult",
+                        Quantity = 1,
+                        GrossAmount = 250m,
+                        CostAmount = 100m,
+                        SourceSystem = "manual",
+                        RawPayloadJson = "{}",
+                        PostedById = admin.Id
+                    };
+
+                    context.Users.AddRange(admin, rep);
+                    context.BusinessAccounts.Add(account);
+                    context.CommissionAgreements.Add(activeAgreement);
+                    context.SaleEvents.Add(saleEvent);
+                    context.CommissionLedgerEntries.Add(new CommissionLedgerEntry
+                    {
+                        Id = 700,
+                        SaleEventId = saleEvent.Id,
+                        CommissionAgreementId = activeAgreement.Id,
+                        BeneficiaryId = rep.Id,
+                        CommissionAmount = 40m,
+                        GrossAmount = 250m,
+                        NetAmount = 150m,
+                        CalculationType = CommissionRecipientCalculationType.PercentOfGross,
+                        CalculationDetailsJson = "{\"calculationType\":\"PercentOfGross\",\"rateOrAmount\":16}",
+                        EarnedAtUtc = DateTime.UtcNow
+                    });
+                    context.CommissionAdjustments.Add(new CommissionAdjustment
+                    {
+                        Id = 701,
+                        BeneficiaryId = rep.Id,
+                        Amount = -5m,
+                        Reason = "Correction",
+                        CreatedById = admin.Id,
+                        CreatedAtUtc = DateTime.UtcNow
+                    });
+                    context.PayoutBatches.Add(new PayoutBatch
+                    {
+                        Id = 702,
+                        Reference = "CHK-100",
+                        CreatedById = admin.Id,
+                        CreatedAtUtc = DateTime.UtcNow,
+                        PaidAtUtc = DateTime.UtcNow
+                    });
+                    context.PayoutEntries.Add(new PayoutEntry
+                    {
+                        Id = 703,
+                        PayoutBatchId = 702,
+                        BeneficiaryId = rep.Id,
+                        CommissionLedgerEntryId = 700,
+                        Amount = 10m
+                    });
+                    context.ImportBatches.Add(new ImportBatch
+                    {
+                        Id = 704,
+                        SourceSystem = "csv",
+                        Status = ImportBatchStatus.PendingReview,
+                        ReceivedAtUtc = DateTime.UtcNow,
+                        Rows = new List<ImportRow>
+                        {
+                            new()
+                            {
+                                Id = 705,
+                                RowNumber = 1,
+                                Status = ImportRowStatus.PendingReview,
+                                RawPayloadJson = "{}",
+                                MappedPayloadJson = "{}"
+                            },
+                            new()
+                            {
+                                Id = 706,
+                                RowNumber = 2,
+                                Status = ImportRowStatus.ReadyToPost,
+                                RawPayloadJson = "{}",
+                                MappedPayloadJson = "{}"
+                            }
+                        }
+                    });
+
+                    await context.SaveChangesAsync();
+
+                    var service = new Mock<ICommissionControlPlaneService>(MockBehavior.Strict);
+                    var controller = new CommissionsController(context, service.Object)
+                    {
+                        ControllerContext = new ControllerContext
+                        {
+                            HttpContext = new DefaultHttpContext
+                            {
+                                User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                            }
+                        }
+                    };
+
+                    var result = await controller.Index();
+
+                    var view = Assert.IsType<ViewResult>(result);
+                    var model = Assert.IsType<CommissionDashboardViewModel>(view.Model);
+                    Assert.True(model.IsAdminView);
+                    Assert.Equal(40m, model.TotalCommissionEarned);
+                    Assert.Equal(-5m, model.TotalAdjustments);
+                    Assert.Equal(10m, model.TotalPaid);
+                    Assert.Equal(25m, model.OutstandingBalance);
+                    Assert.Single(model.OutstandingBeneficiaryBalances);
+                    service.VerifyNoOtherCalls();
+                }
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                if (File.Exists(dbPath))
+                {
+                    File.Delete(dbPath);
+                }
+            }
         }
 
         [Fact]
