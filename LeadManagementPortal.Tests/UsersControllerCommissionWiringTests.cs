@@ -189,8 +189,7 @@ namespace LeadManagementPortal.Tests
             var result = await controller.Edit(editedUser.Id);
 
             Assert.IsType<ViewResult>(result);
-            object sponsorsObject = controller.ViewBag.Sponsors;
-            var sponsors = Assert.IsType<SelectList>(sponsorsObject);
+            SelectList sponsors = Assert.IsType<SelectList>((object)controller.ViewBag.Sponsors);
             List<SelectListItem> items = sponsors.Cast<SelectListItem>().ToList();
             Assert.DoesNotContain(items, item => item.Value == editedUser.Id);
             Assert.Contains(items, item => item.Value == sponsor.Id);

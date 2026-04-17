@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -11,6 +12,7 @@ using LeadManagementPortal.Models.ViewModels;
 using LeadManagementPortal.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 
@@ -25,6 +27,18 @@ namespace LeadManagementPortal.Tests
                 .Options;
 
             return new ApplicationDbContext(options);
+        }
+
+        private static async Task<(ApplicationDbContext Context, string DbPath)> CreateSqliteContextAsync()
+        {
+            var dbPath = Path.Combine(Path.GetTempPath(), $"commissions-controller-tests-{Guid.NewGuid():N}.db");
+            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            var context = new ApplicationDbContext(options);
+            await context.Database.EnsureCreatedAsync();
+            return (context, dbPath);
         }
 
         private static ClaimsPrincipal BuildUser(string userId, string role, string? name = null)
@@ -42,6 +56,14 @@ namespace LeadManagementPortal.Tests
 
             var identity = new ClaimsIdentity(claims, "TestAuth");
             return new ClaimsPrincipal(identity);
+        }
+
+        private static Mock<ICommissionControlPlaneService> CreateControlPlaneServiceMock()
+        {
+            var service = new Mock<ICommissionControlPlaneService>(MockBehavior.Strict);
+            service.Setup(s => s.BuildStatementAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new CommissionStatementSummary());
+            return service;
         }
 
         [Fact]
@@ -417,6 +439,362 @@ namespace LeadManagementPortal.Tests
             Assert.Single(model.RecentImportBatches);
             Assert.Single(model.OutstandingBeneficiaryBalances);
             service.VerifyNoOtherCalls();
+        }
+
+        [Fact]
+        public async Task Index_AsOrganizationAdmin_WithSqliteBackend_DoesNotThrowDecimalAggregateTranslationErrors()
+        {
+            var (context, dbPath) = await CreateSqliteContextAsync();
+
+            try
+            {
+                await using (context)
+                {
+                    var admin = new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" };
+                    var rep = new ApplicationUser { Id = "rep-1", UserName = "rep@example.com", Email = "rep@example.com", FirstName = "Rep", LastName = "One" };
+                    var account = new BusinessAccount { Id = 101, Name = "Delta Care", IsActive = true };
+                    var activeAgreement = new CommissionAgreement
+                    {
+                        Id = 500,
+                        BusinessAccountId = account.Id,
+                        Name = "Delta 2026",
+                        EffectiveStartDate = new DateTime(2026, 1, 1),
+                        EffectiveEndDate = new DateTime(2026, 12, 31),
+                        IsActive = true
+                    };
+                    var saleEvent = new SaleEvent
+                    {
+                        Id = 600,
+                        BusinessAccountId = account.Id,
+                        SaleDate = DateTime.UtcNow.Date,
+                        ProductName = "Consult",
+                        Quantity = 1,
+                        GrossAmount = 250m,
+                        CostAmount = 100m,
+                        SourceSystem = "manual",
+                        RawPayloadJson = "{}",
+                        PostedById = admin.Id
+                    };
+
+                    context.Users.AddRange(admin, rep);
+                    context.BusinessAccounts.Add(account);
+                    context.CommissionAgreements.Add(activeAgreement);
+                    context.SaleEvents.Add(saleEvent);
+                    context.CommissionLedgerEntries.Add(new CommissionLedgerEntry
+                    {
+                        Id = 700,
+                        SaleEventId = saleEvent.Id,
+                        CommissionAgreementId = activeAgreement.Id,
+                        BeneficiaryId = rep.Id,
+                        CommissionAmount = 40m,
+                        GrossAmount = 250m,
+                        NetAmount = 150m,
+                        CalculationType = CommissionRecipientCalculationType.PercentOfGross,
+                        CalculationDetailsJson = "{\"calculationType\":\"PercentOfGross\",\"rateOrAmount\":16}",
+                        EarnedAtUtc = DateTime.UtcNow
+                    });
+                    context.CommissionAdjustments.Add(new CommissionAdjustment
+                    {
+                        Id = 701,
+                        BeneficiaryId = rep.Id,
+                        Amount = -5m,
+                        Reason = "Correction",
+                        CreatedById = admin.Id,
+                        CreatedAtUtc = DateTime.UtcNow
+                    });
+                    context.PayoutBatches.Add(new PayoutBatch
+                    {
+                        Id = 702,
+                        Reference = "CHK-100",
+                        CreatedById = admin.Id,
+                        CreatedAtUtc = DateTime.UtcNow,
+                        PaidAtUtc = DateTime.UtcNow
+                    });
+                    context.PayoutEntries.Add(new PayoutEntry
+                    {
+                        Id = 703,
+                        PayoutBatchId = 702,
+                        BeneficiaryId = rep.Id,
+                        CommissionLedgerEntryId = 700,
+                        Amount = 10m
+                    });
+                    context.ImportBatches.Add(new ImportBatch
+                    {
+                        Id = 704,
+                        SourceSystem = "csv",
+                        Status = ImportBatchStatus.PendingReview,
+                        ReceivedAtUtc = DateTime.UtcNow,
+                        Rows = new List<ImportRow>
+                        {
+                            new()
+                            {
+                                Id = 705,
+                                RowNumber = 1,
+                                Status = ImportRowStatus.PendingReview,
+                                RawPayloadJson = "{}",
+                                MappedPayloadJson = "{}"
+                            },
+                            new()
+                            {
+                                Id = 706,
+                                RowNumber = 2,
+                                Status = ImportRowStatus.ReadyToPost,
+                                RawPayloadJson = "{}",
+                                MappedPayloadJson = "{}"
+                            }
+                        }
+                    });
+
+                    await context.SaveChangesAsync();
+
+                    var service = new Mock<ICommissionControlPlaneService>(MockBehavior.Strict);
+                    var controller = new CommissionsController(context, service.Object)
+                    {
+                        ControllerContext = new ControllerContext
+                        {
+                            HttpContext = new DefaultHttpContext
+                            {
+                                User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                            }
+                        }
+                    };
+
+                    var result = await controller.Index();
+
+                    var view = Assert.IsType<ViewResult>(result);
+                    var model = Assert.IsType<CommissionDashboardViewModel>(view.Model);
+                    Assert.True(model.IsAdminView);
+                    Assert.Equal(40m, model.TotalCommissionEarned);
+                    Assert.Equal(-5m, model.TotalAdjustments);
+                    Assert.Equal(10m, model.TotalPaid);
+                    Assert.Equal(25m, model.OutstandingBalance);
+                    Assert.Single(model.OutstandingBeneficiaryBalances);
+                    service.VerifyNoOtherCalls();
+                }
+            }
+            finally
+            {
+                SqliteConnection.ClearAllPools();
+                if (File.Exists(dbPath))
+                {
+                    File.Delete(dbPath);
+                }
+            }
+        }
+
+        [Fact]
+        public async Task Hierarchy_AsOrganizationAdmin_ReturnsHierarchyViewModelWithOrphansAndLinks()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" },
+                new ApplicationUser { Id = "root-1", UserName = "root@example.com", Email = "root@example.com", FirstName = "Root", LastName = "User" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", FirstName = "Child", LastName = "User" });
+            context.CommissionDeals.Add(new CommissionDeal
+            {
+                ApplicationUserId = "child-1",
+                DealType = CommissionDealType.GrossPercent,
+                Rate = 15m,
+                CalculationBasis = CommissionCalculationBasis.DownlineGross
+            });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "child-1",
+                SponsorId = "root-1"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context, CreateControlPlaneServiceMock().Object)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.Hierarchy();
+
+            var view = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<CommissionHierarchyViewModel>(view.Model);
+            Assert.Equal(3, model.TotalAccounts);
+            Assert.Equal(2, model.RootAccounts);
+            Assert.Equal(1, model.LinkedAccounts);
+            Assert.Equal(1, model.ConfiguredDeals);
+            Assert.Contains(model.Nodes, node => node.Id == "child-1" && node.SponsorId == "root-1");
+        }
+
+        [Fact]
+        public async Task SaveHierarchy_UpsertsSponsorAndDealAndReturnsUpdatedHierarchy()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" },
+                new ApplicationUser { Id = "owner-1", UserName = "owner@example.com", Email = "owner@example.com", FirstName = "Owner", LastName = "User" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", FirstName = "Child", LastName = "User" });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context, CreateControlPlaneServiceMock().Object)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.SaveHierarchy(new SaveCommissionHierarchyRequest
+            {
+                AccountId = "child-1",
+                SponsorId = "owner-1",
+                CommissionDealType = CommissionDealType.NetPercent,
+                CommissionCalculationBasis = CommissionCalculationBasis.DownlineNet,
+                CommissionRate = 8m
+            });
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.NotNull(ok.Value);
+
+            var link = await context.CommissionLinks.SingleAsync(item => item.DownlineId == "child-1");
+            Assert.Equal("owner-1", link.SponsorId);
+
+            var deal = await context.CommissionDeals.SingleAsync(item => item.ApplicationUserId == "child-1");
+            Assert.Equal(CommissionDealType.NetPercent, deal.DealType);
+            Assert.Equal(CommissionCalculationBasis.DownlineNet, deal.CalculationBasis);
+            Assert.Equal(8m, deal.Rate);
+        }
+
+        [Fact]
+        public async Task SaveHierarchy_WhenCycleWouldBeCreated_ReturnsBadRequest()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "admin-1", UserName = "admin@example.com", Email = "admin@example.com" },
+                new ApplicationUser { Id = "owner-1", UserName = "owner@example.com", Email = "owner@example.com" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com" });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "owner-1",
+                SponsorId = "child-1"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context, CreateControlPlaneServiceMock().Object)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("admin-1", UserRoles.OrganizationAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.SaveHierarchy(new SaveCommissionHierarchyRequest
+            {
+                AccountId = "child-1",
+                SponsorId = "owner-1"
+            });
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.NotNull(badRequest.Value);
+        }
+
+        [Fact]
+        public async Task Hierarchy_AsGroupAdmin_PreservesOutOfScopeSponsorWithoutMarkingNodeAsOrphan()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "group-admin-1", UserName = "groupadmin@example.com", Email = "groupadmin@example.com", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", FirstName = "Child", LastName = "User", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "owner-outside", UserName = "outside@example.com", Email = "outside@example.com", FirstName = "Outside", LastName = "Owner", SalesGroupId = "group-b" });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "child-1",
+                SponsorId = "owner-outside"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context, CreateControlPlaneServiceMock().Object)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("group-admin-1", UserRoles.GroupAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.Hierarchy();
+
+            var view = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<CommissionHierarchyViewModel>(view.Model);
+            var childNode = Assert.Single(model.Nodes, node => node.Id == "child-1");
+            Assert.Equal("owner-outside", childNode.SponsorId);
+            Assert.Equal("Owner outside current scope", childNode.SponsorName);
+            Assert.False(childNode.IsOrphan);
+            Assert.Equal(1, model.RootAccounts);
+            Assert.Equal(1, model.LinkedAccounts);
+        }
+
+        [Fact]
+        public async Task SaveHierarchy_AllowsUpdatingDealWhenExistingSponsorIsOutsideScopeAndUnchanged()
+        {
+            await using var context = CreateContext();
+
+            context.Users.AddRange(
+                new ApplicationUser { Id = "group-admin-1", UserName = "groupadmin@example.com", Email = "groupadmin@example.com", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "child-1", UserName = "child@example.com", Email = "child@example.com", SalesGroupId = "group-a" },
+                new ApplicationUser { Id = "owner-outside", UserName = "outside@example.com", Email = "outside@example.com", SalesGroupId = "group-b" });
+            context.CommissionLinks.Add(new CommissionLink
+            {
+                DownlineId = "child-1",
+                SponsorId = "owner-outside"
+            });
+
+            await context.SaveChangesAsync();
+
+            var controller = new CommissionsController(context, CreateControlPlaneServiceMock().Object)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext
+                    {
+                        User = BuildUser("group-admin-1", UserRoles.GroupAdmin)
+                    }
+                }
+            };
+
+            var result = await controller.SaveHierarchy(new SaveCommissionHierarchyRequest
+            {
+                AccountId = "child-1",
+                SponsorId = "owner-outside",
+                CommissionDealType = CommissionDealType.GrossPercent,
+                CommissionCalculationBasis = CommissionCalculationBasis.DownlineGross,
+                CommissionRate = 12m
+            });
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.NotNull(ok.Value);
+
+            var link = await context.CommissionLinks.SingleAsync(item => item.DownlineId == "child-1");
+            Assert.Equal("owner-outside", link.SponsorId);
+
+            var deal = await context.CommissionDeals.SingleAsync(item => item.ApplicationUserId == "child-1");
+            Assert.Equal(12m, deal.Rate);
         }
     }
 }

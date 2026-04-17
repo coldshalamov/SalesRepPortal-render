@@ -7,11 +7,17 @@
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Commissions</h1>
-    <div class="btn-toolbar">
+    <div class="btn-toolbar gap-2">
         @if (Model.IsAdminView)
         {
-            <a asp-controller="CommissionAdmin" asp-action="Imports" class="btn btn-primary me-2">
+            <a asp-controller="CommissionAdmin" asp-action="Imports" class="btn btn-primary">
                 <i class="bi bi-sliders me-1"></i>Open Control Plane
+            </a>
+        }
+        @if (User.IsInRole("OrganizationAdmin") || User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))
+        {
+            <a asp-action="Hierarchy" class="btn btn-outline-primary">
+                <i class="bi bi-diagram-2"></i> Open Hierarchy
             </a>
         }
         <a asp-action="Details" class="btn btn-outline-primary">

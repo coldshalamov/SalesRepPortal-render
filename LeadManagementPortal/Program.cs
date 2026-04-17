@@ -124,18 +124,20 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var startupLogger = services.GetRequiredService<ILoggerFactory>().CreateLogger("StartupSchema");
     try
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
         if (db.Database.IsSqlite())
         {
             EnsureSqliteDataSourceDirectoryExists(db.Database.GetDbConnection().ConnectionString);
-            await db.Database.EnsureCreatedAsync();
+            await SqliteCommissionSchemaCompatibility.EnsureCommissionSchemaAsync(db, startupLogger);
         }
         else
         {
             await db.Database.MigrateAsync();
         }
+
         await SeedData.Initialize(services);
     }
     catch (Exception ex)

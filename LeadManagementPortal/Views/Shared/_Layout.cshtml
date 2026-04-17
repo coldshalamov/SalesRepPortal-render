@@ -79,29 +79,26 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link @(navController == "Commissions" ? "active" : "")" asp-controller="Commissions" asp-action="Index"
+                                <a class="nav-link @(navController == "Commissions" && navAction != "Hierarchy" ? "active" : "")" asp-controller="Commissions" asp-action="Index"
                                    data-bs-toggle="tooltip" data-bs-placement="bottom" title="Track commissions and payouts">
                                     <i class="bi bi-cash-coin me-1 nav-icon" aria-hidden="true"></i>Commissions
                                 </a>
                             </li>
+                            @if (User.IsInRole("OrganizationAdmin") || User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link @(navController == "Organization" ? "active" : "")" asp-controller="Organization" asp-action="Index"
+                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="View and manage your sales team structure">
+                                        <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>Hierarchy
+                                    </a>
+                                </li>
+                            }
                             @if (User.IsInRole("OrganizationAdmin"))
                             {
                                 <li class="nav-item">
                                     <a class="nav-link @(navController == "CommissionAdmin" ? "active" : "")" asp-controller="CommissionAdmin" asp-action="Imports"
                                        data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage accounts, agreements, imports, payouts, and adjustments">
                                         <i class="bi bi-sliders me-1 nav-icon" aria-hidden="true"></i>Commission Admin
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="Index"
-                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage sales groups">
-                                        <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>Groups
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index"
-                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage sales organizations">
-                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Orgs
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -120,18 +117,6 @@
                             else if (User.IsInRole("GroupAdmin"))
                             {
                                 <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesGroups" ? "active" : "")" asp-controller="SalesGroups" asp-action="MyGroup"
-                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="View your sales group">
-                                        <i class="bi bi-diagram-3 me-1 nav-icon" aria-hidden="true"></i>My Group
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="Index"
-                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="View sales orgs in your group">
-                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>Orgs
-                                    </a>
-                                </li>
-                                <li class="nav-item">
                                     <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyGroup"
                                        data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage users in your group">
                                         <i class="bi bi-person-gear me-1 nav-icon" aria-hidden="true"></i>My Group Users
@@ -144,12 +129,6 @@
                                     <a class="nav-link @(navController == "Users" ? "active" : "")" asp-controller="Users" asp-action="MyOrg"
                                        data-bs-toggle="tooltip" data-bs-placement="bottom" title="Manage users in your org">
                                         <i class="bi bi-person-gear me-1 nav-icon" aria-hidden="true"></i>My Org Users
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link @(navController == "SalesOrgs" ? "active" : "")" asp-controller="SalesOrgs" asp-action="MyOrgDetails"
-                                       data-bs-toggle="tooltip" data-bs-placement="bottom" title="View your sales org details">
-                                        <i class="bi bi-people me-1 nav-icon" aria-hidden="true"></i>My Org
                                     </a>
                                 </li>
                             }

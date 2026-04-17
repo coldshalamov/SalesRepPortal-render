@@ -13,6 +13,9 @@ namespace LeadManagementPortal.Controllers
     [Authorize]
     public class CommissionsController : Controller
     {
+        private const string HierarchyAdminRoles =
+            UserRoles.OrganizationAdmin + "," + UserRoles.GroupAdmin + "," + UserRoles.SalesOrgAdmin;
+
         private readonly ApplicationDbContext _context;
         private readonly ICommissionControlPlaneService _commissionControlPlaneService;
 
@@ -42,8 +45,8 @@ namespace LeadManagementPortal.Controllers
                     .ToListAsync();
 
                 var legacyLedgerRows = await QueryLegacyLedgerRowsAsync();
-                var adjustmentsTotal = await _context.CommissionAdjustments.SumAsync(a => a.Amount);
-                var paidTotal = await _context.PayoutEntries.SumAsync(p => p.Amount);
+                var adjustmentsTotal = await SumCommissionAdjustmentsAsync();
+                var paidTotal = await SumPayoutEntriesAsync();
                 var detailRows = ledgerEntries.Select(ToViewModel)
                     .Concat(legacyLedgerRows.Select(ToViewModel))
                     .OrderByDescending(r => r.SaleDate)
@@ -203,25 +206,399 @@ namespace LeadManagementPortal.Controllers
             return View(detailRows);
         }
 
+        [Authorize(Roles = HierarchyAdminRoles)]
+        public async Task<IActionResult> Hierarchy()
+        {
+            return View(await BuildHierarchyViewModelAsync());
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = HierarchyAdminRoles)]
+        public async Task<IActionResult> SaveHierarchy([FromForm] SaveCommissionHierarchyRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.AccountId))
+            {
+                return BadRequest(new
+                {
+                    status = "invalid",
+                    message = "Select an account to update."
+                });
+            }
+
+            var scope = await GetCurrentScopeAsync();
+            if (string.IsNullOrWhiteSpace(scope.UserId))
+            {
+                return Forbid();
+            }
+
+            var userQuery = ApplyScope(
+                _context.Users
+                    .Include(u => u.CommissionDeal)
+                    .Include(u => u.SponsorLink)
+                    .Where(u => u.IsActive),
+                scope);
+
+            var account = await userQuery.FirstOrDefaultAsync(u => u.Id == request.AccountId);
+            if (account == null)
+            {
+                return NotFound(new
+                {
+                    status = "missing",
+                    message = "The selected account is outside your management scope."
+                });
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.SponsorId))
+            {
+                if (string.Equals(request.SponsorId, request.AccountId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(new
+                    {
+                        status = "invalid",
+                        message = "An account cannot own itself."
+                    });
+                }
+
+                var existingSponsorId = account.SponsorLink?.SponsorId;
+                var sponsor = await userQuery
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == request.SponsorId);
+                var isKeepingExistingSponsor = string.Equals(
+                    request.SponsorId,
+                    existingSponsorId,
+                    StringComparison.OrdinalIgnoreCase);
+
+                if (sponsor == null && !isKeepingExistingSponsor)
+                {
+                    return BadRequest(new
+                    {
+                        status = "invalid",
+                        message = "Choose an owner that is visible inside your current scope."
+                    });
+                }
+
+                if (!isKeepingExistingSponsor && sponsor != null && await WouldCreateCommissionCycleAsync(account.Id, sponsor.Id))
+                {
+                    return BadRequest(new
+                    {
+                        status = "invalid",
+                        message = "That ownership link would create a cycle in the commission tree."
+                    });
+                }
+            }
+
+            var validationError = ValidateHierarchyRequest(request);
+            if (!string.IsNullOrWhiteSpace(validationError))
+            {
+                return BadRequest(new
+                {
+                    status = "invalid",
+                    message = validationError
+                });
+            }
+
+            if (request.CommissionDealType.HasValue)
+            {
+                if (account.CommissionDeal == null)
+                {
+                    account.CommissionDeal = new CommissionDeal
+                    {
+                        ApplicationUserId = account.Id
+                    };
+                    _context.CommissionDeals.Add(account.CommissionDeal);
+                }
+
+                account.CommissionDeal.DealType = request.CommissionDealType.Value;
+                account.CommissionDeal.Rate = request.CommissionRate ?? 0m;
+                account.CommissionDeal.BaseCost = request.CommissionBaseCost;
+                account.CommissionDeal.CalculationBasis =
+                    request.CommissionCalculationBasis ?? CommissionCalculationBasis.DownlineGross;
+            }
+            else if (account.CommissionDeal != null)
+            {
+                _context.CommissionDeals.Remove(account.CommissionDeal);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.SponsorId))
+            {
+                if (account.SponsorLink != null)
+                {
+                    _context.CommissionLinks.Remove(account.SponsorLink);
+                }
+            }
+            else if (account.SponsorLink == null)
+            {
+                _context.CommissionLinks.Add(new CommissionLink
+                {
+                    DownlineId = account.Id,
+                    SponsorId = request.SponsorId
+                });
+            }
+            else
+            {
+                account.SponsorLink.SponsorId = request.SponsorId;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                status = "ok",
+                message = "Hierarchy updated.",
+                hierarchy = await BuildHierarchyViewModelAsync()
+            });
+        }
+
+        private async Task<CommissionHierarchyViewModel> BuildHierarchyViewModelAsync()
+        {
+            var scope = await GetCurrentScopeAsync();
+            var users = await ApplyScope(
+                    _context.Users
+                        .AsNoTracking()
+                        .Where(u => u.IsActive)
+                        .Include(u => u.CommissionDeal)
+                        .Include(u => u.SponsorLink),
+                    scope)
+                .OrderBy(u => u.FirstName)
+                .ThenBy(u => u.LastName)
+                .ThenBy(u => u.Email)
+                .ToListAsync();
+
+            var visibleIds = users
+                .Select(u => u.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var roleLookup = await BuildRoleLookupAsync(users.Select(u => u.Id).ToList());
+            var usersById = users.ToDictionary(u => u.Id, StringComparer.OrdinalIgnoreCase);
+            var downlineCounts = users
+                .Where(u => !string.IsNullOrWhiteSpace(u.SponsorLink?.SponsorId) && visibleIds.Contains(u.SponsorLink!.SponsorId))
+                .GroupBy(u => u.SponsorLink!.SponsorId!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
+
+            var nodes = users.Select(user =>
+            {
+                var sponsorId = user.SponsorLink?.SponsorId;
+                var visibleSponsor = !string.IsNullOrWhiteSpace(sponsorId) && usersById.TryGetValue(sponsorId, out var sponsor)
+                    ? sponsor
+                    : null;
+                var fullName = string.IsNullOrWhiteSpace(user.FullName) ? user.Email ?? user.Id : user.FullName;
+
+                return new CommissionHierarchyNodeViewModel
+                {
+                    Id = user.Id,
+                    FullName = fullName,
+                    Email = user.Email ?? string.Empty,
+                    Role = roleLookup.TryGetValue(user.Id, out var roleName) ? roleName : "Unassigned",
+                    SponsorId = sponsorId,
+                    SponsorName = visibleSponsor == null
+                        ? (string.IsNullOrWhiteSpace(sponsorId) ? null : "Owner outside current scope")
+                        : (string.IsNullOrWhiteSpace(visibleSponsor.FullName) ? visibleSponsor.Email ?? visibleSponsor.Id : visibleSponsor.FullName),
+                    DealType = user.CommissionDeal?.DealType.ToString(),
+                    CalculationBasis = user.CommissionDeal?.CalculationBasis.ToString(),
+                    Rate = user.CommissionDeal?.Rate,
+                    BaseCost = user.CommissionDeal?.BaseCost,
+                    IsOrphan = string.IsNullOrWhiteSpace(sponsorId),
+                    DownlineCount = downlineCounts.TryGetValue(user.Id, out var count) ? count : 0
+                };
+            })
+            .OrderByDescending(node => node.IsOrphan)
+            .ThenBy(node => node.FullName)
+            .ToList();
+
+            return new CommissionHierarchyViewModel
+            {
+                Nodes = nodes,
+                TotalAccounts = nodes.Count,
+                RootAccounts = nodes.Count(node => node.IsOrphan),
+                LinkedAccounts = nodes.Count(node => !node.IsOrphan),
+                ConfiguredDeals = nodes.Count(node => !string.IsNullOrWhiteSpace(node.DealType))
+            };
+        }
+
+        private async Task<CurrentScope> GetCurrentScopeAsync()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return new CurrentScope();
+            }
+
+            if (User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                return new CurrentScope { UserId = userId };
+            }
+
+            if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                var salesGroupId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesGroupId)
+                    .SingleOrDefaultAsync();
+
+                return new CurrentScope
+                {
+                    UserId = userId,
+                    SalesGroupId = salesGroupId
+                };
+            }
+
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                var salesOrgId = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => u.SalesOrgId)
+                    .SingleOrDefaultAsync();
+
+                return new CurrentScope
+                {
+                    UserId = userId,
+                    SalesOrgId = salesOrgId
+                };
+            }
+
+            return new CurrentScope
+            {
+                UserId = userId
+            };
+        }
+
+        private IQueryable<ApplicationUser> ApplyScope(IQueryable<ApplicationUser> query, CurrentScope scope)
+        {
+            if (string.IsNullOrWhiteSpace(scope.UserId))
+            {
+                return query.Where(_ => false);
+            }
+
+            if (User.IsInRole(UserRoles.OrganizationAdmin))
+            {
+                return query;
+            }
+
+            if (User.IsInRole(UserRoles.GroupAdmin))
+            {
+                return string.IsNullOrWhiteSpace(scope.SalesGroupId)
+                    ? query.Where(_ => false)
+                    : query.Where(u => u.SalesGroupId == scope.SalesGroupId);
+            }
+
+            if (User.IsInRole(UserRoles.SalesOrgAdmin))
+            {
+                return scope.SalesOrgId.HasValue
+                    ? query.Where(u => u.SalesOrgId == scope.SalesOrgId.Value)
+                    : query.Where(_ => false);
+            }
+
+            return query.Where(u => u.Id == scope.UserId);
+        }
+
+        private async Task<Dictionary<string, string>> BuildRoleLookupAsync(List<string> userIds)
+        {
+            if (userIds.Count == 0)
+            {
+                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var orderedRoles = new[]
+            {
+                UserRoles.OrganizationAdmin,
+                UserRoles.GroupAdmin,
+                UserRoles.SalesOrgAdmin,
+                UserRoles.Affiliate,
+                UserRoles.SalesRep
+            };
+
+            var roleRows = await (
+                    from userRole in _context.UserRoles
+                    join role in _context.Roles on userRole.RoleId equals role.Id
+                    where userIds.Contains(userRole.UserId)
+                    select new
+                    {
+                        userRole.UserId,
+                        RoleName = role.Name ?? string.Empty
+                    })
+                .ToListAsync();
+
+            return roleRows
+                .GroupBy(row => row.UserId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group
+                        .Select(row => row.RoleName)
+                        .OrderBy(roleName =>
+                        {
+                            var index = Array.IndexOf(orderedRoles, roleName);
+                            return index >= 0 ? index : int.MaxValue;
+                        })
+                        .ThenBy(roleName => roleName)
+                        .FirstOrDefault() ?? "Unassigned",
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string? ValidateHierarchyRequest(SaveCommissionHierarchyRequest request)
+        {
+            var hasCommissionInput = request.CommissionDealType.HasValue
+                || request.CommissionCalculationBasis.HasValue
+                || request.CommissionRate.HasValue
+                || request.CommissionBaseCost.HasValue;
+
+            if (!hasCommissionInput)
+            {
+                return null;
+            }
+
+            if (!request.CommissionDealType.HasValue)
+            {
+                return "Select a deal type or clear the commission fields.";
+            }
+
+            if (!request.CommissionRate.HasValue)
+            {
+                return "Enter the commission percentage or markup amount.";
+            }
+
+            if (!request.CommissionCalculationBasis.HasValue)
+            {
+                return "Select what the commission is calculated from.";
+            }
+
+            return null;
+        }
+
+        private async Task<bool> WouldCreateCommissionCycleAsync(string downlineId, string sponsorId)
+        {
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { downlineId };
+            var currentSponsorId = sponsorId;
+
+            while (!string.IsNullOrWhiteSpace(currentSponsorId))
+            {
+                if (!visited.Add(currentSponsorId))
+                {
+                    return true;
+                }
+
+                currentSponsorId = await _context.CommissionLinks
+                    .AsNoTracking()
+                    .Where(link => link.DownlineId == currentSponsorId)
+                    .Select(link => link.SponsorId)
+                    .SingleOrDefaultAsync() ?? string.Empty;
+            }
+
+            return false;
+        }
+
         private async Task<List<OutstandingBeneficiaryBalanceViewModel>> BuildOutstandingBalancesAsync()
         {
-            var earnings = await _context.CommissionLedgerEntries
-                .AsNoTracking()
-                .GroupBy(e => e.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.CommissionAmount) })
-                .ToListAsync();
+            var earnings = await LoadAmountsByBeneficiaryAsync(
+                _context.CommissionLedgerEntries.AsNoTracking().Select(e => new BeneficiaryAmount(e.BeneficiaryId, e.CommissionAmount)));
 
-            var adjustments = await _context.CommissionAdjustments
-                .AsNoTracking()
-                .GroupBy(a => a.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.Amount) })
-                .ToListAsync();
+            var adjustments = await LoadAmountsByBeneficiaryAsync(
+                _context.CommissionAdjustments.AsNoTracking().Select(a => new BeneficiaryAmount(a.BeneficiaryId, a.Amount)));
 
-            var paid = await _context.PayoutEntries
-                .AsNoTracking()
-                .GroupBy(p => p.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.Amount) })
-                .ToListAsync();
+            var paid = await LoadAmountsByBeneficiaryAsync(
+                _context.PayoutEntries.AsNoTracking().Select(p => new BeneficiaryAmount(p.BeneficiaryId, p.Amount)));
 
             var users = await _context.Users
                 .AsNoTracking()
@@ -229,11 +606,8 @@ namespace LeadManagementPortal.Controllers
                     u => u.Id,
                     u => string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? u.Id) : u.FullName);
 
-            var legacyEarnings = await _context.CommissionLedgers
-                .AsNoTracking()
-                .GroupBy(e => e.BeneficiaryId)
-                .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.CommissionAmount) })
-                .ToListAsync();
+            var legacyEarnings = await LoadAmountsByBeneficiaryAsync(
+                _context.CommissionLedgers.AsNoTracking().Select(e => new BeneficiaryAmount(e.BeneficiaryId, e.CommissionAmount)));
 
             return earnings
                 .Concat(legacyEarnings)
@@ -254,6 +628,37 @@ namespace LeadManagementPortal.Controllers
                 .OrderByDescending(x => x.OutstandingBalance)
                 .Take(10)
                 .ToList();
+        }
+
+        private async Task<decimal> SumCommissionAdjustmentsAsync()
+        {
+            var amounts = await _context.CommissionAdjustments
+                .AsNoTracking()
+                .Select(a => a.Amount)
+                .ToListAsync();
+
+            return amounts.Sum();
+        }
+
+        private async Task<decimal> SumPayoutEntriesAsync()
+        {
+            var amounts = await _context.PayoutEntries
+                .AsNoTracking()
+                .Select(p => p.Amount)
+                .ToListAsync();
+
+            return amounts.Sum();
+        }
+
+        private static List<BeneficiaryAmount> AggregateAmountsByBeneficiary(IEnumerable<BeneficiaryAmount> rows) =>
+            rows.GroupBy(row => row.BeneficiaryId)
+                .Select(group => new BeneficiaryAmount(group.Key, group.Sum(row => row.Amount)))
+                .ToList();
+
+        private async Task<List<BeneficiaryAmount>> LoadAmountsByBeneficiaryAsync(IQueryable<BeneficiaryAmount> query)
+        {
+            var rows = await query.ToListAsync();
+            return AggregateAmountsByBeneficiary(rows);
         }
 
         private async Task<List<CommissionLedger>> QueryLegacyLedgerRowsAsync(string? beneficiaryId = null)
@@ -304,6 +709,8 @@ namespace LeadManagementPortal.Controllers
                 CalculationNotes = calculationDetails
             };
         }
+
+        private sealed record BeneficiaryAmount(string BeneficiaryId, decimal Amount);
 
         private static CommissionLedgerRowViewModel ToViewModel(CommissionLedger ledger)
         {
@@ -368,6 +775,13 @@ namespace LeadManagementPortal.Controllers
         {
             public string DealType { get; set; } = string.Empty;
             public string CalculationBasis { get; set; } = string.Empty;
+        }
+
+        private sealed class CurrentScope
+        {
+            public string? UserId { get; set; }
+            public string? SalesGroupId { get; set; }
+            public int? SalesOrgId { get; set; }
         }
     }
 }
