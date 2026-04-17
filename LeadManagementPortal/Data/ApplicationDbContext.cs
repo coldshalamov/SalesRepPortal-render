@@ -28,6 +28,7 @@ namespace LeadManagementPortal.Data
         public DbSet<SaleRecord> SaleRecords { get; set; }
         public DbSet<CommissionLedger> CommissionLedgers { get; set; }
         public DbSet<BusinessAccount> BusinessAccounts { get; set; }
+        public DbSet<BusinessAccountProductPrice> BusinessAccountProductPrices { get; set; }
         public DbSet<CommissionAgreement> CommissionAgreements { get; set; }
         public DbSet<CommissionAgreementRecipient> CommissionAgreementRecipients { get; set; }
         public DbSet<ImportProfile> ImportProfiles { get; set; }
@@ -359,6 +360,21 @@ namespace LeadManagementPortal.Data
                 entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.ExternalKey).HasMaxLength(100);
                 entity.Property(e => e.Notes).HasMaxLength(4000);
+            });
+
+            builder.Entity<BusinessAccountProductPrice>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.BusinessAccountId, e.ProductName, e.IsActive });
+                entity.HasIndex(e => new { e.BusinessAccountId, e.EffectiveStartDate, e.EffectiveEndDate });
+                entity.Property(e => e.ProductName).HasMaxLength(256).IsRequired();
+                entity.Property(e => e.UnitPrice).HasPrecision(18, 2);
+                entity.Property(e => e.UnitCost).HasPrecision(18, 2);
+                entity.Property(e => e.Notes).HasMaxLength(1000);
+                entity.HasOne(e => e.BusinessAccount)
+                    .WithMany(a => a.ProductPrices)
+                    .HasForeignKey(e => e.BusinessAccountId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<CommissionAgreement>(entity =>

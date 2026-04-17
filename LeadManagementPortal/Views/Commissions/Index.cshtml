@@ -1,4 +1,5 @@
 @model LeadManagementPortal.Models.ViewModels.CommissionDashboardViewModel
+@using System.Globalization
 
 @{
     ViewData["Title"] = "Commission Dashboard";
@@ -21,62 +22,104 @@
 
 <div class="row mb-4">
     <div class="col-md-4">
-        <div class="card text-white bg-success mb-3">
+        <div class="card mui-kpi-card mui-magic-card mui-beam-card mb-3">
             <div class="card-header">Total Earned</div>
             <div class="card-body">
-                <h2 class="card-title">@Model.TotalCommissionEarned.ToString("C")</h2>
-                <p class="card-text mb-0">@Model.TotalLedgerRows ledger rows</p>
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker"
+                          data-format="currency"
+                          data-decimals="2"
+                          data-value="@Model.TotalCommissionEarned.ToString(CultureInfo.InvariantCulture)"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">
+                    <span class="mui-number-ticker" data-value="@Model.TotalLedgerRows"></span> ledger rows
+                </p>
             </div>
+            <span class="mui-border-beam" style="--beam-duration: 7.5s;"></span>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-dark bg-light mb-3">
+        <div class="card mui-kpi-card mui-magic-card mui-beam-card mb-3">
             <div class="card-header">This Month</div>
             <div class="card-body">
-                <h2 class="card-title">@Model.CurrentMonthCommission.ToString("C")</h2>
-                <p class="card-text mb-0">Current-month earned commissions.</p>
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker"
+                          data-format="currency"
+                          data-decimals="2"
+                          data-value="@Model.CurrentMonthCommission.ToString(CultureInfo.InvariantCulture)"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">Current-month earned commissions.</p>
             </div>
+            <span class="mui-border-beam" style="--beam-duration: 9.5s;"></span>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-dark bg-info-subtle mb-3">
+        <div class="card mui-kpi-card mui-magic-card mui-beam-card mb-3">
             <div class="card-header">Outstanding</div>
             <div class="card-body">
-                <h2 class="card-title">@Model.OutstandingBalance.ToString("C")</h2>
-                <p class="card-text mb-0">Earned plus adjustments minus payouts.</p>
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker"
+                          data-format="currency"
+                          data-decimals="2"
+                          data-value="@Model.OutstandingBalance.ToString(CultureInfo.InvariantCulture)"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">Earned plus adjustments minus payouts.</p>
             </div>
+            <span class="mui-border-beam" style="--beam-duration: 11s;"></span>
         </div>
     </div>
 </div>
 
 <div class="row mb-4">
     <div class="col-md-4">
-        <div class="card text-dark bg-warning-subtle mb-3">
+        <div class="card mui-kpi-card mui-magic-card mui-beam-card mb-3">
             <div class="card-header">Adjustments</div>
             <div class="card-body">
-                <h4 class="card-title">@Model.TotalAdjustments.ToString("C")</h4>
-                <p class="card-text mb-0">Net manual corrections applied.</p>
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker"
+                          data-format="currency"
+                          data-decimals="2"
+                          data-value="@Model.TotalAdjustments.ToString(CultureInfo.InvariantCulture)"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">Net manual corrections applied.</p>
             </div>
+            <span class="mui-border-beam" style="--beam-duration: 8.2s;"></span>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card text-dark bg-secondary-subtle mb-3">
+        <div class="card mui-kpi-card mui-magic-card mui-beam-card mb-3">
             <div class="card-header">Paid</div>
             <div class="card-body">
-                <h4 class="card-title">@Model.TotalPaid.ToString("C")</h4>
-                <p class="card-text mb-0">Amount already included in payout batches.</p>
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker"
+                          data-format="currency"
+                          data-decimals="2"
+                          data-value="@Model.TotalPaid.ToString(CultureInfo.InvariantCulture)"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">Amount already included in payout batches.</p>
             </div>
+            <span class="mui-border-beam" style="--beam-duration: 10.2s;"></span>
         </div>
     </div>
     @if (Model.IsAdminView)
     {
         <div class="col-md-4">
-            <div class="card text-dark bg-light mb-3">
+            <div class="card mui-kpi-card mui-magic-card mui-beam-card mb-3">
                 <div class="card-header">Review Queue</div>
                 <div class="card-body">
-                    <h4 class="card-title">@Model.PendingReviewRows pending / @Model.ReadyToPostRows ready</h4>
-                    <p class="card-text mb-0">@Model.BusinessAccountCount accounts, @Model.ActiveAgreementCount active agreements.</p>
+                    <div class="mui-kpi-value mb-1">
+                        <span class="mui-number-ticker" data-value="@Model.PendingReviewRows"></span>
+                        <span class="fs-6 text-secondary">pending</span>
+                        <span class="fs-6 text-secondary">/</span>
+                        <span class="mui-number-ticker" data-value="@Model.ReadyToPostRows"></span>
+                        <span class="fs-6 text-secondary">ready</span>
+                    </div>
+                    <p class="mui-kpi-subtext mb-0">
+                        <span class="mui-number-ticker" data-value="@Model.BusinessAccountCount"></span> accounts,
+                        <span class="mui-number-ticker" data-value="@Model.ActiveAgreementCount"></span> active agreements.
+                    </p>
                 </div>
+                <span class="mui-border-beam" style="--beam-duration: 7.8s;"></span>
             </div>
         </div>
     }
@@ -135,6 +178,7 @@
                                 <th>Date</th>
                                 <th>Account</th>
                                 <th>Product</th>
+                                <th>Source</th>
                                 <th>Beneficiary</th>
                                 <th>Deal Type</th>
                                 <th class="text-end">Gross</th>
@@ -153,6 +197,7 @@
                                         <td>@row.SaleDate.ToString("MMM dd, yyyy")</td>
                                         <td>@row.BusinessAccountName</td>
                                         <td>@row.ProductName</td>
+                                        <td>@row.SourceSystem</td>
                                         <td>@row.BeneficiaryName</td>
                                         <td>@row.DealType</td>
                                         <td class="text-end">@row.GrossAmount.ToString("C")</td>
@@ -166,7 +211,7 @@
                             else
                             {
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">No commission data is available yet.</td>
+                                    <td colspan="11" class="text-center text-muted py-4">No commission data is available yet.</td>
                                 </tr>
                             }
                         </tbody>

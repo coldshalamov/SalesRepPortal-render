@@ -95,6 +95,19 @@ namespace LeadManagementPortal.Models.ViewModels
         public List<ImportRow> Rows { get; set; } = new();
     }
 
+    public class CommissionImportsPageViewModel
+    {
+        public List<ImportBatch> Batches { get; set; } = new();
+        public ImportUploadPreviewViewModel? Preview { get; set; }
+    }
+
+    public class ImportUploadPreviewViewModel
+    {
+        public string SourceFileName { get; set; } = string.Empty;
+        public List<string> Headers { get; set; } = new();
+        public List<Dictionary<string, string?>> SampleRows { get; set; } = new();
+    }
+
     public class ImportRowEditViewModel
     {
         public int Id { get; set; }
@@ -115,6 +128,63 @@ namespace LeadManagementPortal.Models.ViewModels
         public string? ReviewNotes { get; set; }
         public string RawPayloadJson { get; set; } = "{}";
         public string MappedPayloadJson { get; set; } = "{}";
+    }
+
+    public class BusinessAccountProductPriceEditViewModel
+    {
+        public int? Id { get; set; }
+
+        [Required]
+        public int BusinessAccountId { get; set; }
+
+        [Required]
+        [StringLength(256)]
+        public string ProductName { get; set; } = string.Empty;
+
+        [Range(0, 99999999)]
+        public decimal? UnitPrice { get; set; }
+
+        [Range(0, 99999999)]
+        public decimal UnitCost { get; set; }
+
+        [DataType(DataType.Date)]
+        public DateTime EffectiveStartDate { get; set; } = DateTime.UtcNow.Date;
+
+        [DataType(DataType.Date)]
+        public DateTime EffectiveEndDate { get; set; } = DateTime.UtcNow.Date.AddYears(1);
+
+        public bool IsActive { get; set; } = true;
+
+        [StringLength(1000)]
+        public string? Notes { get; set; }
+    }
+
+    public class CommissionAgreementFlowViewModel
+    {
+        public int AgreementId { get; set; }
+        public string AgreementName { get; set; } = string.Empty;
+        public string BusinessAccountName { get; set; } = string.Empty;
+        public string? ProductNameFilter { get; set; }
+        public DateTime EffectiveStartDate { get; set; }
+        public DateTime EffectiveEndDate { get; set; }
+        public decimal SampleGrossAmount { get; set; }
+        public decimal? SampleCostAmount { get; set; }
+        public int SampleQuantity { get; set; }
+        public decimal SampleNetAmount { get; set; }
+        public string MermaidGraph { get; set; } = string.Empty;
+        public List<CommissionAgreementFlowRecipientViewModel> Recipients { get; set; } = new();
+    }
+
+    public class CommissionAgreementFlowRecipientViewModel
+    {
+        public int RecipientId { get; set; }
+        public int SortOrder { get; set; }
+        public string BeneficiaryName { get; set; } = string.Empty;
+        public string CalculationType { get; set; } = string.Empty;
+        public decimal RateOrAmount { get; set; }
+        public int? BasisRecipientId { get; set; }
+        public int? BasisSortOrder { get; set; }
+        public decimal CommissionAmount { get; set; }
     }
 
     public class CommissionAdjustmentEditViewModel

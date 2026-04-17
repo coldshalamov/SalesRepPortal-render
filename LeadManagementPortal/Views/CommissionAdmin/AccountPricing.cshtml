@@ -1,0 +1,135 @@
+@model IReadOnlyList<LeadManagementPortal.Models.BusinessAccountProductPrice>
+@using LeadManagementPortal.Models.ViewModels
+
+@{
+    ViewData["Title"] = "Account Product Pricing";
+    var createModel = ViewBag.CreatePriceModel as BusinessAccountProductPriceEditViewModel ?? new BusinessAccountProductPriceEditViewModel();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1">Account Product Pricing</h2>
+        <p class="text-muted mb-0">Define per-account medication price/cost so net commissions can be calculated automatically.</p>
+    </div>
+    <a asp-action="Accounts" class="btn btn-outline-secondary">Back to Accounts</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Filter</div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Business Account</label>
+                <select name="businessAccountId" class="form-select" asp-items="ViewBag.BusinessAccounts">
+                    <option value="">-- All Active Accounts --</option>
+                </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary">Apply Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Create Pricing Rule</div>
+    <div class="card-body">
+        <form asp-action="CreateAccountPrice" method="post">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Business Account</label>
+                    <select name="BusinessAccountId" class="form-select" asp-items="ViewBag.BusinessAccounts"></select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Product Name</label>
+                    <input name="ProductName" value="@createModel.ProductName" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Unit Price</label>
+                    <input name="UnitPrice" value="@createModel.UnitPrice" type="number" min="0" step="0.01" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Unit Cost</label>
+                    <input name="UnitCost" value="@createModel.UnitCost" type="number" min="0" step="0.01" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Effective Start</label>
+                    <input name="EffectiveStartDate" value="@createModel.EffectiveStartDate.ToString("yyyy-MM-dd")" type="date" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Effective End</label>
+                    <input name="EffectiveEndDate" value="@createModel.EffectiveEndDate.ToString("yyyy-MM-dd")" type="date" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Notes</label>
+                    <input name="Notes" value="@createModel.Notes" class="form-control" />
+                </div>
+                <div class="col-md-2 d-flex align-items-center">
+                    <div class="form-check mt-4">
+                        <input id="IsActiveCreatePrice" name="IsActive" type="checkbox" value="true" class="form-check-input" @(createModel.IsActive ? "checked" : null) />
+                        <label for="IsActiveCreatePrice" class="form-check-label">Active</label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-1"></i>Create Pricing Rule
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Pricing Rules</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Account</th>
+                        <th>Product</th>
+                        <th class="text-end">Unit Price</th>
+                        <th class="text-end">Unit Cost</th>
+                        <th>Effective Dates</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Any())
+                    {
+                        @foreach (var row in Model)
+                        {
+                            <tr>
+                                <td>@row.BusinessAccount?.Name</td>
+                                <td>
+                                    <div class="fw-semibold">@row.ProductName</div>
+                                    <div class="text-muted small">@row.Notes</div>
+                                </td>
+                                <td class="text-end">@(row.UnitPrice.HasValue ? row.UnitPrice.Value.ToString("C") : "-")</td>
+                                <td class="text-end">@row.UnitCost.ToString("C")</td>
+                                <td>@row.EffectiveStartDate.ToString("yyyy-MM-dd") to @row.EffectiveEndDate.ToString("yyyy-MM-dd")</td>
+                                <td>
+                                    <span class="badge @(row.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(row.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <a asp-action="EditAccountPrice" asp-route-id="@row.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">No account pricing rules found for the selected filter.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

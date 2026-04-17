@@ -1,13 +1,94 @@
-@model IReadOnlyList<LeadManagementPortal.Models.ImportBatch>
+@model LeadManagementPortal.Models.ViewModels.CommissionImportsPageViewModel
+@using LeadManagementPortal.Models
 
 @{
     ViewData["Title"] = "Commission Imports";
+    var preview = Model.Preview;
+    var headers = preview?.Headers ?? new List<string>();
+    var totalBatchCount = Model.Batches.Count;
+    var pendingBatchCount = Model.Batches.Count(b => b.Status == ImportBatchStatus.PendingReview);
+    var readyBatchCount = Model.Batches.Count(b => b.Status == ImportBatchStatus.ReadyToPost);
+    var postedBatchCount = Model.Batches.Count(b => b.Status == ImportBatchStatus.Posted);
+    var totalRowCount = Model.Batches.Sum(b => b.Rows.Count);
+    string? SuggestHeader(string targetField)
+    {
+        if (!headers.Any())
+        {
+            return null;
+        }
+
+        var normalized = targetField.ToLowerInvariant();
+        return headers.FirstOrDefault(header =>
+            (normalized == "externalrowid" && (header.Contains("rx", StringComparison.OrdinalIgnoreCase) || header.Contains("order", StringComparison.OrdinalIgnoreCase) || header.Contains("id", StringComparison.OrdinalIgnoreCase)))
+            || (normalized == "businessaccountexternalkey" && header.Contains("account key", StringComparison.OrdinalIgnoreCase))
+            || (normalized == "businessaccountname" && (header.Contains("customer", StringComparison.OrdinalIgnoreCase) || header.Contains("account", StringComparison.OrdinalIgnoreCase)))
+            || (normalized == "productname" && header.Contains("product", StringComparison.OrdinalIgnoreCase))
+            || (normalized == "quantity" && header.Contains("quantity", StringComparison.OrdinalIgnoreCase))
+            || (normalized == "grossamount" && (header.Contains("total", StringComparison.OrdinalIgnoreCase) || header.Contains("gross", StringComparison.OrdinalIgnoreCase)))
+            || (normalized == "costamount" && header.Contains("cost", StringComparison.OrdinalIgnoreCase))
+            || (normalized == "saledate" && (header.Contains("invoice", StringComparison.OrdinalIgnoreCase) || header.Contains("ship", StringComparison.OrdinalIgnoreCase) || header.Contains("created", StringComparison.OrdinalIgnoreCase) || header.Contains("date", StringComparison.OrdinalIgnoreCase)))
+            || (normalized == "creditedrepid" && (header.Contains("rep", StringComparison.OrdinalIgnoreCase) || header.Contains("owner", StringComparison.OrdinalIgnoreCase))));
+    }
 }
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 mui-kpi-card mui-magic-card mui-beam-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Import Batches</span>
+                <span class="badge text-bg-primary-subtle text-primary-emphasis">Tracked</span>
+            </div>
+            <div class="card-body">
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker" data-value="@totalBatchCount"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">
+                    <span class="mui-number-ticker" data-value="@pendingBatchCount"></span> pending,
+                    <span class="mui-number-ticker" data-value="@readyBatchCount"></span> ready,
+                    <span class="mui-number-ticker" data-value="@postedBatchCount"></span> posted
+                </p>
+            </div>
+            <span class="mui-border-beam" style="--beam-duration: 7s;"></span>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 mui-kpi-card mui-magic-card mui-beam-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Rows Ingested</span>
+                <span class="badge text-bg-info-subtle text-info-emphasis">Volume</span>
+            </div>
+            <div class="card-body">
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker" data-value="@totalRowCount"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">Total rows tied to visible import batches.</p>
+            </div>
+            <span class="mui-border-beam" style="--beam-duration: 8.5s;"></span>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 mui-kpi-card mui-magic-card mui-beam-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Post Progress</span>
+                <span class="badge text-bg-success-subtle text-success-emphasis">Pipeline</span>
+            </div>
+            <div class="card-body">
+                <div class="mui-kpi-value mb-1">
+                    <span class="mui-number-ticker" data-value="@postedBatchCount"></span>
+                    <span class="fs-5 fw-semibold text-secondary">/</span>
+                    <span class="mui-number-ticker" data-value="@totalBatchCount"></span>
+                </div>
+                <p class="mui-kpi-subtext mb-0">Batches fully posted to ledger.</p>
+            </div>
+            <span class="mui-border-beam" style="--beam-duration: 10s;"></span>
+        </div>
+    </div>
+</div>
 
 <div class="row g-4">
     <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">Upload CSV</div>
+        <div class="card mb-4 mui-magic-card mui-beam-card">
+            <div class="card-header">Upload Spreadsheet</div>
             <div class="card-body">
                 <form asp-action="UploadCsv" method="post" enctype="multipart/form-data">
                     @Html.AntiForgeryToken()
@@ -18,19 +99,149 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">CSV File</label>
-                        <input name="file" type="file" accept=".csv,text/csv" class="form-control" />
+                        <label class="form-label">Spreadsheet File</label>
+                        <input name="file" type="file" accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" class="form-control" />
+                        <div class="form-text">Supports CSV, XLSX, and XLSM uploads.</div>
                     </div>
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-upload me-1"></i>Upload
                     </button>
                 </form>
             </div>
+            <span class="mui-border-beam" style="--beam-duration: 9s;"></span>
+        </div>
+
+        <div class="card mui-magic-card mui-beam-card">
+            <div class="card-header">Quick Mapper Wizard</div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">Analyze spreadsheet headers, pick columns from dropdowns, and upload with ad hoc or saved mapping.</p>
+                <form asp-action="PreviewUpload" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label">Spreadsheet File</label>
+                        <input name="previewFile" type="file" accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" class="form-control" />
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-magic me-1"></i>Analyze Columns
+                    </button>
+                </form>
+            </div>
+            <span class="mui-border-beam" style="--beam-duration: 11s;"></span>
         </div>
     </div>
 
     <div class="col-lg-8">
-        <div class="card">
+        @if (preview != null)
+        {
+            <div class="card mb-4 mui-magic-card mui-beam-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Quick Mapping: @preview.SourceFileName</span>
+                    <span class="badge bg-info-subtle text-dark">
+                        <span class="mui-number-ticker" data-value="@headers.Count"></span> headers detected
+                    </span>
+                </div>
+                <div class="card-body">
+                    <form asp-action="UploadCsv" method="post" enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Spreadsheet File</label>
+                                <input name="file" type="file" accept=".csv,.xlsx,.xlsm,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" class="form-control" required />
+                                <div class="form-text">Re-select the file for final upload after mapping.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Source Bucket</label>
+                                <input name="quickSourceSystem" value="dirx-patient" class="form-control" placeholder="dirx-patient, bulk-sales, etc." />
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check mt-4">
+                                    <input id="saveQuickProfile" name="saveQuickProfile" type="checkbox" value="true" class="form-check-input" />
+                                    <label for="saveQuickProfile" class="form-check-label">Save this mapping as a reusable active profile</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Profile Name (optional)</label>
+                                <input name="quickProfileName" value="DiRX Quick Mapping" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            @{
+                                var fieldSpecs = new List<(string Name, string Label, string Target)>
+                                {
+                                    ("quickExternalRowIdColumn", "External Row Id", "ExternalRowId"),
+                                    ("quickBusinessAccountExternalKeyColumn", "Business Account Key", "BusinessAccountExternalKey"),
+                                    ("quickBusinessAccountNameColumn", "Business Account Name", "BusinessAccountName"),
+                                    ("quickProductNameColumn", "Product Name", "ProductName"),
+                                    ("quickQuantityColumn", "Quantity", "Quantity"),
+                                    ("quickGrossAmountColumn", "Gross Amount", "GrossAmount"),
+                                    ("quickCostAmountColumn", "Cost Amount", "CostAmount"),
+                                    ("quickSaleDateColumn", "Sale Date", "SaleDate"),
+                                    ("quickCreditedRepIdColumn", "Credited Rep", "CreditedRepId")
+                                };
+                            }
+                            @foreach (var field in fieldSpecs)
+                            {
+                                var suggested = SuggestHeader(field.Target);
+                                <div class="col-md-4">
+                                    <label class="form-label">@field.Label</label>
+                                    <select name="@field.Name" class="form-select">
+                                        <option value="">-- Not mapped --</option>
+                                        @foreach (var header in headers)
+                                        {
+                                            if (string.Equals(header, suggested, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <option value="@header" selected="selected">@header</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@header">@header</option>
+                                            }
+                                        }
+                                    </select>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-play-circle me-1"></i>Upload With Quick Mapping
+                            </button>
+                        </div>
+                    </form>
+
+                    <hr />
+
+                    <h6 class="mb-3">Sample Rows</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    @foreach (var header in headers)
+                                    {
+                                        <th>@header</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in preview.SampleRows)
+                                {
+                                    <tr>
+                                        @foreach (var header in headers)
+                                        {
+                                            <td>@(row.TryGetValue(header, out var value) ? value : null)</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <span class="mui-border-beam" style="--beam-duration: 8.25s;"></span>
+            </div>
+        }
+
+        <div class="card mui-magic-card mui-beam-card">
             <div class="card-header">Recent Import Batches</div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -47,9 +258,9 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @if (Model.Any())
+                            @if (Model.Batches.Any())
                             {
-                                @foreach (var batch in Model)
+                                @foreach (var batch in Model.Batches)
                                 {
                                     <tr>
                                         <td>#@batch.Id</td>
@@ -74,6 +285,7 @@
                     </table>
                 </div>
             </div>
+            <span class="mui-border-beam" style="--beam-duration: 12s;"></span>
         </div>
     </div>
 </div>

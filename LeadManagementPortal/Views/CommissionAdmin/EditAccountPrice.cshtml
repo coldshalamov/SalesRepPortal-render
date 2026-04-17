@@ -1,0 +1,70 @@
+@model LeadManagementPortal.Models.ViewModels.BusinessAccountProductPriceEditViewModel
+
+@{
+    ViewData["Title"] = Model.Id.HasValue ? "Edit Account Pricing" : "Create Account Pricing";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-1">@ViewData["Title"]</h2>
+        <p class="text-muted mb-0">Maintain account-specific product pricing and cost for commission profit calculations.</p>
+    </div>
+    <a asp-action="AccountPricing" asp-route-businessAccountId="@Model.BusinessAccountId" class="btn btn-outline-secondary">Back</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form asp-action="EditAccountPrice" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="BusinessAccountId" class="form-label">Business Account</label>
+                    <select asp-for="BusinessAccountId" class="form-select" asp-items="ViewBag.BusinessAccounts"></select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="ProductName" class="form-label"></label>
+                    <input asp-for="ProductName" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="UnitPrice" class="form-label"></label>
+                    <input asp-for="UnitPrice" type="number" min="0" step="0.01" class="form-control" />
+                </div>
+                <div class="col-md-2">
+                    <label asp-for="UnitCost" class="form-label"></label>
+                    <input asp-for="UnitCost" type="number" min="0" step="0.01" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="EffectiveStartDate" class="form-label"></label>
+                    <input asp-for="EffectiveStartDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <label asp-for="EffectiveEndDate" class="form-label"></label>
+                    <input asp-for="EffectiveEndDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <input asp-for="Notes" class="form-control" />
+                </div>
+                <div class="col-md-2 d-flex align-items-center">
+                    <div class="form-check mt-4">
+                        <input asp-for="IsActive" class="form-check-input" />
+                        <label asp-for="IsActive" class="form-check-label"></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-1"></i>Save Pricing Rule
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

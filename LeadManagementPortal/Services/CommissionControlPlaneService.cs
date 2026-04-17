@@ -1,5 +1,8 @@
 using System.Globalization;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
+using System.Xml;
 using CsvHelper;
 using LeadManagementPortal.Controllers;
 using LeadManagementPortal.Data;
@@ -24,6 +27,7 @@ namespace LeadManagementPortal.Services
     {
         public int LedgerEntryId { get; set; }
         public DateTime SaleDate { get; set; }
+        public string SourceSystem { get; set; } = string.Empty;
         public string BusinessAccountName { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
         public decimal GrossAmount { get; set; }
@@ -219,19 +223,29 @@ namespace LeadManagementPortal.Services
                 .Include(b => b.Rows)
                 .SingleAsync(b => b.Id == batchId, cancellationToken);
 
-            var agreementIds = batch.Rows
-                .Where(r => r.Status == ImportRowStatus.ReadyToPost && r.SelectedAgreementId.HasValue)
-                .Select(r => r.SelectedAgreementId!.Value)
-                .Distinct()
-                .ToList();
-
             var agreements = await _context.CommissionAgreements
                 .Include(a => a.BusinessAccount)
                 .Include(a => a.Recipients)
                 .ToDictionaryAsync(a => a.Id, cancellationToken);
 
-            foreach (var row in batch.Rows.Where(r => r.Status == ImportRowStatus.ReadyToPost).OrderBy(r => r.RowNumber))
+            var readyRows = batch.Rows.Where(r => r.Status == ImportRowStatus.ReadyToPost).OrderBy(r => r.RowNumber).ToList();
+            var candidateAccountIds = readyRows
+                .Where(r => r.BusinessAccountId.HasValue)
+                .Select(r => r.BusinessAccountId!.Value)
+                .Distinct()
+                .ToList();
+
+            var productPricingRows = candidateAccountIds.Count == 0
+                ? new List<BusinessAccountProductPrice>()
+                : await _context.BusinessAccountProductPrices
+                    .AsNoTracking()
+                    .Where(p => p.IsActive && candidateAccountIds.Contains(p.BusinessAccountId))
+                    .ToListAsync(cancellationToken);
+
+            foreach (var row in readyRows)
             {
+                ApplyAccountProductPricingIfAvailable(row, productPricingRows);
+
                 if (!row.SelectedAgreementId.HasValue || !row.BusinessAccountId.HasValue || !row.GrossAmount.HasValue || !row.SaleDate.HasValue || string.IsNullOrWhiteSpace(row.ProductName))
                 {
                     row.Status = ImportRowStatus.PendingReview;
@@ -355,6 +369,7 @@ namespace LeadManagementPortal.Services
                 {
                     LedgerEntryId = entry.Id,
                     SaleDate = entry.SaleEvent?.SaleDate ?? DateTime.MinValue,
+                    SourceSystem = entry.SaleEvent?.SourceSystem ?? "unknown",
                     BusinessAccountName = entry.SaleEvent?.BusinessAccount?.Name ?? "Unknown Account",
                     ProductName = entry.SaleEvent?.ProductName ?? string.Empty,
                     GrossAmount = entry.GrossAmount,
@@ -613,7 +628,9 @@ namespace LeadManagementPortal.Services
                 row.CostAmount = costAmount;
             }
 
-            if (DateTime.TryParse(GetMappedValue(rawValues, mappings, "SaleDate"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var saleDate))
+            var saleDateValue = GetMappedValue(rawValues, mappings, "SaleDate");
+            saleDateValue ??= GetDefaultSaleDateValue(rawValues);
+            if (DateTime.TryParse(saleDateValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var saleDate))
             {
                 row.SaleDate = saleDate;
             }
@@ -744,6 +761,41 @@ namespace LeadManagementPortal.Services
             }
         }
 
+        private static void ApplyAccountProductPricingIfAvailable(
+            ImportRow row,
+            IReadOnlyList<BusinessAccountProductPrice> pricingRows)
+        {
+            if (!row.BusinessAccountId.HasValue || string.IsNullOrWhiteSpace(row.ProductName) || !row.SaleDate.HasValue)
+            {
+                return;
+            }
+
+            var matchedPricing = pricingRows
+                .Where(p => p.BusinessAccountId == row.BusinessAccountId.Value
+                    && p.EffectiveStartDate.Date <= row.SaleDate.Value.Date
+                    && p.EffectiveEndDate.Date >= row.SaleDate.Value.Date
+                    && string.Equals(p.ProductName, row.ProductName, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(p => p.EffectiveStartDate)
+                .ThenByDescending(p => p.Id)
+                .FirstOrDefault();
+
+            if (matchedPricing == null)
+            {
+                return;
+            }
+
+            var quantity = row.Quantity.GetValueOrDefault(1);
+            if (!row.GrossAmount.HasValue && matchedPricing.UnitPrice.HasValue)
+            {
+                row.GrossAmount = Decimal.Round(matchedPricing.UnitPrice.Value * quantity, 2, MidpointRounding.AwayFromZero);
+            }
+
+            if (!row.CostAmount.HasValue)
+            {
+                row.CostAmount = Decimal.Round(matchedPricing.UnitCost * quantity, 2, MidpointRounding.AwayFromZero);
+            }
+        }
+
         private static string? GetMappedValue(
             IReadOnlyDictionary<string, string?> rawValues,
             IReadOnlyDictionary<string, string> mappings,
@@ -754,7 +806,25 @@ namespace LeadManagementPortal.Services
                 return null;
             }
 
-            return rawValues.TryGetValue(sourceColumn, out var value) ? value : null;
+            var candidates = sourceColumn
+                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+                .ToList();
+
+            if (!candidates.Any())
+            {
+                return rawValues.TryGetValue(sourceColumn, out var directValue) ? directValue : null;
+            }
+
+            foreach (var candidate in candidates)
+            {
+                if (rawValues.TryGetValue(candidate, out var value) && !string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
         }
 
         private static decimal CalculateRecipientAmount(
@@ -799,6 +869,11 @@ namespace LeadManagementPortal.Services
 
         public static async Task<IReadOnlyList<IDictionary<string, string?>>> ReadCsvRowsAsync(Stream stream, CancellationToken cancellationToken = default)
         {
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+
             using var reader = new StreamReader(stream, leaveOpen: true);
             using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
             await csv.ReadAsync();
@@ -818,8 +893,319 @@ namespace LeadManagementPortal.Services
                 rows.Add(row);
             }
 
-            stream.Position = 0;
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+
             return rows;
+        }
+
+        public static async Task<IReadOnlyList<IDictionary<string, string?>>> ReadTabularRowsAsync(
+            Stream stream,
+            string? sourceFileName,
+            CancellationToken cancellationToken = default)
+        {
+            var extension = Path.GetExtension(sourceFileName ?? string.Empty);
+            if (string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".xlsm", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ReadXlsxRowsAsync(stream, cancellationToken);
+            }
+
+            if (string.IsNullOrWhiteSpace(extension)
+                || string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".txt", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ReadCsvRowsAsync(stream, cancellationToken);
+            }
+
+            throw new InvalidOperationException("Unsupported file format. Upload a CSV, XLSX, or XLSM file.");
+        }
+
+        public static async Task<IReadOnlyList<IDictionary<string, string?>>> ReadXlsxRowsAsync(
+            Stream stream,
+            CancellationToken cancellationToken = default)
+        {
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+            var worksheetEntry = archive.Entries
+                .Where(entry => entry.FullName.StartsWith("xl/worksheets/", StringComparison.OrdinalIgnoreCase)
+                    && entry.FullName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(entry => entry.FullName, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+
+            if (worksheetEntry == null)
+            {
+                if (stream.CanSeek)
+                {
+                    stream.Position = 0;
+                }
+
+                return Array.Empty<IDictionary<string, string?>>();
+            }
+
+            var sharedStrings = await ReadSharedStringsAsync(archive, cancellationToken);
+            var rows = new List<IDictionary<string, string?>>();
+            Dictionary<int, string>? headersByColumn = null;
+
+            using var worksheetStream = worksheetEntry.Open();
+            using var reader = XmlReader.Create(worksheetStream, new XmlReaderSettings
+            {
+                Async = true,
+                IgnoreWhitespace = true,
+                IgnoreComments = true,
+                IgnoreProcessingInstructions = true
+            });
+
+            while (await reader.ReadAsync())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (reader.NodeType != XmlNodeType.Element || !string.Equals(reader.Name, "row", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var rowValues = await ReadWorksheetRowValuesAsync(reader, sharedStrings, cancellationToken);
+                if (rowValues.Count == 0)
+                {
+                    continue;
+                }
+
+                if (headersByColumn == null)
+                {
+                    headersByColumn = rowValues
+                        .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value))
+                        .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!.Trim());
+                    continue;
+                }
+
+                var mappedRow = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var header in headersByColumn)
+                {
+                    rowValues.TryGetValue(header.Key, out var rawValue);
+                    mappedRow[header.Value] = NormalizeSpreadsheetCellValue(header.Value, rawValue);
+                }
+
+                if (mappedRow.Values.Any(value => !string.IsNullOrWhiteSpace(value)))
+                {
+                    rows.Add(mappedRow);
+                }
+            }
+
+            if (stream.CanSeek)
+            {
+                stream.Position = 0;
+            }
+
+            return rows;
+        }
+
+        private static string? GetDefaultSaleDateValue(IReadOnlyDictionary<string, string?> rawValues)
+        {
+            var candidates = new[]
+            {
+                "InvoicePaidDate",
+                "OrderShippedDate",
+                "OrderCreatedDate",
+                "PaidDate",
+                "ShippedDate",
+                "CreatedDate",
+                "SaleDate"
+            };
+
+            foreach (var candidate in candidates)
+            {
+                if (rawValues.TryGetValue(candidate, out var value) && !string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return null;
+        }
+
+        private static async Task<IReadOnlyList<string>> ReadSharedStringsAsync(
+            ZipArchive archive,
+            CancellationToken cancellationToken)
+        {
+            var entry = archive.GetEntry("xl/sharedStrings.xml");
+            if (entry == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            var sharedStrings = new List<string>();
+            using var stream = entry.Open();
+            using var reader = XmlReader.Create(stream, new XmlReaderSettings
+            {
+                Async = true,
+                IgnoreWhitespace = true,
+                IgnoreComments = true,
+                IgnoreProcessingInstructions = true
+            });
+
+            while (await reader.ReadAsync())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (reader.NodeType != XmlNodeType.Element || !string.Equals(reader.Name, "si", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                using var siReader = reader.ReadSubtree();
+                var stringBuilder = new StringBuilder();
+                await siReader.ReadAsync();
+                while (await siReader.ReadAsync())
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (siReader.NodeType == XmlNodeType.Element && string.Equals(siReader.Name, "t", StringComparison.OrdinalIgnoreCase))
+                    {
+                        stringBuilder.Append(await siReader.ReadElementContentAsStringAsync());
+                    }
+                }
+
+                sharedStrings.Add(stringBuilder.ToString());
+            }
+
+            return sharedStrings;
+        }
+
+        private static async Task<Dictionary<int, string?>> ReadWorksheetRowValuesAsync(
+            XmlReader rowReader,
+            IReadOnlyList<string> sharedStrings,
+            CancellationToken cancellationToken)
+        {
+            var values = new Dictionary<int, string?>();
+            using var subtree = rowReader.ReadSubtree();
+            await subtree.ReadAsync();
+            while (await subtree.ReadAsync())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (subtree.NodeType != XmlNodeType.Element || !string.Equals(subtree.Name, "c", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var cellReference = subtree.GetAttribute("r");
+                if (string.IsNullOrWhiteSpace(cellReference))
+                {
+                    continue;
+                }
+
+                var columnIndex = GetColumnIndex(cellReference);
+                if (columnIndex < 0)
+                {
+                    continue;
+                }
+
+                using var cellSubtree = subtree.ReadSubtree();
+                var cellType = subtree.GetAttribute("t");
+                var value = await ReadWorksheetCellValueAsync(cellSubtree, cellType, sharedStrings, cancellationToken);
+                values[columnIndex] = value;
+            }
+
+            return values;
+        }
+
+        private static async Task<string?> ReadWorksheetCellValueAsync(
+            XmlReader cellReader,
+            string? cellType,
+            IReadOnlyList<string> sharedStrings,
+            CancellationToken cancellationToken)
+        {
+            var inlineText = new StringBuilder();
+            string? value = null;
+
+            await cellReader.ReadAsync();
+            while (await cellReader.ReadAsync())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (cellReader.NodeType != XmlNodeType.Element)
+                {
+                    continue;
+                }
+
+                if (string.Equals(cellReader.Name, "v", StringComparison.OrdinalIgnoreCase))
+                {
+                    value = await cellReader.ReadElementContentAsStringAsync();
+                    continue;
+                }
+
+                if (string.Equals(cellReader.Name, "t", StringComparison.OrdinalIgnoreCase))
+                {
+                    inlineText.Append(await cellReader.ReadElementContentAsStringAsync());
+                }
+            }
+
+            if (string.Equals(cellType, "s", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var sharedStringIndex)
+                    && sharedStringIndex >= 0
+                    && sharedStringIndex < sharedStrings.Count)
+                {
+                    return sharedStrings[sharedStringIndex];
+                }
+
+                return null;
+            }
+
+            if (string.Equals(cellType, "b", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
+            }
+
+            if (inlineText.Length > 0)
+            {
+                return inlineText.ToString();
+            }
+
+            return value;
+        }
+
+        private static int GetColumnIndex(string cellReference)
+        {
+            var column = 0;
+            foreach (var character in cellReference)
+            {
+                if (!char.IsLetter(character))
+                {
+                    break;
+                }
+
+                column *= 26;
+                column += char.ToUpperInvariant(character) - 'A' + 1;
+            }
+
+            return column - 1;
+        }
+
+        private static string? NormalizeSpreadsheetCellValue(string headerName, string? rawValue)
+        {
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                return null;
+            }
+
+            var trimmed = rawValue.Trim();
+            if (headerName.Contains("date", StringComparison.OrdinalIgnoreCase)
+                && Double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out var oaDate))
+            {
+                try
+                {
+                    return DateTime.FromOADate(oaDate).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                }
+                catch
+                {
+                    return trimmed;
+                }
+            }
+
+            return trimmed;
         }
     }
 }

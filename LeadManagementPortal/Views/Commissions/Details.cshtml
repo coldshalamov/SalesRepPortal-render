@@ -22,6 +22,7 @@
                         <th>Date</th>
                         <th>Account</th>
                         <th>Product</th>
+                        <th>Source</th>
                         <th>Beneficiary</th>
                         <th>Deal Type</th>
                         <th>Basis</th>
@@ -42,6 +43,7 @@
                                 <td>@row.SaleDate.ToString("MMM dd, yyyy")</td>
                                 <td>@row.BusinessAccountName</td>
                                 <td>@row.ProductName</td>
+                                <td>@row.SourceSystem</td>
                                 <td>@row.BeneficiaryName</td>
                                 <td>@row.DealType</td>
                                 <td>@row.CalculationBasis</td>
@@ -57,7 +59,7 @@
                     else
                     {
                         <tr>
-                            <td colspan="11" class="text-center text-muted py-4">No ledger rows are visible for this user.</td>
+                            <td colspan="12" class="text-center text-muted py-4">No ledger rows are visible for this user.</td>
                         </tr>
                     }
                 </tbody>

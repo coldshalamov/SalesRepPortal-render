@@ -27,6 +27,7 @@
                 <div class="col-md-6">
                     <label asp-for="SourceSystem" class="form-label"></label>
                     <input asp-for="SourceSystem" class="form-control" />
+                    <div class="form-text">Use this as your reporting bucket label (for example: <code>dirx-patient</code> or <code>bulk-sales</code>).</div>
                 </div>
             </div>
 
@@ -67,6 +68,7 @@
                 <div class="col-md-4">
                     <label asp-for="SaleDateColumn" class="form-label">Sale Date Column</label>
                     <input asp-for="SaleDateColumn" class="form-control" />
+                    <div class="form-text">Multiple fallback columns are supported using <code>|</code>, e.g. <code>InvoicePaidDate|OrderShippedDate|OrderCreatedDate</code>.</div>
                 </div>
                 <div class="col-md-4">
                     <label asp-for="CreditedRepIdColumn" class="form-label">Credited Rep Column</label>

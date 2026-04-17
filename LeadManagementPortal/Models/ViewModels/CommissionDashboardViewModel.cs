@@ -33,6 +33,7 @@ namespace LeadManagementPortal.Models.ViewModels
         public string BeneficiaryId { get; set; } = string.Empty;
         public string BeneficiaryName { get; set; } = string.Empty;
         public DateTime SaleDate { get; set; }
+        public string SourceSystem { get; set; } = string.Empty;
         public string BusinessAccountName { get; set; } = string.Empty;
         public string ProductName { get; set; } = string.Empty;
         public decimal GrossAmount { get; set; }

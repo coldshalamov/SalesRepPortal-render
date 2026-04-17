@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using LeadManagementPortal.Data;
@@ -205,6 +208,98 @@ namespace LeadManagementPortal.Tests
         }
 
         [Fact]
+        public async Task CreateBatchFromRawRowsAsync_WithSaleDateFallbackMapping_UsesFirstPopulatedColumn()
+        {
+            await using var context = CreateContext();
+            context.BusinessAccounts.Add(new BusinessAccount
+            {
+                Id = 130,
+                Name = "Fallback Clinic",
+                ExternalKey = "acct-130",
+                IsActive = true
+            });
+            context.CommissionAgreements.Add(new CommissionAgreement
+            {
+                Id = 131,
+                BusinessAccountId = 130,
+                Name = "Fallback 2026",
+                IsActive = true,
+                EffectiveStartDate = new DateTime(2026, 1, 1),
+                EffectiveEndDate = new DateTime(2026, 12, 31)
+            });
+            context.ImportProfiles.Add(new ImportProfile
+            {
+                Id = 132,
+                Name = "Date Fallback Profile",
+                IsActive = true,
+                ColumnMappingsJson = JsonSerializer.Serialize(new Dictionary<string, string>
+                {
+                    ["BusinessAccountExternalKey"] = "Account Key",
+                    ["ProductName"] = "Medication",
+                    ["Quantity"] = "Units",
+                    ["GrossAmount"] = "Gross",
+                    ["SaleDate"] = "InvoicePaidDate|OrderShippedDate|OrderCreatedDate"
+                })
+            });
+            await context.SaveChangesAsync();
+
+            var service = new CommissionControlPlaneService(context, NullLogger<CommissionControlPlaneService>.Instance);
+            var batch = await service.CreateBatchFromRawRowsAsync(
+                "xlsx-upload",
+                new[]
+                {
+                    (IDictionary<string, string?>)new Dictionary<string, string?>
+                    {
+                        ["Account Key"] = "acct-130",
+                        ["Medication"] = "GLP-1",
+                        ["Units"] = "1",
+                        ["Gross"] = "150.00",
+                        ["InvoicePaidDate"] = null,
+                        ["OrderShippedDate"] = "2026-04-10",
+                        ["OrderCreatedDate"] = "2026-04-09"
+                    }
+                },
+                132,
+                uploadedById: null,
+                sourceFileName: "import.xlsx");
+
+            var row = await context.ImportRows.SingleAsync(r => r.ImportBatchId == batch.Id);
+            Assert.Equal(ImportRowStatus.ReadyToPost, row.Status);
+            Assert.Equal(new DateTime(2026, 4, 10), row.SaleDate?.Date);
+        }
+
+        [Fact]
+        public async Task ReadTabularRowsAsync_WithXlsxFile_ReadsHeaderAndRowData()
+        {
+            await using var stream = BuildInlineStringWorkbook(
+                new[] { "OrderId", "ProductName", "Total", "OrderCreatedDate" },
+                new[] { "A-100", "TRT Starter", "95", "2026-04-12 00:00:00" });
+
+            var rows = await CommissionControlPlaneService.ReadTabularRowsAsync(stream, "import.xlsx");
+
+            var row = Assert.Single(rows);
+            Assert.Equal("A-100", row["OrderId"]);
+            Assert.Equal("TRT Starter", row["ProductName"]);
+            Assert.Equal("95", row["Total"]);
+            Assert.Equal("2026-04-12 00:00:00", row["OrderCreatedDate"]);
+        }
+
+        [Fact]
+        public async Task ReadTabularRowsAsync_WithXlsmFile_ReadsHeaderAndRowData()
+        {
+            await using var stream = BuildInlineStringWorkbook(
+                new[] { "OrderId", "ProductName", "Total" },
+                new[] { "B-200", "Semaglutide", "125.50" });
+
+            var rows = await CommissionControlPlaneService.ReadTabularRowsAsync(stream, "import.xlsm");
+
+            var row = Assert.Single(rows);
+            Assert.Equal("B-200", row["OrderId"]);
+            Assert.Equal("Semaglutide", row["ProductName"]);
+            Assert.Equal("125.50", row["Total"]);
+        }
+
+        [Fact]
         public async Task PostReadyRowsAsync_WhenNetBasedRecipientHasNoCost_KeepsRowPendingReview()
         {
             await using var context = CreateContext();
@@ -264,6 +359,85 @@ namespace LeadManagementPortal.Tests
             Assert.Contains("Cost amount is required", row.ReviewNotes, StringComparison.OrdinalIgnoreCase);
             Assert.Equal(0, await context.SaleEvents.CountAsync());
             Assert.Equal(0, await context.CommissionLedgerEntries.CountAsync());
+        }
+
+        [Fact]
+        public async Task PostReadyRowsAsync_WhenNetBasedRecipientHasPricingRule_AutoCalculatesCostAndPosts()
+        {
+            await using var context = CreateContext();
+            var admin = new ApplicationUser { Id = "admin-2", UserName = "admin2@example.com", Email = "admin2@example.com" };
+            var rep = new ApplicationUser { Id = "rep-2", UserName = "rep2@example.com", Email = "rep2@example.com" };
+            context.Users.AddRange(admin, rep);
+
+            context.BusinessAccounts.Add(new BusinessAccount { Id = 210, Name = "Pricing Clinic", IsActive = true });
+            context.BusinessAccountProductPrices.Add(new BusinessAccountProductPrice
+            {
+                Id = 211,
+                BusinessAccountId = 210,
+                ProductName = "TRT",
+                UnitPrice = 150m,
+                UnitCost = 40m,
+                EffectiveStartDate = new DateTime(2026, 1, 1),
+                EffectiveEndDate = new DateTime(2026, 12, 31),
+                IsActive = true
+            });
+            context.CommissionAgreements.Add(new CommissionAgreement
+            {
+                Id = 212,
+                BusinessAccountId = 210,
+                Name = "Pricing 2026",
+                IsActive = true,
+                EffectiveStartDate = new DateTime(2026, 1, 1),
+                EffectiveEndDate = new DateTime(2026, 12, 31)
+            });
+            context.CommissionAgreementRecipients.Add(new CommissionAgreementRecipient
+            {
+                Id = 213,
+                CommissionAgreementId = 212,
+                BeneficiaryId = rep.Id,
+                CalculationType = CommissionRecipientCalculationType.PercentOfNet,
+                RateOrAmount = 10m,
+                SortOrder = 1
+            });
+            context.ImportBatches.Add(new ImportBatch
+            {
+                Id = 214,
+                SourceSystem = "xlsx-upload",
+                Status = ImportBatchStatus.ReadyToPost,
+                ReceivedAtUtc = DateTime.UtcNow
+            });
+            context.ImportRows.Add(new ImportRow
+            {
+                Id = 215,
+                ImportBatchId = 214,
+                RowNumber = 1,
+                Status = ImportRowStatus.ReadyToPost,
+                BusinessAccountId = 210,
+                SelectedAgreementId = 212,
+                ProductName = "TRT",
+                Quantity = 2,
+                GrossAmount = 300m,
+                CostAmount = null,
+                SaleDate = new DateTime(2026, 4, 12),
+                RawPayloadJson = "{}",
+                MappedPayloadJson = "{}"
+            });
+            await context.SaveChangesAsync();
+
+            var service = new CommissionControlPlaneService(context, NullLogger<CommissionControlPlaneService>.Instance);
+
+            await service.PostReadyRowsAsync(214, admin.Id);
+
+            var row = await context.ImportRows.SingleAsync(r => r.Id == 215);
+            Assert.Equal(ImportRowStatus.Posted, row.Status);
+            Assert.NotNull(row.SaleEventId);
+
+            var saleEvent = await context.SaleEvents.SingleAsync(s => s.Id == row.SaleEventId);
+            Assert.Equal(80m, saleEvent.CostAmount);
+            Assert.Equal(300m, saleEvent.GrossAmount);
+
+            var ledger = await context.CommissionLedgerEntries.SingleAsync();
+            Assert.Equal(22m, ledger.CommissionAmount);
         }
 
         [Fact]
@@ -427,6 +601,108 @@ namespace LeadManagementPortal.Tests
                 }));
 
             Assert.Equal(1, await context.PayoutBatches.CountAsync());
+        }
+
+        private static MemoryStream BuildInlineStringWorkbook(params string[][] rows)
+        {
+            var stream = new MemoryStream();
+            using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                AddZipEntry(archive, "[Content_Types].xml", """
+                    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                    <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+                      <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+                      <Default Extension="xml" ContentType="application/xml"/>
+                      <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+                      <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+                    </Types>
+                    """);
+
+                AddZipEntry(archive, "_rels/.rels", """
+                    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                      <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+                    </Relationships>
+                    """);
+
+                AddZipEntry(archive, "xl/workbook.xml", """
+                    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                    <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                      <sheets>
+                        <sheet name="Data" sheetId="1" r:id="rId1"/>
+                      </sheets>
+                    </workbook>
+                    """);
+
+                AddZipEntry(archive, "xl/_rels/workbook.xml.rels", """
+                    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                      <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+                    </Relationships>
+                    """);
+
+                AddZipEntry(archive, "xl/worksheets/sheet1.xml", BuildWorksheetXml(rows));
+            }
+
+            stream.Position = 0;
+            return stream;
+        }
+
+        private static string BuildWorksheetXml(IReadOnlyList<string[]> rows)
+        {
+            var builder = new StringBuilder();
+            builder.Append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""");
+            builder.Append("""<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>""");
+
+            for (var rowIndex = 0; rowIndex < rows.Count; rowIndex++)
+            {
+                var rowNumber = rowIndex + 1;
+                builder.Append($"""<row r="{rowNumber}">""");
+                var row = rows[rowIndex];
+                for (var columnIndex = 0; columnIndex < row.Length; columnIndex++)
+                {
+                    var cellReference = $"{ToColumnName(columnIndex + 1)}{rowNumber}";
+                    var escaped = EscapeXml(row[columnIndex] ?? string.Empty);
+                    builder.Append($"""<c r="{cellReference}" t="inlineStr"><is><t>{escaped}</t></is></c>""");
+                }
+
+                builder.Append("</row>");
+            }
+
+            builder.Append("</sheetData></worksheet>");
+            return builder.ToString();
+        }
+
+        private static string ToColumnName(int columnNumber)
+        {
+            var dividend = columnNumber;
+            var columnName = string.Empty;
+            while (dividend > 0)
+            {
+                var modulo = (dividend - 1) % 26;
+                columnName = Convert.ToChar('A' + modulo) + columnName;
+                dividend = (dividend - modulo) / 26;
+            }
+
+            return columnName;
+        }
+
+        private static string EscapeXml(string value)
+        {
+            return value
+                .Replace("&", "&amp;", StringComparison.Ordinal)
+                .Replace("<", "&lt;", StringComparison.Ordinal)
+                .Replace(">", "&gt;", StringComparison.Ordinal)
+                .Replace("\"", "&quot;", StringComparison.Ordinal)
+                .Replace("'", "&apos;", StringComparison.Ordinal);
+        }
+
+        private static void AddZipEntry(ZipArchive archive, string path, string content)
+        {
+            var entry = archive.CreateEntry(path);
+            using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            writer.Write(content.Trim());
         }
     }
 }

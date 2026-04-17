@@ -46,6 +46,29 @@ namespace LeadManagementPortal.Models
 
         public ICollection<CommissionAgreement> Agreements { get; set; } = new List<CommissionAgreement>();
         public ICollection<SaleEvent> SaleEvents { get; set; } = new List<SaleEvent>();
+        public ICollection<BusinessAccountProductPrice> ProductPrices { get; set; } = new List<BusinessAccountProductPrice>();
+    }
+
+    public class BusinessAccountProductPrice
+    {
+        public int Id { get; set; }
+        public int BusinessAccountId { get; set; }
+        public BusinessAccount? BusinessAccount { get; set; }
+
+        [Required]
+        [MaxLength(256)]
+        public string ProductName { get; set; } = string.Empty;
+
+        public decimal? UnitPrice { get; set; }
+        public decimal UnitCost { get; set; }
+        public DateTime EffectiveStartDate { get; set; } = DateTime.UtcNow.Date;
+        public DateTime EffectiveEndDate { get; set; } = DateTime.UtcNow.Date.AddYears(1);
+        public bool IsActive { get; set; } = true;
+
+        [MaxLength(1000)]
+        public string? Notes { get; set; }
+
+        public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     }
 
     public class CommissionAgreement

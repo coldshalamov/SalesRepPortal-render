@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using LeadManagementPortal.Data;
 using LeadManagementPortal.Models;
@@ -106,6 +107,141 @@ namespace LeadManagementPortal.Controllers
             return RedirectToAction(nameof(Accounts));
         }
 
+        public async Task<IActionResult> AccountPricing(int? businessAccountId)
+        {
+            await PopulateAccountPricingOptionsAsync(businessAccountId);
+            var pricingRowsQuery = _context.BusinessAccountProductPrices
+                .AsNoTracking()
+                .Include(p => p.BusinessAccount)
+                .AsQueryable();
+
+            if (businessAccountId.HasValue)
+            {
+                pricingRowsQuery = pricingRowsQuery.Where(p => p.BusinessAccountId == businessAccountId.Value);
+            }
+
+            var pricingRows = await pricingRowsQuery
+                .OrderBy(p => p.BusinessAccount!.Name)
+                .ThenBy(p => p.ProductName)
+                .ThenByDescending(p => p.EffectiveStartDate)
+                .Take(500)
+                .ToListAsync();
+
+            ViewBag.CreatePriceModel = new BusinessAccountProductPriceEditViewModel
+            {
+                BusinessAccountId = businessAccountId
+                    ?? (await _context.BusinessAccounts.AsNoTracking().Where(a => a.IsActive).OrderBy(a => a.Name).Select(a => a.Id).FirstOrDefaultAsync()),
+                EffectiveStartDate = DateTime.UtcNow.Date,
+                EffectiveEndDate = DateTime.UtcNow.Date.AddYears(1),
+                IsActive = true
+            };
+
+            return View(pricingRows);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateAccountPrice(BusinessAccountProductPriceEditViewModel model)
+        {
+            if (!ModelState.IsValid || model.EffectiveEndDate.Date < model.EffectiveStartDate.Date)
+            {
+                if (model.EffectiveEndDate.Date < model.EffectiveStartDate.Date)
+                {
+                    TempData["ErrorMessage"] = "Effective end date must be on or after the start date.";
+                }
+
+                return RedirectToAction(nameof(AccountPricing), new { businessAccountId = model.BusinessAccountId });
+            }
+
+            var account = await _context.BusinessAccounts
+                .AsNoTracking()
+                .SingleOrDefaultAsync(a => a.Id == model.BusinessAccountId && a.IsActive);
+            if (account == null)
+            {
+                TempData["ErrorMessage"] = "Select an active business account.";
+                return RedirectToAction(nameof(AccountPricing));
+            }
+
+            _context.BusinessAccountProductPrices.Add(new BusinessAccountProductPrice
+            {
+                BusinessAccountId = model.BusinessAccountId,
+                ProductName = model.ProductName.Trim(),
+                UnitPrice = model.UnitPrice,
+                UnitCost = model.UnitCost,
+                EffectiveStartDate = model.EffectiveStartDate.Date,
+                EffectiveEndDate = model.EffectiveEndDate.Date,
+                IsActive = model.IsActive,
+                Notes = model.Notes?.Trim(),
+                CreatedAtUtc = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Account product pricing created.";
+            return RedirectToAction(nameof(AccountPricing), new { businessAccountId = model.BusinessAccountId });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditAccountPrice(int id)
+        {
+            var row = await _context.BusinessAccountProductPrices
+                .AsNoTracking()
+                .SingleOrDefaultAsync(p => p.Id == id);
+            if (row == null)
+            {
+                return NotFound();
+            }
+
+            await PopulateAccountPricingOptionsAsync(row.BusinessAccountId);
+            return View(new BusinessAccountProductPriceEditViewModel
+            {
+                Id = row.Id,
+                BusinessAccountId = row.BusinessAccountId,
+                ProductName = row.ProductName,
+                UnitPrice = row.UnitPrice,
+                UnitCost = row.UnitCost,
+                EffectiveStartDate = row.EffectiveStartDate,
+                EffectiveEndDate = row.EffectiveEndDate,
+                IsActive = row.IsActive,
+                Notes = row.Notes
+            });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditAccountPrice(BusinessAccountProductPriceEditViewModel model)
+        {
+            if (!ModelState.IsValid || !model.Id.HasValue)
+            {
+                await PopulateAccountPricingOptionsAsync(model.BusinessAccountId);
+                return View(model);
+            }
+
+            if (model.EffectiveEndDate.Date < model.EffectiveStartDate.Date)
+            {
+                ModelState.AddModelError(string.Empty, "Effective end date must be on or after the start date.");
+                await PopulateAccountPricingOptionsAsync(model.BusinessAccountId);
+                return View(model);
+            }
+
+            var row = await _context.BusinessAccountProductPrices
+                .SingleOrDefaultAsync(p => p.Id == model.Id.Value);
+            if (row == null)
+            {
+                return NotFound();
+            }
+
+            row.BusinessAccountId = model.BusinessAccountId;
+            row.ProductName = model.ProductName.Trim();
+            row.UnitPrice = model.UnitPrice;
+            row.UnitCost = model.UnitCost;
+            row.EffectiveStartDate = model.EffectiveStartDate.Date;
+            row.EffectiveEndDate = model.EffectiveEndDate.Date;
+            row.IsActive = model.IsActive;
+            row.Notes = model.Notes?.Trim();
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Account product pricing updated.";
+            return RedirectToAction(nameof(AccountPricing), new { businessAccountId = model.BusinessAccountId });
+        }
+
         public async Task<IActionResult> Agreements()
         {
             var agreements = await _context.CommissionAgreements
@@ -119,6 +255,75 @@ namespace LeadManagementPortal.Controllers
                 .ToListAsync();
 
             return View(agreements);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> FlowAgreement(int id, decimal grossAmount = 100m, decimal? costAmount = null, int quantity = 1)
+        {
+            var agreement = await _context.CommissionAgreements
+                .AsNoTracking()
+                .Include(a => a.BusinessAccount)
+                .Include(a => a.Recipients)
+                    .ThenInclude(r => r.Beneficiary)
+                .SingleOrDefaultAsync(a => a.Id == id);
+            if (agreement == null)
+            {
+                return NotFound();
+            }
+
+            var normalizedQuantity = quantity <= 0 ? 1 : quantity;
+            var normalizedGross = Decimal.Round(Math.Max(grossAmount, 0m), 2, MidpointRounding.AwayFromZero);
+            decimal? normalizedCost = costAmount.HasValue
+                ? Decimal.Round(Math.Max(costAmount.Value, 0m), 2, MidpointRounding.AwayFromZero)
+                : null;
+            var netAmount = normalizedCost.HasValue
+                ? Decimal.Round(normalizedGross - normalizedCost.Value, 2, MidpointRounding.AwayFromZero)
+                : 0m;
+
+            var orderedRecipients = agreement.Recipients
+                .OrderBy(r => r.SortOrder)
+                .ThenBy(r => r.Id)
+                .ToList();
+
+            var computedAmounts = new Dictionary<int, decimal>();
+            var recipientRows = orderedRecipients.Select(recipient =>
+            {
+                var amount = CalculateFlowAmount(recipient, normalizedGross, netAmount, normalizedQuantity, computedAmounts);
+                computedAmounts[recipient.Id] = amount;
+                return new CommissionAgreementFlowRecipientViewModel
+                {
+                    RecipientId = recipient.Id,
+                    SortOrder = recipient.SortOrder,
+                    BeneficiaryName = string.IsNullOrWhiteSpace(recipient.Beneficiary?.FullName)
+                        ? (recipient.Beneficiary?.Email ?? recipient.BeneficiaryId)
+                        : recipient.Beneficiary.FullName,
+                    CalculationType = recipient.CalculationType.ToString(),
+                    RateOrAmount = recipient.RateOrAmount,
+                    BasisRecipientId = recipient.BasisRecipientId,
+                    BasisSortOrder = recipient.BasisRecipientId.HasValue
+                        ? orderedRecipients.FirstOrDefault(r => r.Id == recipient.BasisRecipientId.Value)?.SortOrder
+                        : null,
+                    CommissionAmount = amount
+                };
+            }).ToList();
+
+            var mermaid = BuildAgreementFlowMermaid(recipientRows, normalizedGross, normalizedCost, netAmount, normalizedQuantity);
+
+            return View(new CommissionAgreementFlowViewModel
+            {
+                AgreementId = agreement.Id,
+                AgreementName = agreement.Name,
+                BusinessAccountName = agreement.BusinessAccount?.Name ?? "Unknown Account",
+                ProductNameFilter = agreement.ProductNameFilter,
+                EffectiveStartDate = agreement.EffectiveStartDate,
+                EffectiveEndDate = agreement.EffectiveEndDate,
+                SampleGrossAmount = normalizedGross,
+                SampleCostAmount = normalizedCost,
+                SampleQuantity = normalizedQuantity,
+                SampleNetAmount = netAmount,
+                MermaidGraph = mermaid,
+                Recipients = recipientRows
+            });
         }
 
         [HttpGet]
@@ -243,37 +448,152 @@ namespace LeadManagementPortal.Controllers
 
         public async Task<IActionResult> Imports()
         {
-            var batches = await _context.ImportBatches
-                .AsNoTracking()
-                .Include(b => b.ImportProfile)
-                .Include(b => b.UploadedBy)
-                .OrderByDescending(b => b.ReceivedAtUtc)
-                .ToListAsync();
-
-            ViewBag.ImportProfiles = new SelectList(
-                await _context.ImportProfiles.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync(),
-                "Id",
-                "Name");
-
-            return View(batches);
+            var viewModel = await BuildImportsPageViewModelAsync();
+            await PopulateImportProfileOptionsAsync();
+            return View(viewModel);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UploadCsv(IFormFile? file, int? importProfileId)
+        public async Task<IActionResult> PreviewUpload(IFormFile? previewFile)
         {
-            if (file == null || file.Length == 0)
+            if (previewFile == null || previewFile.Length == 0)
             {
-                TempData["ErrorMessage"] = "Select a CSV file to upload.";
+                TempData["ErrorMessage"] = "Select a CSV, XLSX, or XLSM file to preview.";
                 return RedirectToAction(nameof(Imports));
             }
 
+            IReadOnlyList<IDictionary<string, string?>> rows;
+            await using (var stream = previewFile.OpenReadStream())
+            {
+                try
+                {
+                    rows = await CommissionControlPlaneService.ReadTabularRowsAsync(stream, previewFile.FileName);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    TempData["ErrorMessage"] = ex.Message;
+                    return RedirectToAction(nameof(Imports));
+                }
+            }
+
+            if (!rows.Any())
+            {
+                TempData["ErrorMessage"] = "No importable rows were detected in the selected file.";
+                return RedirectToAction(nameof(Imports));
+            }
+
+            var preview = BuildImportPreview(previewFile.FileName, rows);
+            var viewModel = await BuildImportsPageViewModelAsync(preview);
+            await PopulateImportProfileOptionsAsync();
+            return View("Imports", viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UploadCsv(
+            IFormFile? file,
+            int? importProfileId,
+            string? quickSourceSystem,
+            bool saveQuickProfile = false,
+            string? quickProfileName = null,
+            string? quickExternalRowIdColumn = null,
+            string? quickBusinessAccountExternalKeyColumn = null,
+            string? quickBusinessAccountNameColumn = null,
+            string? quickProductNameColumn = null,
+            string? quickQuantityColumn = null,
+            string? quickGrossAmountColumn = null,
+            string? quickCostAmountColumn = null,
+            string? quickSaleDateColumn = null,
+            string? quickCreditedRepIdColumn = null)
+        {
+            if (file == null || file.Length == 0)
+            {
+                TempData["ErrorMessage"] = "Select a CSV, XLSX, or XLSM file to upload.";
+                return RedirectToAction(nameof(Imports));
+            }
+
+            var extension = Path.GetExtension(file.FileName ?? string.Empty);
+            var quickMappings = BuildQuickMappings(
+                quickExternalRowIdColumn,
+                quickBusinessAccountExternalKeyColumn,
+                quickBusinessAccountNameColumn,
+                quickProductNameColumn,
+                quickQuantityColumn,
+                quickGrossAmountColumn,
+                quickCostAmountColumn,
+                quickSaleDateColumn,
+                quickCreditedRepIdColumn);
+
+            if (importProfileId.HasValue && quickMappings.Count > 0)
+            {
+                TempData["ErrorMessage"] = "Use either an existing import profile or quick-mapper columns, not both.";
+                return RedirectToAction(nameof(Imports));
+            }
+
+            if (!importProfileId.HasValue && quickMappings.Count > 0)
+            {
+                var profileName = string.IsNullOrWhiteSpace(quickProfileName)
+                    ? $"Quick Mapping {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}"
+                    : quickProfileName.Trim();
+                var transientProfile = new ImportProfile
+                {
+                    Name = profileName,
+                    SourceSystem = quickSourceSystem?.Trim(),
+                    IsActive = saveQuickProfile,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    ColumnMappingsJson = JsonSerializer.Serialize(quickMappings)
+                };
+                _context.ImportProfiles.Add(transientProfile);
+                await _context.SaveChangesAsync();
+                importProfileId = transientProfile.Id;
+            }
+
+            string sourceSystem;
+            if (importProfileId.HasValue)
+            {
+                var profile = await _context.ImportProfiles
+                    .AsNoTracking()
+                    .SingleOrDefaultAsync(p => p.Id == importProfileId.Value);
+                if (profile == null)
+                {
+                    TempData["ErrorMessage"] = "Select a valid import profile.";
+                    return RedirectToAction(nameof(Imports));
+                }
+
+                sourceSystem = string.IsNullOrWhiteSpace(profile.SourceSystem)
+                    ? GetDefaultSourceSystem(extension)
+                    : profile.SourceSystem.Trim();
+            }
+            else
+            {
+                sourceSystem = string.IsNullOrWhiteSpace(quickSourceSystem)
+                    ? GetDefaultSourceSystem(extension)
+                    : quickSourceSystem.Trim();
+            }
+
             await using var stream = file.OpenReadStream();
-            var rows = await CommissionControlPlaneService.ReadCsvRowsAsync(stream);
+            IReadOnlyList<IDictionary<string, string?>> rows;
+            try
+            {
+                rows = await CommissionControlPlaneService.ReadTabularRowsAsync(stream, file.FileName);
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["ErrorMessage"] = ex.Message;
+                return RedirectToAction(nameof(Imports));
+            }
+
+            if (!rows.Any())
+            {
+                TempData["ErrorMessage"] = "No importable rows were detected in the uploaded file.";
+                return RedirectToAction(nameof(Imports));
+            }
+
             var currentUser = await _userManager.GetUserAsync(User);
 
             var batch = await _commissionControlPlaneService.CreateBatchFromRawRowsAsync(
-                "csv-upload",
+                sourceSystem,
                 rows,
                 importProfileId,
                 currentUser?.Id,
@@ -535,6 +855,141 @@ namespace LeadManagementPortal.Controllers
             }
 
             return RedirectToAction(nameof(Payouts), new { beneficiaryId = model.BeneficiaryId });
+        }
+
+        private async Task<CommissionImportsPageViewModel> BuildImportsPageViewModelAsync(ImportUploadPreviewViewModel? preview = null)
+        {
+            var batches = await _context.ImportBatches
+                .AsNoTracking()
+                .Include(b => b.ImportProfile)
+                .Include(b => b.UploadedBy)
+                .Include(b => b.Rows)
+                .OrderByDescending(b => b.ReceivedAtUtc)
+                .ToListAsync();
+
+            return new CommissionImportsPageViewModel
+            {
+                Batches = batches,
+                Preview = preview
+            };
+        }
+
+        private async Task PopulateImportProfileOptionsAsync()
+        {
+            ViewBag.ImportProfiles = new SelectList(
+                await _context.ImportProfiles.AsNoTracking().Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync(),
+                "Id",
+                "Name");
+        }
+
+        private async Task PopulateAccountPricingOptionsAsync(int? selectedBusinessAccountId)
+        {
+            var accounts = await _context.BusinessAccounts
+                .AsNoTracking()
+                .Where(a => a.IsActive)
+                .OrderBy(a => a.Name)
+                .ToListAsync();
+            ViewBag.BusinessAccounts = new SelectList(accounts, "Id", "Name", selectedBusinessAccountId);
+        }
+
+        private static ImportUploadPreviewViewModel BuildImportPreview(string sourceFileName, IReadOnlyList<IDictionary<string, string?>> rows)
+        {
+            var firstRow = rows.First();
+            var headers = firstRow.Keys.ToList();
+            var sampleRows = rows
+                .Take(8)
+                .Select(row => headers.ToDictionary(header => header, header => row.TryGetValue(header, out var value) ? value : null))
+                .ToList();
+
+            return new ImportUploadPreviewViewModel
+            {
+                SourceFileName = sourceFileName,
+                Headers = headers,
+                SampleRows = sampleRows
+            };
+        }
+
+        private static Dictionary<string, string> BuildQuickMappings(
+            string? quickExternalRowIdColumn,
+            string? quickBusinessAccountExternalKeyColumn,
+            string? quickBusinessAccountNameColumn,
+            string? quickProductNameColumn,
+            string? quickQuantityColumn,
+            string? quickGrossAmountColumn,
+            string? quickCostAmountColumn,
+            string? quickSaleDateColumn,
+            string? quickCreditedRepIdColumn)
+        {
+            return new Dictionary<string, string?>
+            {
+                ["ExternalRowId"] = quickExternalRowIdColumn,
+                ["BusinessAccountExternalKey"] = quickBusinessAccountExternalKeyColumn,
+                ["BusinessAccountName"] = quickBusinessAccountNameColumn,
+                ["ProductName"] = quickProductNameColumn,
+                ["Quantity"] = quickQuantityColumn,
+                ["GrossAmount"] = quickGrossAmountColumn,
+                ["CostAmount"] = quickCostAmountColumn,
+                ["SaleDate"] = quickSaleDateColumn,
+                ["CreditedRepId"] = quickCreditedRepIdColumn
+            }
+            .Where(kvp => !string.IsNullOrWhiteSpace(kvp.Value))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value!, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static string GetDefaultSourceSystem(string extension)
+        {
+            if (string.Equals(extension, ".xlsx", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".xlsm", StringComparison.OrdinalIgnoreCase))
+            {
+                return "xlsx-upload";
+            }
+
+            return "csv-upload";
+        }
+
+        private static decimal CalculateFlowAmount(
+            CommissionAgreementRecipient recipient,
+            decimal grossAmount,
+            decimal netAmount,
+            int quantity,
+            IReadOnlyDictionary<int, decimal> computedAmounts)
+        {
+            decimal amount = recipient.CalculationType switch
+            {
+                CommissionRecipientCalculationType.FlatAmountPerOrder => recipient.RateOrAmount,
+                CommissionRecipientCalculationType.FlatAmountPerUnit => recipient.RateOrAmount * quantity,
+                CommissionRecipientCalculationType.PercentOfGross => grossAmount * (recipient.RateOrAmount / 100m),
+                CommissionRecipientCalculationType.PercentOfNet => netAmount * (recipient.RateOrAmount / 100m),
+                CommissionRecipientCalculationType.PercentOfRecipientCommission when recipient.BasisRecipientId.HasValue
+                    && computedAmounts.TryGetValue(recipient.BasisRecipientId.Value, out var upstreamCommission)
+                        => upstreamCommission * (recipient.RateOrAmount / 100m),
+                _ => 0m
+            };
+
+            return Decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
+        }
+
+        private static string BuildAgreementFlowMermaid(
+            IReadOnlyList<CommissionAgreementFlowRecipientViewModel> recipientRows,
+            decimal grossAmount,
+            decimal? costAmount,
+            decimal netAmount,
+            int quantity)
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine("graph BT");
+            builder.AppendLine($"  SALE[\"Sale Event\\nQty: {quantity}\\nGross: {grossAmount:C}\\nCost: {(costAmount.HasValue ? costAmount.Value.ToString("C") : "n/a")}\\nNet: {netAmount:C}\"]");
+
+            foreach (var row in recipientRows)
+            {
+                var nodeId = $"R{row.RecipientId}";
+                var description = $"{row.SortOrder}. {row.BeneficiaryName}\\n{row.CalculationType} @ {row.RateOrAmount}\\nCommission: {row.CommissionAmount:C}";
+                builder.AppendLine($"  {nodeId}[\"{description}\"]");
+                var parentNode = row.BasisRecipientId.HasValue ? $"R{row.BasisRecipientId.Value}" : "SALE";
+                builder.AppendLine($"  {parentNode} --> {nodeId}");
+            }
+
+            return builder.ToString();
         }
 
         private async Task<IActionResult> SaveAgreementAsync(CommissionAgreementEditViewModel model, bool isCreate)
