@@ -25,6 +25,7 @@
   const relationshipSummaryElement = document.getElementById("commissionRelationshipSummary");
 
   const accountIdInput = document.getElementById("commissionAccountId");
+  const displayNameInput = document.getElementById("commissionDisplayName");
   const sponsorSelect = document.getElementById("commissionSponsorId");
   const dealTypeSelect = document.getElementById("commissionDealType");
   const calculationBasisSelect = document.getElementById("commissionCalculationBasis");
@@ -166,6 +167,7 @@
     relationshipSummaryElement.innerHTML = buildRelationshipSummary(node);
 
     accountIdInput.value = node.id;
+    displayNameInput.value = node.fullName;
     sponsorSelect.innerHTML = buildSponsorOptions(node.id);
     sponsorSelect.value = node.sponsorId || "";
     dealTypeSelect.value = node.dealType || "";

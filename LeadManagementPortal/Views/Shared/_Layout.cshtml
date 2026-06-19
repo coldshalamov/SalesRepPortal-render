@@ -233,6 +233,25 @@
             </div>
         }
         <main role="main" class="pb-3">
+            @if (ViewBag.Breadcrumbs != null)
+            {
+                <nav aria-label="breadcrumb" class="pt-3 pb-0">
+                    <ol class="breadcrumb small mb-0">
+                        <li class="breadcrumb-item"><a asp-controller="Dashboard" asp-action="Index">Home</a></li>
+                        @foreach (dynamic item in ViewBag.Breadcrumbs)
+                        {
+                            if (string.IsNullOrEmpty((string)item.Url))
+                            {
+                                <li class="breadcrumb-item active" aria-current="page">@item.Label</li>
+                            }
+                            else
+                            {
+                                <li class="breadcrumb-item"><a href="@item.Url">@item.Label</a></li>
+                            }
+                        }
+                    </ol>
+                </nav>
+            }
             @RenderBody()
         </main>
     </div>

@@ -4,6 +4,7 @@
     ViewData["Title"] = "Hierarchy";
     var totalOrgs    = Model.Groups.Sum(g => g.Orgs.Count);
     var totalMembers = Model.Groups.Sum(g => g.MemberCount);
+    ViewBag.Breadcrumbs = new[] { new { Label = "Hierarchy", Url = "" } };
 }
 
 <link rel="stylesheet" href="~/css/org-chart.css" asp-append-version="true" />

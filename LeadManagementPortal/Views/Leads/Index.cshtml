@@ -2,6 +2,7 @@
 @model IEnumerable<Lead>
 @{
     ViewData["Title"] = "Leads";
+    ViewBag.Breadcrumbs = new[] { new { Label = "Leads", Url = "" } };
     var selectedStatuses = ViewBag.SelectedStatuses as List<LeadStatus> ?? new List<LeadStatus>();
     var canConvertInPipeline = User.IsInRole(UserRoles.OrganizationAdmin);
     var followUpLookup = ViewBag.FollowUpsByLead as Dictionary<string, List<LeadFollowUpTask>> ?? new Dictionary<string, List<LeadFollowUpTask>>();
@@ -139,6 +140,18 @@
         </form>
     </div>
 </div>
+
+@if (ViewBag.HiddenCount != null)
+{
+    var hiddenCount = (int)ViewBag.HiddenCount;
+    <div class="alert alert-secondary d-flex align-items-center gap-2 py-2 px-3 mb-3 small border-start border-4 border-secondary rounded-start-0" role="alert">
+        <i class="bi bi-eye-slash flex-shrink-0"></i>
+        <span>
+            <strong>@hiddenCount</strong> Lost or Expired lead@(hiddenCount == 1 ? " is" : "s are") hidden by default.
+            Select those statuses in the filter above to include them.
+        </span>
+    </div>
+}
 
 <div class="card mb-3" id="pipelineWorkspace">
     <div class="card-body">

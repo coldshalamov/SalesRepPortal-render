@@ -1,6 +1,10 @@
 @model LeadManagementPortal.Controllers.LeadReassignViewModel
 @{
     ViewData["Title"] = "Reassign Lead";
+    ViewBag.Breadcrumbs = new[] {
+        new { Label = "Leads", Url = "/Leads" },
+        new { Label = "Reassign", Url = "" }
+    };
 }
 
 <div class="row mb-3">

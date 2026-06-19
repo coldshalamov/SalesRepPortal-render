@@ -3,6 +3,10 @@
 @inject LeadManagementPortal.Services.ISettingsService SettingsService
 @{
     ViewData["Title"] = "Lead Details";
+    ViewBag.Breadcrumbs = new[] {
+        new { Label = "Leads", Url = "/Leads" },
+        new { Label = Model.Company, Url = "" }
+    };
     var settings = await SettingsService.GetAsync();
     var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
     var canReassign = User.IsInRole("OrganizationAdmin")

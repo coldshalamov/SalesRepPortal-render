@@ -2,6 +2,10 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Create Lead";
+    ViewBag.Breadcrumbs = new[] {
+        new { Label = "Leads", Url = "/Leads" },
+        new { Label = "New Lead", Url = "" }
+    };
     var products = (ViewBag.Products as IEnumerable<SelectListItem>)?.ToList() ?? new List<SelectListItem>();
 }
 

@@ -13,6 +13,8 @@ namespace LeadManagementPortal.Models.ViewModels
         public int ActiveAgreementCount { get; set; }
         public int PendingReviewRows { get; set; }
         public int ReadyToPostRows { get; set; }
+        public int LegacyRowCount { get; set; }
+        public decimal LegacyTotalAmount { get; set; }
         public List<CommissionDealBreakdownViewModel> BreakdownByDealType { get; set; } = new();
         public List<CommissionLedgerRowViewModel> DetailRows { get; set; } = new();
         public List<CommissionImportBatchViewModel> RecentImportBatches { get; set; } = new();
@@ -44,6 +46,7 @@ namespace LeadManagementPortal.Models.ViewModels
         public string DealType { get; set; } = string.Empty;
         public string CalculationBasis { get; set; } = string.Empty;
         public string CalculationNotes { get; set; } = string.Empty;
+        public bool IsLegacy { get; set; }
     }
 
     public class CommissionImportBatchViewModel

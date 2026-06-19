@@ -1,6 +1,11 @@
 @model Lead
 @{
     ViewData["Title"] = "Edit Lead";
+    ViewBag.Breadcrumbs = new[] {
+        new { Label = "Leads", Url = "/Leads" },
+        new { Label = Model.Company, Url = $"/Leads/Details/{Model.Id}" },
+        new { Label = "Edit", Url = "" }
+    };
 }
 
 <div class="row mb-3">

@@ -2,7 +2,11 @@
 @model LeadManagementPortal.Models.ViewModels.CommissionHierarchyViewModel
 
 @{
-    ViewData["Title"] = "Commission Hierarchy";
+    ViewData["Title"] = "Commission Account Map";
+    ViewBag.Breadcrumbs = new[] {
+        new { Label = "Commissions", Url = "/Commissions" },
+        new { Label = "Account Map", Url = "" }
+    };
     var hierarchyJson = JsonSerializer.Serialize(Model, new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -115,6 +119,12 @@
                 <form id="commissionHierarchyForm">
                     @Html.AntiForgeryToken()
                     <input id="commissionAccountId" name="AccountId" type="hidden" />
+
+                    <div class="mb-3">
+                        <label class="form-label" for="commissionDisplayName">Display Name</label>
+                        <input id="commissionDisplayName" name="DisplayName" type="text" class="form-control" maxlength="200" autocomplete="off" />
+                        <small class="text-muted">Updates the account's name across the portal.</small>
+                    </div>
 
                     <div class="mb-3">
                         <label class="form-label" for="commissionSponsorId">Owned By</label>

@@ -29,6 +29,7 @@ namespace LeadManagementPortal.Models.ViewModels
     {
         public string AccountId { get; set; } = string.Empty;
         public string? SponsorId { get; set; }
+        public string? DisplayName { get; set; }
         public CommissionDealType? CommissionDealType { get; set; }
         public CommissionCalculationBasis? CommissionCalculationBasis { get; set; }
         public decimal? CommissionRate { get; set; }

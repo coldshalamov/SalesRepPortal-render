@@ -47,8 +47,7 @@ namespace LeadManagementPortal.Controllers
                 var legacyLedgerRows = await QueryLegacyLedgerRowsAsync();
                 var adjustmentsTotal = await SumCommissionAdjustmentsAsync();
                 var paidTotal = await SumPayoutEntriesAsync();
-                var detailRows = ledgerEntries.Select(ToViewModel)
-                    .Concat(legacyLedgerRows.Select(ToViewModel))
+                var newDetailRows = ledgerEntries.Select(ToViewModel)
                     .OrderByDescending(r => r.SaleDate)
                     .ThenByDescending(r => r.Id)
                     .ToList();
@@ -56,19 +55,21 @@ namespace LeadManagementPortal.Controllers
                 var viewModel = new CommissionDashboardViewModel
                 {
                     IsAdminView = true,
-                    TotalCommissionEarned = detailRows.Sum(r => r.CommissionAmount),
-                    CurrentMonthCommission = detailRows
+                    TotalCommissionEarned = newDetailRows.Sum(r => r.CommissionAmount),
+                    CurrentMonthCommission = newDetailRows
                         .Where(r => r.SaleDate.Month == DateTime.UtcNow.Month && r.SaleDate.Year == DateTime.UtcNow.Year)
                         .Sum(r => r.CommissionAmount),
                     TotalAdjustments = adjustmentsTotal,
                     TotalPaid = paidTotal,
-                    OutstandingBalance = detailRows.Sum(r => r.OutstandingAmount) + adjustmentsTotal,
-                    TotalLedgerRows = detailRows.Count,
+                    OutstandingBalance = newDetailRows.Sum(r => r.OutstandingAmount) + adjustmentsTotal,
+                    TotalLedgerRows = newDetailRows.Count,
+                    LegacyRowCount = legacyLedgerRows.Count,
+                    LegacyTotalAmount = legacyLedgerRows.Sum(l => l.CommissionAmount),
                     BusinessAccountCount = await _context.BusinessAccounts.CountAsync(),
                     ActiveAgreementCount = await _context.CommissionAgreements.CountAsync(a => a.IsActive),
                     PendingReviewRows = await _context.ImportRows.CountAsync(r => r.Status == ImportRowStatus.PendingReview || r.Status == ImportRowStatus.PendingMapping),
                     ReadyToPostRows = await _context.ImportRows.CountAsync(r => r.Status == ImportRowStatus.ReadyToPost),
-                    BreakdownByDealType = detailRows
+                    BreakdownByDealType = newDetailRows
                         .GroupBy(r => r.DealType)
                         .OrderByDescending(g => g.Sum(r => r.CommissionAmount))
                         .Select(g => new CommissionDealBreakdownViewModel
@@ -78,7 +79,7 @@ namespace LeadManagementPortal.Controllers
                             RowCount = g.Count()
                         })
                         .ToList(),
-                    DetailRows = detailRows.Take(20).ToList(),
+                    DetailRows = newDetailRows.Take(20).ToList(),
                     RecentImportBatches = await _context.ImportBatches
                         .AsNoTracking()
                         .OrderByDescending(b => b.ReceivedAtUtc)
@@ -120,7 +121,6 @@ namespace LeadManagementPortal.Controllers
                     CalculationBasis = r.CalculationType,
                     CalculationNotes = r.CalculationDetails
                 })
-                .Concat(legacyRows)
                 .OrderByDescending(r => r.SaleDate)
                 .ThenByDescending(r => r.Id)
                 .ToList();
@@ -128,14 +128,16 @@ namespace LeadManagementPortal.Controllers
             return View(new CommissionDashboardViewModel
             {
                 IsAdminView = false,
-                TotalCommissionEarned = statement.TotalEarned + legacyRows.Sum(r => r.CommissionAmount),
+                TotalCommissionEarned = statement.TotalEarned,
                 CurrentMonthCommission = statementRows
                     .Where(r => r.SaleDate.Month == DateTime.UtcNow.Month && r.SaleDate.Year == DateTime.UtcNow.Year)
                     .Sum(r => r.CommissionAmount),
                 TotalAdjustments = statement.TotalAdjustments,
                 TotalPaid = statement.TotalPaid,
-                OutstandingBalance = statement.OutstandingBalance + legacyRows.Sum(r => r.OutstandingAmount),
+                OutstandingBalance = statement.OutstandingBalance,
                 TotalLedgerRows = statementRows.Count,
+                LegacyRowCount = legacyRows.Count,
+                LegacyTotalAmount = legacyRows.Sum(r => r.CommissionAmount),
                 BreakdownByDealType = statementRows
                     .GroupBy(r => r.DealType)
                     .OrderByDescending(g => g.Sum(r => r.CommissionAmount))
@@ -296,6 +298,17 @@ namespace LeadManagementPortal.Controllers
                     status = "invalid",
                     message = validationError
                 });
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.DisplayName))
+            {
+                var trimmed = request.DisplayName.Trim();
+                if (trimmed.Length > 0 && trimmed.Length <= 200)
+                {
+                    var parts = trimmed.Split(' ', 2);
+                    account.FirstName = parts[0];
+                    account.LastName = parts.Length > 1 ? parts[1].Trim() : string.Empty;
+                }
             }
 
             if (request.CommissionDealType.HasValue)
@@ -606,11 +619,7 @@ namespace LeadManagementPortal.Controllers
                     u => u.Id,
                     u => string.IsNullOrWhiteSpace(u.FullName) ? (u.Email ?? u.Id) : u.FullName);
 
-            var legacyEarnings = await LoadAmountsByBeneficiaryAsync(
-                _context.CommissionLedgers.AsNoTracking().Select(e => new BeneficiaryAmount(e.BeneficiaryId, e.CommissionAmount)));
-
             return earnings
-                .Concat(legacyEarnings)
                 .GroupBy(e => e.BeneficiaryId)
                 .Select(g => new { BeneficiaryId = g.Key, Amount = g.Sum(x => x.Amount) })
                 .Select(e =>
@@ -740,7 +749,8 @@ namespace LeadManagementPortal.Controllers
                 OutstandingAmount = ledger.CommissionAmount,
                 DealType = snapshot?.DealType ?? "Legacy",
                 CalculationBasis = snapshot?.CalculationBasis ?? "Legacy",
-                CalculationNotes = ledger.CalculationNotes
+                CalculationNotes = ledger.CalculationNotes,
+                IsLegacy = true
             };
         }
 

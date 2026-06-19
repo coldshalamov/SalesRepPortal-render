@@ -2,29 +2,66 @@
 @using System.Globalization
 
 @{
-    ViewData["Title"] = "Commission Dashboard";
+    ViewData["Title"] = "Commissions";
+    ViewBag.Breadcrumbs = new[] { new { Label = "Commissions", Url = "" } };
 }
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Commissions</h1>
-    <div class="btn-toolbar gap-2">
+<style>
+.comm-stat { background: #fff; border: 1px solid #dee2e6; border-top: 3px solid #0d6efd; border-radius: .5rem; padding: 1.25rem 1.5rem; }
+.comm-stat-green  { border-top-color: #198754; }
+.comm-stat-orange { border-top-color: #fd7e14; }
+.comm-stat-gray   { border-top-color: #6c757d; }
+.comm-stat-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; margin-bottom: .25rem; }
+.comm-stat-value { font-size: 1.65rem; font-weight: 700; color: #212529; line-height: 1.2; }
+.comm-stat-sub { font-size: .72rem; color: #adb5bd; margin-top: .25rem; }
+</style>
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 pt-3 pb-2 mb-4 border-bottom">
+    <div>
+        <h1 class="h2 mb-1">Commissions</h1>
         @if (Model.IsAdminView)
         {
-            <a asp-controller="CommissionAdmin" asp-action="Imports" class="btn btn-primary">
-                <i class="bi bi-sliders me-1"></i>Open Control Plane
+            <p class="text-muted mb-0 small">
+                @Model.TotalLedgerRows row@(Model.TotalLedgerRows == 1 ? "" : "s")
+                &middot; @Model.BusinessAccountCount account@(Model.BusinessAccountCount == 1 ? "" : "s")
+                &middot; @Model.ActiveAgreementCount active agreement@(Model.ActiveAgreementCount == 1 ? "" : "s")
+            </p>
+        }
+        else
+        {
+            <p class="text-muted mb-0 small">Your commission statement</p>
+        }
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        @if (Model.IsAdminView)
+        {
+            <a asp-controller="CommissionAdmin" asp-action="Imports" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-sliders me-1"></i>Control Plane
             </a>
         }
         @if (User.IsInRole("OrganizationAdmin") || User.IsInRole("GroupAdmin") || User.IsInRole("SalesOrgAdmin"))
         {
-            <a asp-action="Hierarchy" class="btn btn-outline-primary">
-                <i class="bi bi-diagram-2"></i> Open Hierarchy
+            <a asp-action="Hierarchy" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-diagram-2 me-1"></i>Account Map
             </a>
         }
-        <a asp-action="Details" class="btn btn-outline-primary">
-            <i class="bi bi-table"></i> View All Ledger Rows
+        <a asp-action="Details" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-table me-1"></i>All Records
         </a>
     </div>
 </div>
+
+@if (Model.LegacyRowCount > 0)
+{
+    <div class="alert alert-secondary d-flex align-items-start gap-2 py-2 px-3 mb-4 small border-start border-4 border-secondary rounded-start-0" role="alert">
+        <i class="bi bi-archive mt-1 flex-shrink-0"></i>
+        <span>
+            <strong>@Model.LegacyRowCount</strong> historical record@(Model.LegacyRowCount == 1 ? "" : "s") (@Model.LegacyTotalAmount.ToString("C"))
+            from the legacy system are excluded from these totals and cannot be tracked for payouts.
+            <a asp-action="Details" class="alert-link">View all records</a>
+        </span>
+    </div>
+}
 
 <div class="row mb-4">
     <div class="col-md-4">
@@ -134,17 +171,17 @@
 <div class="row g-4">
     <div class="col-lg-4">
         <div class="card h-100">
-            <div class="card-header">
-                Earnings By Calculation Type
+            <div class="card-header bg-transparent fw-semibold border-bottom py-3">
+                Earnings by Type
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 @if (Model.BreakdownByDealType.Any())
                 {
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
-                            <thead>
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Deal Type</th>
+                                    <th>Type</th>
                                     <th class="text-end">Rows</th>
                                     <th class="text-end">Earned</th>
                                 </tr>
@@ -153,9 +190,9 @@
                                 @foreach (var row in Model.BreakdownByDealType)
                                 {
                                     <tr>
-                                        <td>@row.DealType</td>
-                                        <td class="text-end">@row.RowCount</td>
-                                        <td class="text-end fw-semibold">@row.TotalCommission.ToString("C")</td>
+                                        <td class="small">@row.DealType</td>
+                                        <td class="text-end small">@row.RowCount</td>
+                                        <td class="text-end fw-semibold small">@row.TotalCommission.ToString("C")</td>
                                     </tr>
                                 }
                             </tbody>
@@ -164,7 +201,7 @@
                 }
                 else
                 {
-                    <p class="text-muted mb-0">No commission rows are visible yet.</p>
+                    <div class="text-center text-muted py-5 small">No commission data yet.</div>
                 }
             </div>
         </div>
@@ -172,26 +209,26 @@
 
     <div class="col-lg-8">
         <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>@(Model.IsAdminView ? "Recent Ledger Rows" : "My Recent Statement Rows")</span>
-                <span class="text-muted small">Newest 20 visible rows</span>
+            <div class="card-header bg-transparent d-flex justify-content-between align-items-center py-3">
+                <span class="fw-semibold">@(Model.IsAdminView ? "Recent Ledger Rows" : "My Recent Statement")</span>
+                <span class="text-muted small">Newest 20</span>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Date</th>
-                                <th>Account</th>
-                                <th>Product</th>
-                                <th>Source</th>
-                                <th>Beneficiary</th>
-                                <th>Deal Type</th>
-                                <th class="text-end">Gross</th>
-                                <th class="text-end">Net</th>
-                                <th class="text-end">Paid</th>
-                                <th class="text-end">Outstanding</th>
-                                <th class="text-end">Commission</th>
+                                <th class="small">Date</th>
+                                <th class="small">Account</th>
+                                <th class="small">Product</th>
+                                <th class="small">Source</th>
+                                <th class="small">Recipient</th>
+                                <th class="small">Type</th>
+                                <th class="text-end small">Gross</th>
+                                <th class="text-end small">Net</th>
+                                <th class="text-end small">Paid</th>
+                                <th class="text-end small">Outstanding</th>
+                                <th class="text-end small">Commission</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -200,24 +237,24 @@
                                 @foreach (var row in Model.DetailRows)
                                 {
                                     <tr>
-                                        <td>@row.SaleDate.ToString("MMM dd, yyyy")</td>
-                                        <td>@row.BusinessAccountName</td>
-                                        <td>@row.ProductName</td>
-                                        <td>@row.SourceSystem</td>
-                                        <td>@row.BeneficiaryName</td>
-                                        <td>@row.DealType</td>
-                                        <td class="text-end">@row.GrossAmount.ToString("C")</td>
-                                        <td class="text-end">@row.NetAmount.ToString("C")</td>
-                                        <td class="text-end">@row.PaidAmount.ToString("C")</td>
-                                        <td class="text-end">@row.OutstandingAmount.ToString("C")</td>
-                                        <td class="text-end fw-semibold text-success">@row.CommissionAmount.ToString("C")</td>
+                                        <td class="small text-muted">@row.SaleDate.ToString("MMM d, yyyy")</td>
+                                        <td class="small">@row.BusinessAccountName</td>
+                                        <td class="small">@row.ProductName</td>
+                                        <td class="small">@row.SourceSystem</td>
+                                        <td class="small">@row.BeneficiaryName</td>
+                                        <td class="small">@row.DealType</td>
+                                        <td class="text-end small">@row.GrossAmount.ToString("C")</td>
+                                        <td class="text-end small">@row.NetAmount.ToString("C")</td>
+                                        <td class="text-end small">@row.PaidAmount.ToString("C")</td>
+                                        <td class="text-end small">@row.OutstandingAmount.ToString("C")</td>
+                                        <td class="text-end fw-semibold small text-success">@row.CommissionAmount.ToString("C")</td>
                                     </tr>
                                 }
                             }
                             else
                             {
                                 <tr>
-                                    <td colspan="11" class="text-center text-muted py-4">No commission data is available yet.</td>
+                                    <td colspan="11" class="text-center text-muted py-5 small">No commission data available yet.</td>
                                 </tr>
                             }
                         </tbody>
@@ -233,28 +270,28 @@
     <div class="row g-4 mt-1">
         <div class="col-lg-6">
             <div class="card">
-                <div class="card-header">Recent Import Batches</div>
+                <div class="card-header bg-transparent fw-semibold py-3">Recent Import Batches</div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm mb-0">
+                        <table class="table table-sm align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Batch</th>
-                                    <th>Source</th>
-                                    <th>Status</th>
-                                    <th>Rows</th>
+                                    <th class="small">Batch</th>
+                                    <th class="small">Source</th>
+                                    <th class="small">Status</th>
+                                    <th class="small text-end">Rows</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var batch in Model.RecentImportBatches)
                                 {
                                     <tr>
-                                        <td>
-                                            <a asp-controller="CommissionAdmin" asp-action="ReviewBatch" asp-route-id="@batch.Id">#@batch.Id</a>
+                                        <td class="small">
+                                            <a asp-controller="CommissionAdmin" asp-action="ReviewBatch" asp-route-id="@batch.Id" class="text-decoration-none">#@batch.Id</a>
                                         </td>
-                                        <td>@batch.SourceSystem</td>
-                                        <td>@batch.Status</td>
-                                        <td>@batch.RowCount</td>
+                                        <td class="small">@batch.SourceSystem</td>
+                                        <td class="small">@batch.Status</td>
+                                        <td class="text-end small">@batch.RowCount</td>
                                     </tr>
                                 }
                             </tbody>
@@ -266,14 +303,14 @@
 
         <div class="col-lg-6">
             <div class="card">
-                <div class="card-header">Largest Outstanding Balances</div>
+                <div class="card-header bg-transparent fw-semibold py-3">Largest Outstanding Balances</div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-sm mb-0">
+                        <table class="table table-sm align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Beneficiary</th>
-                                    <th class="text-end">Outstanding</th>
+                                    <th class="small">Recipient</th>
+                                    <th class="text-end small">Outstanding</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -282,15 +319,15 @@
                                     @foreach (var balance in Model.OutstandingBeneficiaryBalances)
                                     {
                                         <tr>
-                                            <td>@balance.BeneficiaryName</td>
-                                            <td class="text-end">@balance.OutstandingBalance.ToString("C")</td>
+                                            <td class="small">@balance.BeneficiaryName</td>
+                                            <td class="text-end fw-semibold small">@balance.OutstandingBalance.ToString("C")</td>
                                         </tr>
                                     }
                                 }
                                 else
                                 {
                                     <tr>
-                                        <td colspan="2" class="text-center text-muted py-3">No outstanding balances.</td>
+                                        <td colspan="2" class="text-center text-muted py-4 small">No outstanding balances.</td>
                                     </tr>
                                 }
                             </tbody>
